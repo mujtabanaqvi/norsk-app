@@ -32,51 +32,43 @@ export interface TranscriptEntry {
   timestamp: number;
 }
 
-// B1/B2 Oral Exam Evaluation structure stored in JSONB
-export interface ExamEvaluationCriterion {
-  score: number; // 1-5 or percentage
-  levelAchieved: 'Under B1' | 'B1' | 'B2' | 'Over B2';
-  feedback: string;
-  evidence: string[];
+// Criterion Score structure
+export interface CriterionScore {
+  score: number; // 1-10
+  feedbackNo: string;
+  feedbackEn: string;
 }
 
+// Concrete improvement correction
+export interface ConcreteCorrection {
+  originalQuote: string;
+  correctedNorwegian: string;
+  grammarOrVocabRule: string;
+}
+
+// Candidate evaluation scorecard
 export interface CandidateEvaluation {
-  overallLevel: 'Under B1' | 'B1' | 'B2' | 'Over B2';
+  speakerRole: 'CANDIDATE_1' | 'CANDIDATE_2';
+  targetLevel: 'B1' | 'B2';
+  assessedLevel: 'Under B1' | 'B1' | 'B2' | 'Over B2';
   passedTargetLevel: boolean;
-  summary: string;
-  criteria: {
-    uttale: ExamEvaluationCriterion;
-    flyt: ExamEvaluationCriterion;
-    ordforrad: ExamEvaluationCriterion;
-    grammatikk: ExamEvaluationCriterion;
-    sammenheng: ExamEvaluationCriterion;
+  overallSummaryNo: string;
+  overallSummaryEn: string;
+  criteriaScores: {
+    formidlingOgFlyt: CriterionScore;
+    uttaleOgForstaelighet: CriterionScore;
+    ordforrad: CriterionScore;
+    grammatikkOgSetningsstruktur: CriterionScore;
   };
-  keyCorrections: Array<{
-    candidateSaid: string;
-    correction: string;
-    explanation: string;
-  }>;
+  concreteCorrections: ConcreteCorrection[];
 }
 
+// Complete post-exam evaluation stored in JSONB
 export interface ExamEvaluation {
-  overallLevel?: 'Under B1' | 'B1' | 'B2' | 'Over B2';
-  passedTargetLevel?: boolean;
-  summary?: string;
-  criteria?: {
-    uttale: ExamEvaluationCriterion;
-    flyt: ExamEvaluationCriterion;
-    ordforrad: ExamEvaluationCriterion;
-    grammatikk: ExamEvaluationCriterion;
-    sammenheng: ExamEvaluationCriterion;
-  };
-  keyCorrections?: Array<{
-    candidateSaid: string;
-    correction: string;
-    explanation: string;
-  }>;
-  candidate1?: CandidateEvaluation;
-  candidate2?: CandidateEvaluation;
-  evaluatedAt: string;
+  candidates: CandidateEvaluation[];
+  evaluatedAt?: string;
+  insufficientData?: boolean;
+  notes?: string;
 }
 
 /**
