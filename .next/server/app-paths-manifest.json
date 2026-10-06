@@ -1,8 +1,0 @@
-{
-  "/api/exam/[sessionId]/route": "app/api/exam/[sessionId]/route.js",
-  "/api/exam/start/route": "app/api/exam/start/route.js",
-  "/api/webhooks/agent-complete/route": "app/api/webhooks/agent-complete/route.js",
-  "/api/quota/route": "app/api/quota/route.js",
-  "/_not-found/page": "app/_not-found/page.js",
-  "/page": "app/page.js"
-}
