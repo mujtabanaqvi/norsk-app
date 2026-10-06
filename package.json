@@ -1,7 +1,7 @@
 {
   "name": "norsk-app-control-plane",
   "version": "1.0.0",
-  "private": true,
+  "main": "index.js",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -15,10 +15,14 @@
     "db:seed": "tsx src/db/seed.ts",
     "agent:download-files": "tsx src/agent/worker.ts download-files",
     "agent:dev": "tsx watch src/agent/worker.ts dev",
-    "agent:start": "tsx src/agent/worker.ts start"
+    "agent:start": "tsx src/agent/worker.ts start",
+    "mobile:start": "expo start",
+    "mobile:android": "expo run:android",
+    "mobile:ios": "expo run:ios"
   },
   "dependencies": {
     "@ai-sdk/openai": "^4.0.84",
+    "@expo/metro-runtime": "~57.0.16",
     "@livekit/agents": "^1.9.1",
     "@livekit/agents-plugin-deepgram": "^1.9.1",
     "@livekit/agents-plugin-elevenlabs": "^1.9.1",
@@ -30,30 +34,35 @@
     "@neondatabase/serverless": "^1.2.0",
     "@react-navigation/native": "^7.5.0",
     "@react-navigation/native-stack": "^7.20.0",
-    "@types/react-native": "^0.72.8",
     "@types/ws": "^8.18.2",
     "ai": "^7.0.128",
     "drizzle-orm": "^0.45.3",
+    "expo": "^57.0.27",
+    "expo-dev-client": "~57.0.19",
     "livekit-client": "^2.22.3",
     "livekit-server-sdk": "^2.10.1",
     "next": "^16.3.8",
     "openai": "^4.83.0",
     "pg": "^8.13.1",
     "postgres": "^3.4.5",
-    "react": "^19.0.0",
-    "react-dom": "^19.0.0",
-    "react-native": "^0.87.1",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
+    "react-native-web": "^0.21.2",
     "ws": "^8.22.0",
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@livekit/react-native-expo-plugin": "^1.0.3",
     "@types/node": "^22.13.1",
     "@types/pg": "^8.11.11",
-    "@types/react": "^19.0.8",
-    "@types/react-dom": "^19.0.3",
+    "@types/react": "~19.2.4",
+    "@types/react-dom": "~19.2.3",
     "dotenv": "^16.4.7",
     "drizzle-kit": "^0.31.11",
-    "typescript": "^5.7.3"
+    "typescript": "~6.0.3"
   },
   "overrides": {
     "esbuild": "^0.25.12",

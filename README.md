@@ -98,6 +98,15 @@ npm test
 ```
 All 29 tests verify the voice worker, schema, API endpoints, evaluation engine, and screen results.
 
+### Step 8: Run the Mobile Client with Expo
+Start the Expo Metro bundler (Terminal 4):
+```bash
+npm run mobile:start
+```
+- Press `a` in the terminal to launch on a running Android emulator or connected device.
+- Or run `npm run mobile:android` to build and run the native Android development client.
+- Or scan the terminal QR code using Expo Go / Development Build on your phone.
+
 ---
 
 ## Repository Structure

@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Norskprøven Muntlig",
+    "slug": "norsk-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "no.norskapp.muntlig",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Norskprøven muntlig simulator trenger tilgang til mikrofonen for å vurdere din muntlige uttale og flyt."
+      }
+    },
+    "android": {
+      "package": "no.norskapp.muntlig",
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
+    },
+    "plugins": [
+      "@livekit/react-native-expo-plugin"
+    ]
+  }
+}

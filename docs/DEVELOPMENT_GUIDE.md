@@ -119,11 +119,19 @@ All 29 tests will execute across:
 - `tests/evaluate-exam.test.ts`: HK-dir rubric evaluation and fallback handling.
 - `tests/exam-results.test.ts`: Polling states, dual-candidate tabs, and metric calculation.
 
-### Step 8: Client Mobile Screens Integration
-The React Native client screens live in `src/screens/`:
-- `ExamSetupScreen.tsx`: Point `EXPO_PUBLIC_API_URL` to your Next.js host (e.g. `http://localhost:3000` or local IP if testing on physical devices).
-- `ExamRoomScreen.tsx`: Connects to LiveKit via the token returned by `/api/exam/start`.
-- `ExamResultsScreen.tsx`: Displays the scorecard returned by `/api/exam/[sessionId]/results`.
+### Step 8: Run the Mobile Client with Expo
+The React Native client screens are wired with Expo via `App.tsx` and `index.js`:
+- Point `EXPO_PUBLIC_API_URL` in `.env.local` to your Next.js host:
+  - `http://localhost:3000` for iOS simulator or local web.
+  - `http://10.0.2.2:3000` for Android emulator.
+  - `http://192.168.x.x:3000` for a physical phone on your local Wi-Fi.
+
+In **Terminal 4**, start Expo:
+```bash
+npm run mobile:start
+```
+- Press `a` to open in Android emulator / connected device.
+- Or run `npm run mobile:android` to build and launch with Expo.
 
 ---
 
@@ -138,6 +146,9 @@ The React Native client screens live in `src/screens/`:
 | `npm run agent:download-files` | Download VAD Weights | Fetches Silero VAD weights for `@livekit/agents`. |
 | `npm run agent:dev` | Agent Worker (Dev) | Runs `src/agent/worker.ts` with `tsx watch` for auto-reloading. |
 | `npm run agent:start` | Agent Worker (Prod)| Runs `src/agent/worker.ts` in production mode. |
+| `npm run mobile:start` | Expo Start | Starts the Expo Metro development server with QR code. |
+| `npm run mobile:android`| Expo Android Build| Builds and launches the native Android development client. |
+| `npm run mobile:ios` | Expo iOS Build | Builds and launches the native iOS development client (macOS). |
 | `npm run db:push` | Drizzle Push | Directly pushes `src/db/schema.ts` to PostgreSQL. |
 | `npm run db:generate` | Drizzle Generate | Generates new SQL migration files in `drizzle/`. |
 | `npm run db:migrate` | Drizzle Migrate | Executes pending SQL migration files. |

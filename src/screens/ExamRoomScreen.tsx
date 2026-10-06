@@ -32,8 +32,17 @@ import type {
   ExamStage,
 } from '../types/exam';
 
-// Ensure WebRTC globals are registered for React Native
-registerGlobals();
+// Ensure WebRTC globals are registered for React Native (when native WebRTC binary is present)
+if (Platform.OS !== 'web') {
+  try {
+    registerGlobals();
+  } catch (error) {
+    console.warn(
+      '[LiveKit] Native WebRTC module not found (Expo Go sandbox detected). For live mic WebRTC in mobile, use an Expo Development Build: npx expo run:android or npx expo run:ios.',
+      error
+    );
+  }
+}
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
