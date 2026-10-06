@@ -266,7 +266,7 @@ export default defineAgent({
     // 5. State tracking
     let currentSpeaker: 'examiner' | 'co_candidate' = 'examiner';
     let isPassiveModerator = false;
-    let passiveModeratorTimer: NodeJS.Timeout | null = null;
+    let passiveModeratorTimer: ReturnType<typeof setTimeout> | null = null;
     let lastUserSpeakerId: string | null = null;
 
     const transcriptEntries: TranscriptEntry[] = [];
