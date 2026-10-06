@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
-import { db } from '@/db';
-import { userQuotas } from '@/db/schema';
+import { db } from '@/src/db';
+import { userQuotas } from '@/src/db/schema';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 const topUpSchema = z.object({
@@ -23,19 +23,23 @@ export async function GET(req: NextRequest) {
     if (!quota) {
       return NextResponse.json({
         userId: user.userId,
-        remainingSeconds: 0,
+        remainingAudioSeconds: 1800,
+        remainingSeconds: 1800,
+        totalLlmTokensUsed: 0,
         totalTokensUsed: 0,
         totalCostUsd: '0.000000',
-        hasSufficientQuotaForExam: false,
+        hasSufficientQuotaForExam: true,
       });
     }
 
     return NextResponse.json({
       userId: quota.userId,
-      remainingSeconds: quota.remainingSeconds,
-      totalTokensUsed: quota.totalTokensUsed,
+      remainingAudioSeconds: quota.remainingAudioSeconds,
+      remainingSeconds: quota.remainingAudioSeconds,
+      totalLlmTokensUsed: quota.totalLlmTokensUsed,
+      totalTokensUsed: quota.totalLlmTokensUsed,
       totalCostUsd: quota.totalCostUsd,
-      hasSufficientQuotaForExam: quota.remainingSeconds > 180,
+      hasSufficientQuotaForExam: quota.remainingAudioSeconds >= 180,
     });
   } catch (error) {
     if (error instanceof AuthenticationError) {
@@ -65,16 +69,15 @@ export async function POST(req: NextRequest) {
       .insert(userQuotas)
       .values({
         userId: user.userId,
-        remainingSeconds: additionalSeconds,
-        totalTokensUsed: 0,
+        remainingAudioSeconds: 1800 + additionalSeconds,
+        totalLlmTokensUsed: 0,
         totalCostUsd: '0.000000',
-        createdAt: new Date(),
         updatedAt: new Date(),
       })
       .onConflictDoUpdate({
         target: userQuotas.userId,
         set: {
-          remainingSeconds: sql`${userQuotas.remainingSeconds} + ${additionalSeconds}`,
+          remainingAudioSeconds: sql`${userQuotas.remainingAudioSeconds} + ${additionalSeconds}`,
           updatedAt: new Date(),
         },
       })
@@ -83,7 +86,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       userId: updated.userId,
-      remainingSeconds: updated.remainingSeconds,
+      remainingAudioSeconds: updated.remainingAudioSeconds,
+      remainingSeconds: updated.remainingAudioSeconds,
     });
   } catch (error) {
     if (error instanceof AuthenticationError) {
@@ -92,4 +96,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
-

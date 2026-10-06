@@ -1,8 +1,33 @@
-import dotenv from 'dotenv';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import { drizzle } from 'drizzle-orm/neon-serverless';
+import ws from 'ws';
+import * as dotenv from 'dotenv';
+import * as schema from './schema';
+
 dotenv.config({ path: '.env.local' });
 
-import { db, pool } from '../../db/index';
+// Configure WebSocket constructor for Neon interactive transactions in Node.js
+neonConfig.webSocketConstructor = ws;
 
-export { db, pool };
+const connectionString =
+  process.env.DIRECT_DATABASE_URL ||
+  process.env.DATABASE_URL ||
+  'postgresql://postgres:postgres@localhost:5432/norsk_app';
+
+declare global {
+  // eslint-disable-next-line no-var
+  var _neonPool: Pool | undefined;
+}
+
+export const pool =
+  global._neonPool ||
+  new Pool({
+    connectionString,
+  });
+
+if (process.env.NODE_ENV !== 'production') {
+  global._neonPool = pool;
+}
+
+export const db = drizzle(pool, { schema });
 export default db;
-

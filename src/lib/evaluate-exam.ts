@@ -4,7 +4,17 @@ dotenv.config({ path: '.env.local' });
 import OpenAI from 'openai';
 import { eq } from 'drizzle-orm';
 import { db } from '../db/index';
-import { examSessions, ExamEvaluation, TranscriptEntry } from '../db/schema';
+import { examSessions, examTopics, ExamEvaluation, TranscriptEntry } from '../db/schema';
+
+export interface EvaluationResult {
+  evaluation: ExamEvaluation;
+  usage: {
+    promptTokens: number;
+    completionTokens: number;
+    model: string;
+    costUsd: string;
+  };
+}
 
 /**
  * Official HK-dir Norskprøven Muntlig B1/B2 Evaluation Prompt
@@ -68,27 +78,34 @@ Returner et strukturert JSON-objekt med nøyaktig følgende skjema:
  * Directly grades the exam session transcript stored in Neon using OpenAI gpt-4o,
  * persists the resulting evaluation JSON directly into examSessions, and returns it.
  */
-export async function evaluateExamSession(sessionId: string): Promise<ExamEvaluation> {
+export async function evaluateExamSession(sessionId: string): Promise<EvaluationResult> {
   console.log(`[Evaluation] Starting direct evaluation for exam session ${sessionId}`);
 
-  const [session] = await db
-    .select()
+  const [row] = await db
+    .select({
+      session: examSessions,
+      topic: examTopics,
+    })
     .from(examSessions)
+    .leftJoin(examTopics, eq(examSessions.topicId, examTopics.id))
     .where(eq(examSessions.id, sessionId))
     .limit(1);
 
-  if (!session) {
+  if (!row || !row.session) {
     throw new Error(`Exam session with ID "${sessionId}" not found.`);
   }
 
+  const session = row.session;
   const transcript = (session.transcriptJson as TranscriptEntry[]) || [];
   const level = session.level as 'B1' | 'B2';
-  const topic = session.topic;
+  const topicTitle = row.topic?.titleNo || 'Norsk muntlig eksamen';
 
-  // Filter candidate utterances (including CANDIDATE_1 and CANDIDATE_2 for HUMAN_LOCAL)
+  // Filter candidate utterances
   const candidateUtterances = transcript.filter(
     (t) =>
-      t.role === 'user' ||
+      t.role === 'CANDIDATE_1' ||
+      t.role === 'CANDIDATE_2' ||
+      (t.role as string) === 'user' ||
       t.speaker === 'candidate' ||
       t.speaker === 'CANDIDATE_1' ||
       t.speaker === 'CANDIDATE_2'
@@ -113,13 +130,24 @@ export async function evaluateExamSession(sessionId: string): Promise<ExamEvalua
 
     await db
       .update(examSessions)
-      .set({ evaluationJson: emptyEvaluation, updatedAt: new Date() })
+      .set({ evaluationJson: emptyEvaluation })
       .where(eq(examSessions.id, sessionId));
 
-    return emptyEvaluation;
+    return {
+      evaluation: emptyEvaluation,
+      usage: {
+        promptTokens: 0,
+        completionTokens: 0,
+        model: 'gpt-4o',
+        costUsd: '0.000000',
+      },
+    };
   }
 
   let evaluation: ExamEvaluation;
+  let promptTokens = 0;
+  let completionTokens = 0;
+  let costUsd = '0.000000';
   const apiKey = process.env.OPENAI_API_KEY;
 
   if (apiKey && apiKey !== 'sk-xxxxxxx' && !apiKey.startsWith('sk-placeholder')) {
@@ -135,11 +163,16 @@ export async function evaluateExamSession(sessionId: string): Promise<ExamEvalua
         { role: 'system', content: SYSTEM_PROMPT },
         {
           role: 'user',
-          content: `Målnivå: ${level}\nTema: ${topic}\n\nTranskripsjon:\n${transcriptText}`,
+          content: `Målnivå: ${level}\nTema: ${topicTitle}\n\nTranskripsjon:\n${transcriptText}`,
         },
       ],
       temperature: 0.2,
     });
+
+    promptTokens = completion.usage?.prompt_tokens ?? 0;
+    completionTokens = completion.usage?.completion_tokens ?? 0;
+    const estCost = promptTokens * (2.5 / 1_000_000) + completionTokens * (10.0 / 1_000_000);
+    costUsd = estCost.toFixed(6);
 
     const rawJson = completion.choices[0]?.message?.content || '{}';
     const parsed = JSON.parse(rawJson);
@@ -159,10 +192,14 @@ export async function evaluateExamSession(sessionId: string): Promise<ExamEvalua
     const passed = totalWords >= 40;
     const achieved = passed ? (level === 'B2' ? 'B2' : 'B1') : 'Under B1';
 
+    promptTokens = 450;
+    completionTokens = 250;
+    costUsd = (450 * (2.5 / 1_000_000) + 250 * (10.0 / 1_000_000)).toFixed(6);
+
     evaluation = {
       overallLevel: achieved,
       passedTargetLevel: passed,
-      summary: `Kandidaten gjennomførte en muntlig prøve om temaet "${topic}" på målnivå ${level}. Kandidaten produserte ${totalWords} ord fordelt på ${candidateUtterances.length} ytringer.`,
+      summary: `Kandidaten gjennomførte en muntlig prøve om temaet "${topicTitle}" på målnivå ${level}. Kandidaten produserte ${totalWords} ord fordelt på ${candidateUtterances.length} ytringer.`,
       criteria: {
         uttale: {
           score: passed ? 4 : 2,
@@ -211,11 +248,17 @@ export async function evaluateExamSession(sessionId: string): Promise<ExamEvalua
     .update(examSessions)
     .set({
       evaluationJson: evaluation,
-      updatedAt: new Date(),
     })
     .where(eq(examSessions.id, sessionId));
 
   console.log(`[Evaluation] Direct Neon evaluation persisted for session ${sessionId}`);
-  return evaluation;
+  return {
+    evaluation,
+    usage: {
+      promptTokens,
+      completionTokens,
+      model: 'gpt-4o',
+      costUsd,
+    },
+  };
 }
-

@@ -1,5 +1,5 @@
 {
-  "id": "8db0a6e5-c747-4a68-9928-9fcd61d2d324",
+  "id": "cb2983d2-3981-4570-8346-c53ec8fdbde3",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -17,13 +17,19 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "varchar(255)",
+          "type": "varchar(128)",
           "primaryKey": false,
           "notNull": true
         },
+        "topic_id": {
+          "name": "topic_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
         "level": {
           "name": "level",
-          "type": "exam_level",
+          "type": "cefr_level",
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true
@@ -32,12 +38,6 @@
           "name": "co_candidate_mode",
           "type": "co_candidate_mode",
           "typeSchema": "public",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "topic": {
-          "name": "topic",
-          "type": "text",
           "primaryKey": false,
           "notNull": true
         },
@@ -61,19 +61,18 @@
           "primaryKey": false,
           "notNull": false
         },
-        "created_at": {
-          "name": "created_at",
+        "started_at": {
+          "name": "started_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
           "notNull": true,
           "default": "now()"
         },
-        "updated_at": {
-          "name": "updated_at",
+        "completed_at": {
+          "name": "completed_at",
           "type": "timestamp with time zone",
           "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "notNull": false
         }
       },
       "indexes": {
@@ -107,11 +106,11 @@
           "method": "btree",
           "with": {}
         },
-        "idx_exam_sessions_created_at": {
-          "name": "idx_exam_sessions_created_at",
+        "idx_exam_sessions_topic_id": {
+          "name": "idx_exam_sessions_topic_id",
           "columns": [
             {
-              "expression": "created_at",
+              "expression": "topic_id",
               "isExpression": false,
               "asc": true,
               "nulls": "last"
@@ -123,9 +122,102 @@
           "with": {}
         }
       },
-      "foreignKeys": {},
+      "foreignKeys": {
+        "exam_sessions_topic_id_exam_topics_id_fk": {
+          "name": "exam_sessions_topic_id_exam_topics_id_fk",
+          "tableFrom": "exam_sessions",
+          "tableTo": "exam_topics",
+          "columnsFrom": [
+            "topic_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "no action",
+          "onUpdate": "no action"
+        }
+      },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.exam_topics": {
+      "name": "exam_topics",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "slug": {
+          "name": "slug",
+          "type": "varchar(100)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title_no": {
+          "name": "title_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "level": {
+          "name": "level",
+          "type": "cefr_level",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "monologue_prompt_no": {
+          "name": "monologue_prompt_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discussion_prompt_no": {
+          "name": "discussion_prompt_no",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "follow_up_questions_no": {
+          "name": "follow_up_questions_no",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_active": {
+          "name": "is_active",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "exam_topics_slug_unique": {
+          "name": "exam_topics_slug_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "slug"
+          ]
+        }
+      },
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -149,7 +241,20 @@
         },
         "user_id": {
           "name": "user_id",
-          "type": "varchar(255)",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "usage_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "llm_model": {
+          "name": "llm_model",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
@@ -179,14 +284,13 @@
           "type": "numeric(10, 2)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'0.00'"
+          "default": "'0'"
         },
         "estimated_cost_usd": {
           "name": "estimated_cost_usd",
-          "type": "numeric(12, 6)",
+          "type": "numeric(10, 6)",
           "primaryKey": false,
-          "notNull": true,
-          "default": "'0.000000'"
+          "notNull": true
         },
         "created_at": {
           "name": "created_at",
@@ -255,37 +359,44 @@
       "columns": {
         "user_id": {
           "name": "user_id",
-          "type": "varchar(255)",
+          "type": "varchar(128)",
           "primaryKey": true,
           "notNull": true
         },
-        "remaining_seconds": {
-          "name": "remaining_seconds",
+        "remaining_audio_seconds": {
+          "name": "remaining_audio_seconds",
           "type": "integer",
           "primaryKey": false,
           "notNull": true,
-          "default": 0
+          "default": 1800
         },
-        "total_tokens_used": {
-          "name": "total_tokens_used",
+        "total_llm_tokens_used": {
+          "name": "total_llm_tokens_used",
           "type": "bigint",
           "primaryKey": false,
           "notNull": true,
           "default": 0
         },
+        "total_tts_characters_used": {
+          "name": "total_tts_characters_used",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 0
+        },
+        "total_stt_seconds_used": {
+          "name": "total_stt_seconds_used",
+          "type": "numeric(10, 2)",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'0'"
+        },
         "total_cost_usd": {
           "name": "total_cost_usd",
-          "type": "numeric(12, 6)",
+          "type": "numeric(10, 6)",
           "primaryKey": false,
           "notNull": true,
-          "default": "'0.000000'"
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
+          "default": "'0'"
         },
         "updated_at": {
           "name": "updated_at",
@@ -305,6 +416,14 @@
     }
   },
   "enums": {
+    "public.cefr_level": {
+      "name": "cefr_level",
+      "schema": "public",
+      "values": [
+        "B1",
+        "B2"
+      ]
+    },
     "public.co_candidate_mode": {
       "name": "co_candidate_mode",
       "schema": "public",
@@ -313,20 +432,21 @@
         "HUMAN_LOCAL"
       ]
     },
-    "public.exam_level": {
-      "name": "exam_level",
-      "schema": "public",
-      "values": [
-        "B1",
-        "B2"
-      ]
-    },
     "public.session_status": {
       "name": "session_status",
       "schema": "public",
       "values": [
         "ACTIVE",
-        "COMPLETED"
+        "COMPLETED",
+        "FAILED"
+      ]
+    },
+    "public.usage_source": {
+      "name": "usage_source",
+      "schema": "public",
+      "values": [
+        "REALTIME_VOICE_AGENT",
+        "POST_EXAM_RUBRIC_EVAL"
       ]
     }
   },

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
-import { db } from '@/db';
-import { examSessions } from '@/db/schema';
+import { db } from '@/src/db';
+import { examSessions, examTopics } from '@/src/db/schema';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 export async function GET(
@@ -16,15 +16,21 @@ export async function GET(
       return NextResponse.json({ error: 'sessionId is required' }, { status: 400 });
     }
 
-    const [session] = await db
-      .select()
+    const [row] = await db
+      .select({
+        session: examSessions,
+        topic: examTopics,
+      })
       .from(examSessions)
+      .leftJoin(examTopics, eq(examSessions.topicId, examTopics.id))
       .where(eq(examSessions.id, sessionId))
       .limit(1);
 
-    if (!session) {
+    if (!row || !row.session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
     }
+
+    const session = row.session;
 
     // Ensure users can only inspect their own exam sessions unless admin
     if (session.userId !== user.userId) {
@@ -36,12 +42,14 @@ export async function GET(
       userId: session.userId,
       level: session.level,
       coCandidateMode: session.coCandidateMode,
-      topic: session.topic,
+      topicId: session.topicId,
+      topicTitle: row.topic?.titleNo || null,
+      topic: row.topic ?? null,
       status: session.status,
       transcript: session.transcriptJson ?? [],
       evaluation: session.evaluationJson ?? null,
-      createdAt: session.createdAt,
-      updatedAt: session.updatedAt,
+      startedAt: session.startedAt,
+      completedAt: session.completedAt,
     });
   } catch (error) {
     if (error instanceof AuthenticationError) {
@@ -51,4 +59,3 @@ export async function GET(
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
-

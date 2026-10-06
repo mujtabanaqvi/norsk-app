@@ -372,7 +372,7 @@ export default defineAgent({
       if (chatMsg.role === 'assistant') {
         transcriptEntries.push({
           speaker: currentSpeaker,
-          role: currentSpeaker === 'examiner' ? 'examiner' : 'peer',
+          role: currentSpeaker === 'examiner' ? 'EXAMINER' : 'AI_COCANDIDATE',
           text: text.trim(),
           timestamp: chatMsg.createdAt || Date.now(),
         });
@@ -390,7 +390,7 @@ export default defineAgent({
 
         transcriptEntries.push({
           speaker: speakerName,
-          role: 'user',
+          role: speakerName === 'CANDIDATE_2' ? 'CANDIDATE_2' : 'CANDIDATE_1',
           text: text.trim(),
           timestamp: chatMsg.createdAt || Date.now(),
         });
@@ -439,6 +439,8 @@ export default defineAgent({
           id: crypto.randomUUID(),
           sessionId: metadata.sessionId,
           userId: metadata.userId,
+          source: 'REALTIME_VOICE_AGENT',
+          llmModel: 'gpt-4.1-mini',
           llmPromptTokens: summary.llmPromptTokens,
           llmCompletionTokens: summary.llmCompletionTokens,
           ttsCharacters: summary.ttsCharactersCount,
@@ -452,17 +454,20 @@ export default defineAgent({
           .insert(userQuotas)
           .values({
             userId: metadata.userId,
-            remainingSeconds: 0,
-            totalTokensUsed,
+            remainingAudioSeconds: Math.max(0, 1800 - secondsToDeduct),
+            totalLlmTokensUsed: totalTokensUsed,
+            totalTtsCharactersUsed: summary.ttsCharactersCount,
+            totalSttSecondsUsed: sttAudioSeconds.toFixed(2),
             totalCostUsd: estimatedCostUsd,
-            createdAt: new Date(),
             updatedAt: new Date(),
           })
           .onConflictDoUpdate({
             target: userQuotas.userId,
             set: {
-              remainingSeconds: sql`GREATEST(0, ${userQuotas.remainingSeconds} - ${secondsToDeduct})`,
-              totalTokensUsed: sql`${userQuotas.totalTokensUsed} + ${totalTokensUsed}`,
+              remainingAudioSeconds: sql`GREATEST(0, ${userQuotas.remainingAudioSeconds} - ${secondsToDeduct})`,
+              totalLlmTokensUsed: sql`${userQuotas.totalLlmTokensUsed} + ${totalTokensUsed}`,
+              totalTtsCharactersUsed: sql`${userQuotas.totalTtsCharactersUsed} + ${summary.ttsCharactersCount}`,
+              totalSttSecondsUsed: sql`(${userQuotas.totalSttSecondsUsed} + ${sttAudioSeconds.toFixed(2)}::numeric)`,
               totalCostUsd: sql`(${userQuotas.totalCostUsd} + ${estimatedCostUsd}::numeric)`,
               updatedAt: new Date(),
             },
@@ -474,7 +479,7 @@ export default defineAgent({
           .set({
             status: 'COMPLETED',
             transcriptJson: transcriptEntries,
-            updatedAt: new Date(),
+            completedAt: new Date(),
           })
           .where(eq(examSessions.id, metadata.sessionId));
       });

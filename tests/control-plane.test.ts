@@ -7,6 +7,7 @@ import { z } from 'zod';
 
 // Replicating endpoint validation schemas for isolated unit testing
 const startExamSchema = z.object({
+  userId: z.string().min(1),
   level: z.enum(['B1', 'B2']),
   coCandidateMode: z.enum(['AI_PEER', 'HUMAN_LOCAL']),
   topicId: z.string().min(1),
@@ -66,15 +67,24 @@ test('Topic Catalog: retrieves official B1 and B2 oral exam topics and supports 
   assert.ok(customTopic.topicPrompt.includes('B2'));
 });
 
-test('Validation: Start Exam Schema enforces B1/B2 and valid coCandidateMode', () => {
+test('Validation: Start Exam Schema enforces B1/B2, valid coCandidateMode, and userId', () => {
   const validPayload = {
+    userId: 'user_12345',
     level: 'B1',
     coCandidateMode: 'AI_PEER',
     topicId: 'kollektivtransport-gratis',
   };
   assert.equal(startExamSchema.safeParse(validPayload).success, true);
 
+  const missingUserId = {
+    level: 'B1',
+    coCandidateMode: 'AI_PEER',
+    topicId: 'kollektivtransport-gratis',
+  };
+  assert.equal(startExamSchema.safeParse(missingUserId).success, false);
+
   const invalidLevel = {
+    userId: 'user_12345',
     level: 'A2',
     coCandidateMode: 'AI_PEER',
     topicId: 'kollektivtransport-gratis',
@@ -82,6 +92,7 @@ test('Validation: Start Exam Schema enforces B1/B2 and valid coCandidateMode', (
   assert.equal(startExamSchema.safeParse(invalidLevel).success, false);
 
   const invalidMode = {
+    userId: 'user_12345',
     level: 'B2',
     coCandidateMode: 'REMOTE_HUMAN',
     topicId: 'kollektivtransport-gratis',
@@ -89,6 +100,7 @@ test('Validation: Start Exam Schema enforces B1/B2 and valid coCandidateMode', (
   assert.equal(startExamSchema.safeParse(invalidMode).success, false);
 
   const missingTopic = {
+    userId: 'user_12345',
     level: 'B2',
     coCandidateMode: 'HUMAN_LOCAL',
     topicId: '',
