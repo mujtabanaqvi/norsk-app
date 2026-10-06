@@ -38,7 +38,10 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/norsk_app
 | `npm run dev` | Starts local Next.js development server at `http://localhost:3000`. |
 | `npm run build` | Compiles Next.js production build and validates all TypeScript types. |
 | `npm run start` | Serves the compiled production build. |
-| `npx tsx --test tests/control-plane.test.ts` | Runs the Node.js test suite for validation and cost calculations. |
+| `npm test` | Runs the full unit test suite (control plane + voice agent worker tests). |
+| `npm run agent:dev` | Starts LiveKit Voice Agent worker in watch/dev mode (`src/agent/worker.ts`). |
+| `npm run agent:start` | Runs LiveKit Voice Agent worker in production mode. |
+| `npm run agent:download-files` | Pre-downloads required LiveKit model files. |
 | `npm run db:generate` | Inspects `db/schema.ts` and outputs a new SQL migration file to `drizzle/`. |
 | `npm run db:migrate` | Executes pending migrations against PostgreSQL. |
 | `npm run db:push` | Directly pushes schema changes into PostgreSQL (dev convenience). |

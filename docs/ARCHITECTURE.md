@@ -17,33 +17,32 @@ This document describes the architectural topology, service interactions, and li
 ┌────────────────────────────────────────────────────────┐
 │             Next.js 15 Control Plane                   │
 │   ├── /api/exam/start        (Session provision)       │
-│   ├── /api/webhooks/...      (Agent completion sync)   │
 │   ├── /api/exam/[sessionId]  (Result fetching)         │
-│   └── /api/quota             (Quota management)        │
+│   ├── /api/quota             (Quota management)        │
+│   └── /api/webhooks/...      (Optional external sync)  │
 └────────┬───────────────────────────┬───────────────────┘
          │                           │
          │ RoomServiceClient         │ Drizzle ORM
          │ AccessToken               │ PostgreSQL
          ▼                           ▼
-┌──────────────────┐        ┌──────────────────┐
-│  LiveKit Cloud   │        │    PostgreSQL    │
-│  (WebRTC SFU)    │        │  - user_quotas   │
-└────────▲─────────┘        │  - exam_sessions │
-         │                  │  - usage_ledger  │
-         │ Room Join        └──────────────────┘
-         │
-┌────────┴──────────────────────────┐
-│    LiveKit Agent Worker           │
-│  (Python / Node Voice Agent)      │
+┌──────────────────┐        ┌──────────────────────────────────────┐
+│  LiveKit Cloud   │        │     Neon PostgreSQL (Drizzle)        │
+│  (WebRTC SFU)    │        │  - user_quotas                       │
+└────────▲─────────┘        │  - exam_sessions                     │
+         │                  │  - usage_ledger                      │
+         │ WebRTC Audio     └──────────────────▲───────────────────┘
+         │ & DataPackets                       │
+┌────────┴──────────────────────────┐          │ Direct DB Transaction
+│ LiveKit Voice Agent Worker        │          │ on ctx.addShutdownCallback
+│ (src/agent/worker.ts)             │──────────┘ (ZERO HTTP Webhook Handshake)
+│  ├── ExaminerAgent (HK-dir Sensor)│
+│  ├── CoCandidateAgent (AI Peer)   │
+│  ├── Passive Moderator Mode       │
 │  ├── Deepgram Nova-3 (STT)        │
-│  ├── GPT-4.1-mini / GPT-4o-mini   │
-│  └── ElevenLabs Flash v2.5 (TTS)  │
-└────────────────┬──────────────────┘
-                 │
-                 │ 2. POST /api/webhooks/agent-complete
-                 │    (Bearer AGENT_WEBHOOK_SECRET)
-                 ▼
-     [Back to Next.js Control Plane]
+│  ├── GPT-4.1-mini (Conversation)  │
+│  ├── ElevenLabs Flash v2.5 (TTS)  │
+│  └── evaluateExamSession (GPT-4o) │
+└───────────────────────────────────┘
 ```
 
 ---

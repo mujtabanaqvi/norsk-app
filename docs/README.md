@@ -12,11 +12,12 @@ Welcome to the documentation for the **Norskprøven Muntlig B1/B2 Practice Simul
 | Document | Purpose |
 | :--- | :--- |
 | **[1. Architecture & System Flow](./ARCHITECTURE.md)** | High-level system design, LiveKit integration, and end-to-end sequence diagrams. |
-| **[2. Database Schema & Models](./DATABASE_SCHEMA.md)** | Drizzle ORM models (`user_quotas`, `exam_sessions`, `usage_ledger`), relations, and migration commands. |
-| **[3. API Reference](./API_REFERENCE.md)** | Specification of all Next.js API routes, headers, request/response payloads, and error codes. |
-| **[4. Billing, Costs & Quota Ledger](./BILLING_AND_USAGE.md)** | Pricing formulas for OpenAI GPT-4.1-mini, ElevenLabs Flash v2.5, Deepgram Nova-3, and atomic quota transactions. |
-| **[5. B1/B2 Rubric Evaluation Engine](./EXAM_RUBRIC_EVALUATION.md)** | HK-dir CEFR scoring criteria, prompt templates, JSON schema, and async execution lifecycle. |
-| **[6. Developer & Contributor Guide](./DEVELOPMENT_GUIDE.md)** | Local environment setup, running tests, generating migrations, and guidelines for adding new features. |
+| **[2. LiveKit Voice Agent Worker](./LIVEKIT_VOICE_AGENT.md)** | Voice agent (`src/agent/worker.ts`), dual-persona handoff, passive moderator, and zero-webhook Neon persistence. |
+| **[3. Database Schema & Models](./DATABASE_SCHEMA.md)** | Drizzle ORM models (`user_quotas`, `exam_sessions`, `usage_ledger`), relations, and migration commands. |
+| **[4. API Reference](./API_REFERENCE.md)** | Specification of all Next.js API routes, headers, request/response payloads, and error codes. |
+| **[5. Billing, Costs & Quota Ledger](./BILLING_AND_USAGE.md)** | Pricing formulas for OpenAI GPT-4.1-mini, ElevenLabs Flash v2.5, Deepgram Nova-3, and atomic quota transactions. |
+| **[6. B1/B2 Rubric Evaluation Engine](./EXAM_RUBRIC_EVALUATION.md)** | HK-dir CEFR scoring criteria, prompt templates, JSON schema, and async execution lifecycle. |
+| **[7. Developer & Contributor Guide](./DEVELOPMENT_GUIDE.md)** | Local environment setup, running tests, generating migrations, and guidelines for adding new features. |
 
 ---
 

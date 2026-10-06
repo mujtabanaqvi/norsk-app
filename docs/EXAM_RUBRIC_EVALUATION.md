@@ -18,29 +18,34 @@ The rubric evaluates five dimensions of spoken Norwegian:
 
 ---
 
-## 2. Evaluation Lifecycle & Asynchrony
+## 2. Evaluation Lifecycle & Execution Modes
 
+### Mode A: Direct In-Process Evaluation (`src/lib/evaluate-exam.ts`)
+Used by the in-repo LiveKit Voice Agent Worker (`src/agent/worker.ts`) upon room shutdown:
 ```
-[Agent Webhook Received]
+[Voice Agent ctx.addShutdownCallback()]
           │
           ▼
-[Atomic DB Transaction Commits]
+[Atomic DB Transaction Commits Usage & Transcript]
           │
-          ├─────────────────────────────────────────────┐
-          ▼                                             ▼
-[HTTP 200 Returned to Webhook]            [triggerB1B2Evaluation()]
-                                                        │
-                                                        ▼
-                                          [Extract candidate utterances]
-                                                        │
-                                                        ▼
-                                          [Call OpenAI GPT-4o-mini with JSON Schema]
-                                                        │
-                                                        ▼
-                                          [Save evaluation_json to exam_sessions]
+          ▼
+[evaluateExamSession(sessionId)]
+          │
+          ▼
+[Fetch exam session & candidate utterances from Neon]
+          │
+          ▼
+[Call OpenAI GPT-4o with HK-dir CEFR Rubric & JSON Schema]
+          │
+          ▼
+[Save evaluation_json directly to exam_sessions in Neon]
 ```
+- **Direct Database Access**: Queries and updates `exam_sessions` directly in Neon using Drizzle ORM without HTTP handshakes.
+- **Model**: OpenAI `gpt-4o` (temperature `0.2`, structured JSON output).
 
-- **Non-blocking Execution**: The rubric evaluation is invoked as a background promise without awaiting completion before responding to the agent worker webhook.
+### Mode B: Asynchronous Webhook Evaluation (`lib/evaluation.ts`)
+Used by the external HTTP webhook endpoint (`/api/webhooks/agent-complete`):
+- **Non-blocking Execution**: The rubric evaluation is invoked as a background promise without awaiting completion before responding to the agent worker webhook with `HTTP 200`.
 - **Resilience / Fallback**: If `OPENAI_API_KEY` is not present, the evaluator falls back to a deterministic rule-based evaluation that calculates utterance counts, vocabulary volume, and standard feedback, preventing timeouts or uncaught rejections.
 
 ---
