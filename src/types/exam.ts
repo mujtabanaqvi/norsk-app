@@ -151,3 +151,36 @@ export type RootStackParamList = {
   };
 };
 
+/**
+ * Usage ledger entry stored per exam session
+ */
+export interface UsageLedgerEntry {
+  id?: string;
+  sessionId: string;
+  userId: string;
+  source: 'REALTIME_VOICE_AGENT' | 'POST_EXAM_RUBRIC_EVAL' | string;
+  llmModel: string;
+  llmPromptTokens: number;
+  llmCompletionTokens: number;
+  ttsCharacters: number;
+  sttAudioSeconds: string | number;
+  estimatedCostUsd: string;
+  createdAt?: string | Date;
+}
+
+/**
+ * GET /api/exam/[sessionId]/results response payload
+ */
+export interface ExamResultsResponse {
+  status: ExamSessionStatus;
+  level: CefrLevel;
+  coCandidateMode: CoCandidateMode;
+  transcriptJson: TranscriptTurn[];
+  evaluationJson: ExamEvaluation | null;
+  usage: UsageLedgerEntry[];
+  topic: ExamTopic | null;
+  error?: string;
+  message?: string;
+}
+
+
