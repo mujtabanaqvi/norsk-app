@@ -1,104 +1,92 @@
-# B1/B2 Rubric Evaluation Engine
+# HK-dir B1/B2 Rubric Evaluation Engine
 
-The evaluation engine in [`lib/evaluation.ts`](../lib/evaluation.ts) grades candidate oral proficiency according to official **Direktoratet for høyere utdanning og kompetanse (HK-dir)** guidelines and the **Common European Framework of Reference for Languages (CEFR)**.
-
----
-
-## 1. Assessment Criteria
-
-The rubric evaluates five dimensions of spoken Norwegian:
-
-| Criterion | Norwegian Term | CEFR B1 Indicators | CEFR B2 Indicators |
-| :--- | :--- | :--- | :--- |
-| **Pronunciation** | *Uttale & Intonasjon* | Forståelig uttale; morsmålsaksent er merkbar, men hemmer sjelden forståelse. | Tydelig, naturlig intonasjon og god rytme. Lite anstrengende for samtalepartneren. |
-| **Fluency** | *Flyt & Turtaking* | Kan holde samtalen gående, men med enkelte pauser for å lete etter ord og planlegge ytringer. | God flyt med naturlig tempo; lite nøling og uanstrengt turtaking. |
-| **Vocabulary** | *Ordforråd* | Tilstrekkelig ordforråd til å uttrykke seg om kjente emner og hverdagssituasjoner. | Bredt og nyansert ordforråd; behersker faguttrykk, faste uttrykk og synonymer. |
-| **Grammar** | *Grammatikk* | Rimelig god kontroll over enkle setninger; feil med V2-regelen eller preposisjoner forekommer. | God beherskelse av leddsetninger, inversjon (V2-regelen), tempus og passivformer; få feil. |
-| **Coherence** | *Sammenheng & Oppgaveløsning* | Kan knytte sammen enkle ytringer med bindeord (*fordi*, *men*, *så*); besvarer oppgaven. | Strukturert argumentasjon med varierte tekstbindere (*dessuten*, *på den ene siden*); reflekterer over motargumenter. |
+The evaluation engine in [`src/lib/evaluate-exam.ts`](../src/lib/evaluate-exam.ts) grades candidate oral exam performance according to the official **Direktoratet for høyere utdanning og kompetanse (HK-dir)** assessment matrix and the **Common European Framework of Reference for Languages (CEFR)**.
 
 ---
 
-## 2. Evaluation Lifecycle & Execution Modes
+## 1. Assessment Criteria (1–10 Scale)
 
-### Mode A: Direct In-Process Evaluation (`src/lib/evaluate-exam.ts`)
-Used by the in-repo LiveKit Voice Agent Worker (`src/agent/worker.ts`) upon room shutdown:
-```
-[Voice Agent ctx.addShutdownCallback()]
-          │
-          ▼
-[Atomic DB Transaction Commits Usage & Transcript]
-          │
-          ▼
-[evaluateExamSession(sessionId)]
-          │
-          ▼
-[Fetch exam session & candidate utterances from Neon]
-          │
-          ▼
-[Call OpenAI GPT-4o with HK-dir CEFR Rubric & JSON Schema]
-          │
-          ▼
-[Save evaluation_json directly to exam_sessions in Neon]
-```
-- **Direct Database Access**: Queries and updates `exam_sessions` directly in Neon using Drizzle ORM without HTTP handshakes.
-- **Model**: OpenAI `gpt-4o` (temperature `0.2`, structured JSON output).
+The evaluator assesses four primary dimensions of spoken Norwegian on a 1–10 scale:
 
-### Mode B: Asynchronous Webhook Evaluation (`lib/evaluation.ts`)
-Used by the external HTTP webhook endpoint (`/api/webhooks/agent-complete`):
-- **Non-blocking Execution**: The rubric evaluation is invoked as a background promise without awaiting completion before responding to the agent worker webhook with `HTTP 200`.
-- **Resilience / Fallback**: If `OPENAI_API_KEY` is not present, the evaluator falls back to a deterministic rule-based evaluation that calculates utterance counts, vocabulary volume, and standard feedback, preventing timeouts or uncaught rejections.
+| Criterion | Key in Schema | Description & HK-dir Indicators |
+| :--- | :--- | :--- |
+| **Formidling og flyt** | `formidlingOgFlyt` | Spontan tale, talehastighet, pauselokasjon (planlegging vs leting etter ord), turtaking og evne til å holde samtalen i gang. |
+| **Uttale og forståelighet** | `uttaleOgForstaelighet` | Artikulasjon, setningsmelodi, norsk trykkplassering, intonasjon og grad av anstrengelse for samtalepartneren. |
+| **Ordforråd** | `ordforrad` | Variasjon, presisjon, faste uttrykk og samfunnsrelaterte begreper tilpasset temaet versus gjentakelser og overforenkling. |
+| **Grammatikk og setningsstruktur** | `grammatikkOgSetningsstruktur` | Kontroll over V2-regelen (inversjon), leddsetningsstruktur (*ikke* etter subjekt), bøyning av substantiv/adjektiv (kjønn/tall) og verbtempus. |
 
 ---
 
-## 3. Evaluation Schema Example
+## 2. Score & Level Mapping
 
-Stored in `exam_sessions.evaluation_json`:
+Each criterion receives:
+- `score`: Integer from 1 to 10.
+- `feedbackNo`: Detailed constructive feedback in Norwegian.
+- `feedbackEn`: Actionable feedback in English.
 
-```json
-{
-  "overallLevel": "B2",
-  "passedTargetLevel": true,
-  "summary": "Kandidaten viser god evne til å drøfte temaet nyansert og begrunne egne standpunkter. Ordforrådet er variert og setningsbygningen er for det meste presis.",
-  "criteria": {
-    "uttale": {
-      "score": 4,
-      "levelAchieved": "B2",
-      "feedback": "Klar artikulasjon og god norsk intonasjon.",
-      "evidence": ["Det er en stor fordel for miljøet..."]
-    },
-    "flyt": {
-      "score": 4,
-      "levelAchieved": "B2",
-      "feedback": "Spontan tale uten lange pauser.",
-      "evidence": []
-    },
-    "ordforrad": {
-      "score": 4,
-      "levelAchieved": "B2",
-      "feedback": "Presist ordvalg med gode samfunnsfaglige begreper.",
-      "evidence": ["subsidiering", "samfunnsøkonomisk"]
-    },
-    "grammatikk": {
-      "score": 3,
-      "levelAchieved": "B1",
-      "feedback": "Enkelte feil med V2-regelen etter innledende adverbial.",
-      "evidence": ["I går jeg dro... (bør være: I går dro jeg...)"]
-    },
-    "sammenheng": {
-      "score": 5,
-      "levelAchieved": "B2",
-      "feedback": "Svært god oppgaveløsning og naturlig samhandling.",
-      "evidence": []
-    }
-  },
-  "keyCorrections": [
-    {
-      "candidateSaid": "I går jeg så på nyhetene",
-      "correction": "I går så jeg på nyhetene",
-      "explanation": "V2-regelen: Verbet må stå på andreplass etter foranstilt tidsadverbial."
-    }
-  ],
-  "evaluatedAt": "2026-10-06T08:30:00.000Z"
+The candidate's `assessedLevel` is mapped as:
+- **`Under B1`**: Score generally below 5; frequent communication breakdown, fragmented sentences, severe V2 errors.
+- **`B1`**: Score 5–7; comprehensible pronunciation, able to participate in everyday debate, minor grammatical errors that do not impede understanding.
+- **`B2`**: Score 8–9; clear intonation, nuanced vocabulary, good command of subordinate clauses and complex argumentation.
+- **`Over B2`**: Score 10; near-native fluency, idiomatic mastery, spontaneous reasoning without lexical hesitation.
+
+`passedTargetLevel` is `true` if `assessedLevel` meets or exceeds `targetLevel`.
+
+---
+
+## 3. Concrete Corrections Structure
+
+The evaluator selects 5 to 8 specific quotes directly from the candidate's speech:
+
+```typescript
+interface ConcreteCorrection {
+  originalQuote: string;       // Exact quote from candidate utterance
+  correctedNorwegian: string;  // Corrected natural Bokmål phrasing
+  grammarOrVocabRule: string;  // Grammatical rule explanation in NO & EN
 }
 ```
 
+*Example:*
+```json
+{
+  "originalQuote": "I går jeg leste om mobilforbud...",
+  "correctedNorwegian": "I går leste jeg om mobilforbud...",
+  "grammarOrVocabRule": "V2-regelen: Når en setning starter med et tidsadverbial (i går), må det finitte verbet stå på andreplass (inversjon)."
+}
+```
+
+---
+
+## 4. Single-Candidate vs Dual-Candidate Modes
+
+- **`AI_PEER` Mode**: Evaluates 1 candidate (`speakerRole: 'CANDIDATE_1'`).
+- **`HUMAN_LOCAL` Mode**: Evaluates 2 candidates separately (`CANDIDATE_1` and `CANDIDATE_2`), generating distinct criteria scores, summaries, and concrete corrections for both participants.
+
+---
+
+## 5. Execution Lifecycle & Database Ingestion
+
+```
+[LiveKit Voice Worker Shutdown]
+              │
+              ▼
+[evaluateExamSession(sessionId)]
+              │
+              ├── 1. Read transcript & topic from Neon DB
+              │
+              ├── 2. Check for sufficient candidate speech (>= 10 words)
+              │      (If < 10 words, mark insufficientData: true)
+              │
+              ├── 3. Send transcript to OpenAI GPT-4o (or offline fallback)
+              │      (Structured output via Zod ExamEvaluationSchema)
+              │
+              ├── 4. Update exam_sessions.evaluation_json in Neon
+              │
+              ├── 5. Insert audit record in usage_ledger (source: 'POST_EXAM_RUBRIC_EVAL')
+              │
+              └── 6. Increment user_quotas.total_llm_tokens_used and total_cost_usd
+```
+
+- **Model**: OpenAI `gpt-4o` with temperature `0.2` and strict JSON schema output.
+- **Cost Tracking**: Evaluator tokens are audited in `usage_ledger` with model `gpt-4o` ($2.50 / 1M prompt, $10.00 / 1M completion).
+- **Offline / Sandbox Fallback**: If `OPENAI_API_KEY` is not present, the evaluator produces a deterministic rule-based evaluation report based on utterance counts and vocabulary metrics, ensuring seamless test execution.

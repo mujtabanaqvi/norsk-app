@@ -1,6 +1,6 @@
 # Database Schema & Models
 
-The database layer is managed using **PostgreSQL** and **Drizzle ORM** with TypeScript type generation.
+The database layer is managed using **PostgreSQL** (hosted on Neon Serverless) and **Drizzle ORM** with TypeScript type generation. The active schema is defined in [`src/db/schema.ts`](../src/db/schema.ts).
 
 ---
 
@@ -8,160 +8,196 @@ The database layer is managed using **PostgreSQL** and **Drizzle ORM** with Type
 
 ```mermaid
 erDiagram
+    exam_topics ||--o{ exam_sessions : "referenced_by"
     user_quotas ||--o{ exam_sessions : "starts"
     user_quotas ||--o{ usage_ledger : "billed_for"
     exam_sessions ||--o{ usage_ledger : "generates"
 
-    user_quotas {
-        varchar(255) user_id PK
-        integer remaining_seconds
-        bigint total_tokens_used
-        numeric(12,6) total_cost_usd
+    exam_topics {
+        uuid id PK
+        varchar slug UK
+        text title_no
+        cefr_level level "B1 | B2"
+        text monologue_prompt_no
+        text discussion_prompt_no
+        jsonb follow_up_questions_no
+        boolean is_active
         timestamp created_at
+    }
+
+    user_quotas {
+        varchar user_id PK
+        integer remaining_audio_seconds
+        bigint total_llm_tokens_used
+        bigint total_tts_characters_used
+        numeric total_stt_seconds_used
+        numeric total_cost_usd
         timestamp updated_at
     }
 
     exam_sessions {
         uuid id PK
-        varchar(255) user_id
-        exam_level level "B1 | B2"
+        varchar user_id
+        uuid topic_id FK
+        cefr_level level "B1 | B2"
         co_candidate_mode co_candidate_mode "AI_PEER | HUMAN_LOCAL"
-        text topic
-        session_status status "ACTIVE | COMPLETED"
+        session_status status "ACTIVE | COMPLETED | FAILED"
         jsonb transcript_json
         jsonb evaluation_json
-        timestamp created_at
-        timestamp updated_at
+        timestamp started_at
+        timestamp completed_at
     }
 
     usage_ledger {
         uuid id PK
         uuid session_id FK
-        varchar(255) user_id
+        varchar user_id
+        usage_source source "REALTIME_VOICE_AGENT | POST_EXAM_RUBRIC_EVAL"
+        varchar llm_model
         integer llm_prompt_tokens
         integer llm_completion_tokens
         integer tts_characters
-        numeric(10,2) stt_audio_seconds
-        numeric(12,6) estimated_cost_usd
+        numeric stt_audio_seconds
+        numeric estimated_cost_usd
         timestamp created_at
     }
 ```
 
 ---
 
-## 2. Table Specifications
+## 2. PostgreSQL Tables & Columns
 
-### 2.1 `user_quotas`
-Maintains user billing metrics and real-time seconds quota.
+### 2.1 `exam_topics`
+Catalog of official HK-dir B1 and B2 oral examination topics.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
-| `user_id` | `VARCHAR(255)` | `PRIMARY KEY` | Unique identifier of the candidate. |
-| `remaining_seconds` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Available oral practice seconds. Must be > 180 to start an exam. |
-| `total_tokens_used` | `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative LLM prompt + completion tokens consumed. |
-| `total_cost_usd` | `NUMERIC(12, 6)` | `NOT NULL`, `DEFAULT '0.000000'` | Cumulative estimated infrastructure cost in USD. |
-| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Creation timestamp. |
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique topic UUID. |
+| `slug` | `VARCHAR(100)` | `NOT NULL`, `UNIQUE` | URL-safe identifier (e.g. `'kollektivtransport-gratis'`). |
+| `title_no` | `TEXT` | `NOT NULL` | Official Norwegian title. |
+| `level` | `cefr_level` | `NOT NULL` | Target level (`'B1'` or `'B2'`). |
+| `monologue_prompt_no` | `TEXT` | `NOT NULL` | Prompt for Part 1 individual monologue. |
+| `discussion_prompt_no`| `TEXT` | `NOT NULL` | Prompt for Part 2 debate/discussion. |
+| `follow_up_questions_no`| `JSONB` | `NOT NULL`, `$type<string[]>` | Array of follow-up questions for Part 3. |
+| `is_active` | `BOOLEAN` | `NOT NULL`, `DEFAULT true` | Topic availability flag. |
+| `created_at` | `TIMESTAMPTZ`| `NOT NULL`, `DEFAULT now()` | Topic creation timestamp. |
+
+### 2.2 `user_quotas`
+Tracks candidate audio seconds balance and cumulative provider billing metrics.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `user_id` | `VARCHAR(128)` | `PRIMARY KEY` | Candidate user ID. |
+| `remaining_audio_seconds` | `INTEGER` | `NOT NULL`, `DEFAULT 1800` | Practice balance in seconds. Must be > 180 to start exam. |
+| `total_llm_tokens_used` | `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative LLM prompt + completion tokens. |
+| `total_tts_characters_used`| `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative synthesized characters via ElevenLabs. |
+| `total_stt_seconds_used` | `NUMERIC(10, 2)` | `NOT NULL`, `DEFAULT '0'` | Cumulative transcribed candidate speech seconds. |
+| `total_cost_usd` | `NUMERIC(10, 6)` | `NOT NULL`, `DEFAULT '0'` | Lifetime estimated cost across all providers. |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Last update timestamp. |
 
-### 2.2 `exam_sessions`
-Records each practice exam session, conversational transcript, and final B1/B2 rubric evaluation.
+### 2.3 `exam_sessions`
+Records each practice exam session, conversational transcript turns, and post-exam rubric scorecard.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
-| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique session identifier. |
-| `user_id` | `VARCHAR(255)` | `NOT NULL` | Owning user ID (indexed). |
-| `level` | `exam_level` | `NOT NULL` | Enum: `'B1'` or `'B2'`. |
-| `co_candidate_mode`| `co_candidate_mode` | `NOT NULL` | Enum: `'AI_PEER'` or `'HUMAN_LOCAL'`. |
-| `topic` | `TEXT` | `NOT NULL` | The exam topic title/question. |
-| `status` | `session_status` | `NOT NULL`, `DEFAULT 'ACTIVE'` | Enum: `'ACTIVE'` or `'COMPLETED'` (indexed). |
-| `transcript_json` | `JSONB` | `NULLABLE` | Full speaker-by-speaker transcript array. |
-| `evaluation_json` | `JSONB` | `NULLABLE` | Official B1/B2 evaluation rubric report. |
-| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Session creation timestamp (indexed). |
-| `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Last update timestamp. |
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique exam session identifier. |
+| `user_id` | `VARCHAR(128)` | `NOT NULL` | Owning candidate ID (indexed). |
+| `topic_id` | `UUID` | `NULLABLE`, `FK -> exam_topics(id)` | Associated exam topic (indexed). |
+| `level` | `cefr_level` | `NOT NULL` | Exam level (`'B1'` or `'B2'`). |
+| `co_candidate_mode` | `co_candidate_mode` | `NOT NULL` | `'AI_PEER'` or `'HUMAN_LOCAL'`. |
+| `status` | `session_status` | `NOT NULL`, `DEFAULT 'ACTIVE'` | `'ACTIVE'`, `'COMPLETED'`, or `'FAILED'` (indexed). |
+| `transcript_json` | `JSONB` | `NULLABLE`, `$type<TranscriptEntry[]>` | Full conversation transcript turns. |
+| `evaluation_json` | `JSONB` | `NULLABLE`, `$type<ExamEvaluation>` | Complete post-exam HK-dir evaluation. |
+| `started_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Session start timestamp. |
+| `completed_at` | `TIMESTAMPTZ` | `NULLABLE` | Session finish timestamp. |
 
-**Indexes**:
-- `idx_exam_sessions_user_id` on `user_id`
-- `idx_exam_sessions_status` on `status`
-- `idx_exam_sessions_created_at` on `created_at`
-
-### 2.3 `usage_ledger`
-Immutable audit log of all provider resource consumption per session.
+### 2.4 `usage_ledger`
+Granular audit records of resource consumption per session and source.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
-| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique ledger entry ID. |
-| `session_id` | `UUID` | `NOT NULL`, `FK -> exam_sessions(id) ON DELETE CASCADE` | Exam session reference (indexed). |
-| `user_id` | `VARCHAR(255)` | `NOT NULL` | User identifier (indexed). |
-| `llm_prompt_tokens`| `INTEGER` | `NOT NULL`, `DEFAULT 0` | Input tokens consumed by LLM. |
-| `llm_completion_tokens` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Output tokens generated by LLM. |
-| `tts_characters` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Text characters synthesized via ElevenLabs. |
-| `stt_audio_seconds`| `NUMERIC(10, 2)`| `NOT NULL`, `DEFAULT '0.00'` | Audio seconds transcribed via Deepgram. |
-| `estimated_cost_usd` | `NUMERIC(12, 6)`| `NOT NULL`, `DEFAULT '0.000000'` | Calculated total session cost in USD. |
-| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Timestamp of ingestion. |
-
-**Indexes**:
-- `idx_usage_ledger_session_id` on `session_id`
-- `idx_usage_ledger_user_id` on `user_id`
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique ledger record ID. |
+| `session_id` | `UUID` | `NOT NULL`, `FK -> exam_sessions(id) ON DELETE CASCADE` | Associated session (indexed). |
+| `user_id` | `VARCHAR(128)` | `NOT NULL` | Candidate user ID (indexed). |
+| `source` | `usage_source` | `NOT NULL` | `'REALTIME_VOICE_AGENT'` or `'POST_EXAM_RUBRIC_EVAL'`. |
+| `llm_model` | `VARCHAR(64)` | `NOT NULL` | Model name (e.g. `'gpt-4.1-mini'` or `'gpt-4o'`). |
+| `llm_prompt_tokens` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Input tokens consumed. |
+| `llm_completion_tokens` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Output tokens generated. |
+| `tts_characters` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Synthesized voice characters. |
+| `stt_audio_seconds` | `NUMERIC(10, 2)` | `NOT NULL`, `DEFAULT '0'` | Audio seconds processed. |
+| `estimated_cost_usd` | `NUMERIC(10, 6)` | `NOT NULL` | Calculated cost in USD for this record. |
+| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Audit timestamp. |
 
 ---
 
 ## 3. JSONB Data Structures
 
-### `TranscriptEntry` Schema (`exam_sessions.transcript_json`)
+### `TranscriptEntry` (`transcript_json`)
 ```typescript
 interface TranscriptEntry {
-  speaker: 'examiner' | 'co_candidate' | 'candidate' | string;
-  role: 'examiner' | 'peer' | 'user' | string;
+  speaker: string; // e.g. "Examiner", "Kandidat"
+  role: 'EXAMINER' | 'AI_COCANDIDATE' | 'CANDIDATE_1' | 'CANDIDATE_2';
   text: string;
-  timestamp: number; // Unix timestamp in milliseconds
+  timestamp: number; // Milliseconds Unix epoch
 }
 ```
 
-### `ExamEvaluation` Schema (`exam_sessions.evaluation_json`)
+### `ExamEvaluation` (`evaluation_json`)
 ```typescript
-interface ExamEvaluationCriterion {
-  score: number; // 1 to 5
-  levelAchieved: 'Under B1' | 'B1' | 'B2' | 'Over B2';
-  feedback: string;
-  evidence: string[];
+interface CriterionScore {
+  score: number; // 1 to 10 scale
+  feedbackNo: string;
+  feedbackEn: string;
+}
+
+interface ConcreteCorrection {
+  originalQuote: string;
+  correctedNorwegian: string;
+  grammarOrVocabRule: string;
+}
+
+interface CandidateEvaluation {
+  speakerRole: 'CANDIDATE_1' | 'CANDIDATE_2';
+  targetLevel: 'B1' | 'B2';
+  assessedLevel: 'Under B1' | 'B1' | 'B2' | 'Over B2';
+  passedTargetLevel: boolean;
+  overallSummaryNo: string;
+  overallSummaryEn: string;
+  criteriaScores: {
+    formidlingOgFlyt: CriterionScore;
+    uttaleOgForstaelighet: CriterionScore;
+    ordforrad: CriterionScore;
+    grammatikkOgSetningsstruktur: CriterionScore;
+  };
+  concreteCorrections: ConcreteCorrection[];
 }
 
 interface ExamEvaluation {
-  overallLevel: 'Under B1' | 'B1' | 'B2' | 'Over B2';
-  passedTargetLevel: boolean;
-  summary: string;
-  criteria: {
-    uttale: ExamEvaluationCriterion;     // Pronunciation & intonation
-    flyt: ExamEvaluationCriterion;       // Fluency & pausing
-    ordforrad: ExamEvaluationCriterion;  // Vocabulary range & precision
-    grammatikk: ExamEvaluationCriterion; // Grammar, V2 rule, subclauses
-    sammenheng: ExamEvaluationCriterion; // Interaction, turn-taking, coherence
-  };
-  keyCorrections: Array<{
-    candidateSaid: string;
-    correction: string;
-    explanation: string;
-  }>;
-  evaluatedAt: string; // ISO 8601 string
+  candidates: CandidateEvaluation[];
+  evaluatedAt?: string;
+  insufficientData?: boolean;
+  notes?: string;
 }
 ```
 
 ---
 
-## 4. Drizzle ORM Schema Migration Workflow
+## 4. Drizzle Configuration & Migration Commands
 
-1. **Schema Definition**: Edits are made in [`db/schema.ts`](../db/schema.ts).
-2. **Generate SQL Migration**:
-   ```bash
-   npm run db:generate
-   ```
-   Outputs migration files to `drizzle/*.sql`.
-3. **Execute Migrations Against PostgreSQL**:
-   ```bash
-   npm run db:migrate
-   ```
-4. **Direct Push (Development only)**:
-   ```bash
-   npm run db:push
-   ```
+The Drizzle configuration resides in `drizzle.config.ts`:
+```typescript
+export default defineConfig({
+  schema: './src/db/schema.ts',
+  out: './drizzle',
+  dialect: 'postgresql',
+  dbCredentials: {
+    url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || '',
+  },
+});
+```
 
+- **Push Schema**: `npm run db:push` (applies schema directly to database).
+- **Generate Migrations**: `npm run db:generate` (creates SQL migration files in `drizzle/`).
+- **Execute Migrations**: `npm run db:migrate` (runs pending migrations).
+- **Seed Database**: `npm run db:seed` (populates official topics and test user quota).
+- **Inspect DB in Browser**: `npm run db:studio` (opens Drizzle Studio).

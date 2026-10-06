@@ -9,10 +9,15 @@ dotenv.config({ path: '.env.local' });
 // Configure WebSocket constructor for Neon interactive transactions in Node.js
 neonConfig.webSocketConstructor = ws;
 
-const connectionString =
+const rawConnectionString =
   process.env.DIRECT_DATABASE_URL ||
   process.env.DATABASE_URL ||
   'postgresql://postgres:postgres@localhost:5432/norsk_app';
+
+const connectionString =
+  rawConnectionString.includes('sslmode=require') && !rawConnectionString.includes('uselibpqcompat=true')
+    ? rawConnectionString.replace('sslmode=require', 'sslmode=verify-full')
+    : rawConnectionString;
 
 declare global {
   // eslint-disable-next-line no-var

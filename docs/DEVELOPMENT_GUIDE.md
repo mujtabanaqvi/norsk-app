@@ -1,96 +1,173 @@
 # Developer & Contributor Guide
 
-This guide describes how to run the project locally, execute automated tests, add new features, and maintain database schema consistency.
+This guide describes how to configure, run, test, and contribute to the **Norskprøven Muntlig B1/B2 Practice Simulator**.
 
 ---
 
-## 1. Environment Variables Configuration
+## 1. Prerequisites
 
-Create a `.env.local` file based on `.env.example`:
+Before running the application locally, ensure you have:
+- **Node.js**: v20.x or later (v22 recommended).
+- **Package Manager**: `npm` (v10+).
+- **PostgreSQL**: Neon Serverless PostgreSQL instance (or local PostgreSQL 15+).
+- **LiveKit Cloud**: Account and project credentials (`LIVEKIT_URL`, `LIVEKIT_API_KEY`, `LIVEKIT_API_SECRET`).
+- **AI Provider Credentials**:
+  - **OpenAI**: API key with access to `gpt-4.1-mini` and `gpt-4o`.
+  - **Deepgram**: API key for Nova-3 Norwegian speech recognition.
+  - **ElevenLabs**: API key and Voice IDs for examiner sensor and peer candidate.
 
-```bash
-# LiveKit Cloud Configuration
+---
+
+## 2. Environment Variables Configuration
+
+Create a `.env.local` file in the root directory:
+
+```env
+# -------------------------------------------------------------
+# 1. LiveKit Cloud Configuration
+# -------------------------------------------------------------
 LIVEKIT_URL=wss://your-project.livekit.cloud
-LIVEKIT_API_KEY=APIxxxxxxx
-LIVEKIT_API_SECRET=xxxxxxxxxxxxxxxxx
+LIVEKIT_API_KEY=your_livekit_api_key
+LIVEKIT_API_SECRET=your_livekit_api_secret
 
-# AI Providers (Agent Worker + Next.js Rubric Evaluator)
-DEEPGRAM_API_KEY=dg_xxxxxxx
-ELEVEN_API_KEY=el_xxxxxxx
-ELEVEN_EXAMINER_VOICE_ID=voice_id_1
-ELEVEN_COCANDIDATE_VOICE_ID=voice_id_2
-OPENAI_API_KEY=sk-xxxxxxx
+# -------------------------------------------------------------
+# 2. AI Provider Credentials
+# -------------------------------------------------------------
+OPENAI_API_KEY=sk-your-openai-api-key
+DEEPGRAM_API_KEY=your-deepgram-api-key
+ELEVEN_API_KEY=your-elevenlabs-api-key
+ELEVEN_EXAMINER_VOICE_ID=voice_id_examiner
+ELEVEN_COCANDIDATE_VOICE_ID=voice_id_cocandidate
 
-# Internal Webhook Security (LiveKit Agent -> Next.js Usage Sync)
-NextJS_CONTROL_PLANE_URL=http://localhost:3000
-AGENT_WEBHOOK_SECRET=super_secret_shared_token
+# -------------------------------------------------------------
+# 3. PostgreSQL Database Connection (Neon Serverless)
+# -------------------------------------------------------------
+# Pooled connection string (for Next.js serverless route handlers)
+DATABASE_URL=postgresql://user:password@ep-sample-pooler.eu-central-1.aws.neon.tech/norsk_app?sslmode=require
 
-# PostgreSQL Connection String
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/norsk_app
+# Direct connection string (for Drizzle migrations & DDL operations)
+DIRECT_DATABASE_URL=postgresql://user:password@ep-sample.eu-central-1.aws.neon.tech/norsk_app?sslmode=require
+
+# -------------------------------------------------------------
+# 4. Optional Mobile Client Configuration
+# -------------------------------------------------------------
+EXPO_PUBLIC_API_URL=http://localhost:3000
 ```
 
 ---
 
-## 2. Common Scripts
+## 3. Step-by-Step Local Run Sequence
 
-| Command | Action |
-| :--- | :--- |
-| `npm run dev` | Starts local Next.js development server at `http://localhost:3000`. |
-| `npm run build` | Compiles Next.js production build and validates all TypeScript types. |
-| `npm run start` | Serves the compiled production build. |
-| `npm test` | Runs the full unit test suite (control plane + voice agent worker tests). |
-| `npm run agent:dev` | Starts LiveKit Voice Agent worker in watch/dev mode (`src/agent/worker.ts`). |
-| `npm run agent:start` | Runs LiveKit Voice Agent worker in production mode. |
-| `npm run agent:download-files` | Pre-downloads required LiveKit model files. |
-| `npm run db:generate` | Inspects `db/schema.ts` and outputs a new SQL migration file to `drizzle/`. |
-| `npm run db:migrate` | Executes pending migrations against PostgreSQL. |
-| `npm run db:push` | Directly pushes schema changes into PostgreSQL (dev convenience). |
+To start the simulator locally, follow this exact sequence:
+
+### Step 1: Install Dependencies
+```bash
+npm install
+```
+
+### Step 2: Push Database Schema
+Push the Drizzle ORM schema (`src/db/schema.ts`) to your PostgreSQL database:
+```bash
+npm run db:push
+```
+*Note: This creates the enum types (`cefr_level`, `co_candidate_mode`, `session_status`, `usage_source`) and tables (`exam_topics`, `user_quotas`, `exam_sessions`, `usage_ledger`).*
+
+### Step 3: Seed Database Topics & Candidate Quota
+Seed official HK-dir B1 and B2 exam topics and create an initial test user with 1800 seconds (30 minutes) of practice quota:
+```bash
+npm run db:seed
+```
+*Output validates 4 topics seeded (2 B1, 2 B2) and test user `test-user-uuid` initialized.*
+
+### Step 4: Download Voice Agent Model Assets
+Pre-download the on-device Silero VAD weights required by `@livekit/agents`:
+```bash
+npm run agent:download-files
+```
+
+### Step 5: Start the Next.js Control Plane API Server
+In **Terminal 1**, start the Next.js API server:
+```bash
+npm run dev
+```
+The server starts on `http://localhost:3000`. You can verify it by requesting topics:
+```bash
+curl http://localhost:3000/api/exam/topics?userId=test-user-uuid
+```
+
+### Step 6: Start the LiveKit Voice Agent Worker
+In **Terminal 2**, start the agent worker:
+```bash
+# Development mode with hot-reloading:
+npm run agent:dev
+
+# Or production mode:
+npm run agent:start
+```
+The worker connects to LiveKit Cloud via WebRTC and listens for incoming rooms prefixed with `exam_*`.
+
+### Step 7: Run Automated Verification Tests
+In **Terminal 3**, run the automated test suite to verify end-to-end functionality:
+```bash
+npm test
+```
+All 29 tests will execute across:
+- `tests/agent-worker.test.ts`: LiveKit agent initialization, VAD, and tools.
+- `tests/api-routes.test.ts`: Next.js route handlers (`topics`, `start`, `results`, `quota`).
+- `tests/control-plane.test.ts`: Quota thresholds, JWT token generation, and cost models.
+- `tests/db-schema.test.ts`: Drizzle schema, indexes, and seed checks.
+- `tests/evaluate-exam.test.ts`: HK-dir rubric evaluation and fallback handling.
+- `tests/exam-results.test.ts`: Polling states, dual-candidate tabs, and metric calculation.
+
+### Step 8: Client Mobile Screens Integration
+The React Native client screens live in `src/screens/`:
+- `ExamSetupScreen.tsx`: Point `EXPO_PUBLIC_API_URL` to your Next.js host (e.g. `http://localhost:3000` or local IP if testing on physical devices).
+- `ExamRoomScreen.tsx`: Connects to LiveKit via the token returned by `/api/exam/start`.
+- `ExamResultsScreen.tsx`: Displays the scorecard returned by `/api/exam/[sessionId]/results`.
 
 ---
 
-## 3. How to Implement Common Changes
+## 4. Complete Scripts Reference
 
-### 3.1 Adding a New Exam Topic
-1. Open [`lib/topics.ts`](../lib/topics.ts).
-2. Add your topic to `TOPIC_CATALOG`:
-   ```typescript
-   'nytt-tema-id': {
-     id: 'nytt-tema-id',
-     level: 'B1', // or 'B2'
-     title: 'Norsk Tittel på Temaet',
-     topicPrompt: 'Detaljert instruks til LiveKit-agenten og kandidaten...',
-     instructionsNo: 'Instruks om turtaking og tidsramme...',
-     keyDiscussionPoints: [
-       'Punkt 1...',
-       'Punkt 2...',
-     ],
-   }
-   ```
-3. Test resolution using the topic test in `tests/control-plane.test.ts`.
-
-### 3.2 Modifying the Database Schema
-1. Edit [`db/schema.ts`](../db/schema.ts).
-2. Run migration generator:
-   ```bash
-   npm run db:generate
-   ```
-3. Check the generated SQL in `drizzle/` to verify foreign keys and indexes.
-4. Run `npx tsc --noEmit` to verify type safety across all route handlers.
-
-### 3.3 Adding a New API Route
-1. Create a route handler under `app/api/<your-route>/route.ts`.
-2. Always validate input payloads using **Zod**.
-3. Authenticate requests using `authenticateUser(req)` from `lib/auth.ts`.
-4. Wrap multiple write operations in `db.transaction()` for atomic guarantees.
-5. Add test coverage in `tests/`.
+| Command | Action | Description |
+| :--- | :--- | :--- |
+| `npm run dev` | Next.js Dev Server | Runs Next.js 15 App Router API at `http://localhost:3000`. |
+| `npm run build` | Next.js Build | Compiles production bundle and type-checks the application. |
+| `npm run start` | Next.js Production | Starts the compiled production Next.js server. |
+| `npm test` | Run Test Suite | Runs all tests in `tests/*.test.ts` using Node.js test runner. |
+| `npm run agent:download-files` | Download VAD Weights | Fetches Silero VAD weights for `@livekit/agents`. |
+| `npm run agent:dev` | Agent Worker (Dev) | Runs `src/agent/worker.ts` with `tsx watch` for auto-reloading. |
+| `npm run agent:start` | Agent Worker (Prod)| Runs `src/agent/worker.ts` in production mode. |
+| `npm run db:push` | Drizzle Push | Directly pushes `src/db/schema.ts` to PostgreSQL. |
+| `npm run db:generate` | Drizzle Generate | Generates new SQL migration files in `drizzle/`. |
+| `npm run db:migrate` | Drizzle Migrate | Executes pending SQL migration files. |
+| `npm run db:seed` | Database Seeder | Seeds topics and default test quota into Neon. |
+| `npm run db:studio` | Drizzle Studio | Launches web-based database browser at `https://local.drizzle.studio`. |
 
 ---
 
-## 4. Checklist for Future Feature Requests
-When starting a new feature:
-1. Consult [`docs/README.md`](./README.md) and [`docs/ARCHITECTURE.md`](./ARCHITECTURE.md).
-2. If changing database columns or tables, update [`db/schema.ts`](../db/schema.ts) and run `npm run db:generate`.
-3. If changing API routes or request formats, update [`docs/API_REFERENCE.md`](./API_REFERENCE.md).
-4. Run `npx tsx --test tests/control-plane.test.ts` to ensure zero regressions.
-5. Run `npx tsc --noEmit` and `npm run build` before completing the task.
+## 5. Development Guidelines & Invariants
 
+### 5.1 Modifying Database Schema
+1. Update `src/db/schema.ts` (this is the single source of truth defined in `drizzle.config.ts`).
+2. Run `npm run db:push` or generate migrations via `npm run db:generate`.
+3. If new columns affect evaluation or quota, update `src/lib/evaluate-exam.ts` and `src/agent/worker.ts`.
+4. Run `npm test` to verify schema tests pass.
+
+### 5.2 Adding or Updating HK-dir Topics
+1. Add new topics to `src/db/seed.ts` or via database inserts.
+2. Topics must include:
+   - `slug`: unique URL-safe slug.
+   - `level`: `'B1'` or `'B2'`.
+   - `titleNo`: Norwegian title.
+   - `monologuePromptNo`: Prompt for Del 1.
+   - `discussionPromptNo`: Prompt for Del 2 debate.
+   - `followUpQuestionsNo`: Array of follow-up questions for Del 3.
+3. Re-run `npm run db:seed`.
+
+### 5.3 Modifying API Endpoints
+1. Handlers live under `app/api/...`.
+2. Always validate inputs using **Zod**.
+3. Always authenticate requests using `authenticateUser(req)` from `lib/auth.ts`.
+4. Use `src/db/index.ts` and `src/db/schema.ts` for database operations.
+5. Add corresponding integration tests under `tests/api-routes.test.ts`.

@@ -143,26 +143,54 @@ When the session terminates, `ctx.addShutdownCallback` runs:
 3. **Atomic Neon Transaction**:
    ```typescript
    await db.transaction(async (tx) => {
-     // 1. Audit ledger entry
-     await tx.insert(usageLedger).values({ ... });
-
-     // 2. Atomic user quota deduction & metrics accumulation
-     await tx.insert(userQuotas).values({ ... }).onConflictDoUpdate({
-       target: userQuotas.userId,
-       set: {
-         remainingSeconds: sql`GREATEST(0, ${userQuotas.remainingSeconds} - ${secondsToDeduct})`,
-         totalTokensUsed: sql`${userQuotas.totalTokensUsed} + ${totalTokensUsed}`,
-         totalCostUsd: sql`(${userQuotas.totalCostUsd} + ${estimatedCostUsd}::numeric)`,
-         updatedAt: new Date(),
-       },
+     // 1. Audit ledger entry for REALTIME_VOICE_AGENT
+     await tx.insert(usageLedger).values({
+       id: crypto.randomUUID(),
+       sessionId: metadata.sessionId,
+       userId: metadata.userId,
+       source: 'REALTIME_VOICE_AGENT',
+       llmModel: 'gpt-4.1-mini',
+       llmPromptTokens: summary.llmPromptTokens,
+       llmCompletionTokens: summary.llmCompletionTokens,
+       ttsCharacters: summary.ttsCharactersCount,
+       sttAudioSeconds: sttAudioSeconds.toFixed(2),
+       estimatedCostUsd,
+       createdAt: new Date(),
      });
 
+     // 2. Atomic user quota deduction & metrics accumulation
+     await tx
+       .insert(userQuotas)
+       .values({
+         userId: metadata.userId,
+         remainingAudioSeconds: Math.max(0, 1800 - secondsToDeduct),
+         totalLlmTokensUsed: totalTokensUsed,
+         totalTtsCharactersUsed: summary.ttsCharactersCount,
+         totalSttSecondsUsed: sttAudioSeconds.toFixed(2),
+         totalCostUsd: estimatedCostUsd,
+         updatedAt: new Date(),
+       })
+       .onConflictDoUpdate({
+         target: userQuotas.userId,
+         set: {
+           remainingAudioSeconds: sql`GREATEST(0, ${userQuotas.remainingAudioSeconds} - ${secondsToDeduct})`,
+           totalLlmTokensUsed: sql`${userQuotas.totalLlmTokensUsed} + ${totalTokensUsed}`,
+           totalTtsCharactersUsed: sql`${userQuotas.totalTtsCharactersUsed} + ${summary.ttsCharactersCount}`,
+           totalSttSecondsUsed: sql`(${userQuotas.totalSttSecondsUsed} + ${sttAudioSeconds.toFixed(2)}::numeric)`,
+           totalCostUsd: sql`(${userQuotas.totalCostUsd} + ${estimatedCostUsd}::numeric)`,
+           updatedAt: new Date(),
+         },
+       });
+
      // 3. Mark session complete and save transcript
-     await tx.update(examSessions).set({
-       status: 'COMPLETED',
-       transcriptJson: transcriptEntries,
-       updatedAt: new Date(),
-     }).where(eq(examSessions.id, metadata.sessionId));
+     await tx
+       .update(examSessions)
+       .set({
+         status: 'COMPLETED',
+         transcriptJson: transcriptEntries,
+         completedAt: new Date(),
+       })
+       .where(eq(examSessions.id, metadata.sessionId));
    });
    ```
 4. **Direct Evaluation**: Calls `await evaluateExamSession(metadata.sessionId)` to grade the transcript using OpenAI `gpt-4o` and store `evaluationJson` in Neon.
