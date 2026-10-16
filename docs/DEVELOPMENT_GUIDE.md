@@ -32,7 +32,10 @@ ELEVEN_MODEL_ID=eleven_multilingual_v2
 DATABASE_URL=postgresql://user:password@ep-sample-pooler.eu-central-1.aws.neon.tech/norsk_app?sslmode=require
 DIRECT_DATABASE_URL=postgresql://user:password@ep-sample.eu-central-1.aws.neon.tech/norsk_app?sslmode=require
 
-# 3. Optional Mobile Client Override
+# 3. Web Admin Portal Secret
+ADMIN_SECRET=super_secret_admin_token
+
+# 4. Optional Mobile Client Override
 # Leave commented out for automatic LAN IP / Emulator / Web host detection!
 # EXPO_PUBLIC_API_URL=http://192.168.1.50:3000
 ```
@@ -70,7 +73,8 @@ Or run them in two terminals:
 ### Step 4: Open on Phone, Emulator, or Web
 - **Physical Phone (Expo Go)**: Make sure your phone is on the same Wi-Fi network as your computer, open **Expo Go**, and scan the QR code. `src/config.ts` automatically detects your computer's LAN IP from Expo's `hostUri` and connects to port `3000`. (If prompted by Windows Firewall on first run, allow Node.js on Private networks.)
 - **Android Emulator**: Press `a` in the Expo terminal. `src/config.ts` automatically falls back to `http://10.0.2.2:3000`.
-- **Web Browser**: Run `npm run mobile:web` (or press `w` in the Expo terminal).
+- **Web Browser (Candidate App)**: Run `npm run mobile:web` (or press `w` in the Expo terminal).
+- **Web Admin Portal (Exam & Question Management)**: Navigate to `http://localhost:3000/admin` in your browser. Log in with the `ADMIN_SECRET` configured in `.env.local` (defaults to `admin123` in dev mode). Here you can create, edit, activate/deactivate, and delete oral exams and their Del 3 question pools.
 
 ### Step 5: Run Automated Tests
 ```bash

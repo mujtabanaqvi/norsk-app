@@ -7,17 +7,22 @@ This repository contains the full-stack infrastructure and cross-platform mobile
 
 ## Architecture & System Highlights
 
+- **Web Admin Portal (`app/admin/page.tsx`, `app/api/admin/exams/**`)**:
+  - Secure web-only portal at `/admin` (protected by `ADMIN_SECRET`) for administrators to view, create, edit, toggle active status, and delete B1/B2 oral exams and their Del 3 question pools.
+  - Generates URL-safe Norwegian slugs (handling `æ`, `ø`, `å`) and tracks historical session usage per exam.
+- **Random Exam & Question Pool Selection (`src/server/exam-randomizer.ts`)**:
+  - Every time a candidate starts an exam (defaulting to *"Tilfeldig prøve"*), the backend randomly draws an active exam matching their CEFR level and draws up to 3 random Del 3 follow-up questions from that exam's pool, persisting the chosen question set directly on the session.
 - **Expo Go & Web Mobile Client (`src/screens/*`, `src/hooks/useExamTurns.ts`)**:
   - Runs directly inside standard **Expo Go** on physical phones, Android emulators, and web browsers (`expo start --web`) using `expo-audio` — no native WebRTC prebuilds or custom dev clients required.
-  - `ExamSetupScreen.tsx`: CEFR level selection (B1 / B2), official topic catalog selector, exam mode selection (`AI_PEER` vs `HUMAN_LOCAL`), real-time quota verification, and session initialization.
+  - `ExamSetupScreen.tsx`: CEFR level selection (B1 / B2), random exam drawing (default) with optional manual topic override, exam mode selection (`AI_PEER` vs `HUMAN_LOCAL`), real-time quota verification, and session initialization.
   - `ExamRoomScreen.tsx`: Interactive oral exam room with stage banner (`Del 1: Presentasjon`, `Del 2: Samtale med medkandidat`, `Del 3: Oppfølgingsspørsmål`), active speaker cards (Sensor, Kandidat, Medkandidat), live transcript, tap-to-talk + automatic silence detection (~2.6s via `expo-audio` metering), skip/finish controls, and manual discussion conclusion in `HUMAN_LOCAL` mode.
   - `ExamResultsScreen.tsx`: Polling results dashboard displaying CEFR pass/fail badges, 4 HK-dir criteria breakdowns (1–10 scale), bilingual feedback, concrete before/after Norwegian corrections with grammatical explanations, dual-candidate tab switching, and infrastructure usage & cost metrics drawer.
 - **Deterministic Turn-Based Voice Pipeline (`src/server/*`)**:
-  - `src/server/exam-engine.ts`: Pure deterministic state machine orchestrating `DEL1_MONOLOGUE`, `DEL2_AI` (5 debate turns with AI co-candidate), `DEL2_HUMAN` (local partner discussion), `DEL3` (follow-up questions from topic catalog), and `DONE`.
+  - `src/server/exam-engine.ts`: Pure deterministic state machine orchestrating `DEL1_MONOLOGUE`, `DEL2_AI` (5 debate turns with AI co-candidate), `DEL2_HUMAN` (local partner discussion), `DEL3` (follow-up questions from session question set), and `DONE`.
   - `src/server/personas.ts`: Builds Examiner and AI Co-Candidate system prompts tailored to B1/B2 CEFR targets and generates concise spoken Norwegian responses via `gpt-4.1-mini`.
   - `src/server/speech.ts`: Transcribes candidate audio via OpenAI `/v1/audio/transcriptions` (`gpt-4o-transcribe`, `language: 'no'`) and streams synthesized speech via ElevenLabs (`eleven_multilingual_v2`) with automatic OpenAI `gpt-4o-mini-tts` fallback.
 - **Post-Exam CEFR Rubric Grading (`src/lib/evaluate-exam.ts`)**:
-  - Scores candidate performance against 4 official HK-dir criteria (*Formidling & flyt*, *Uttale & forståelighet*, *Ordforråd*, *Grammatikk & setningsstruktur*) using OpenAI `gpt-4o` scheduled via Next.js `after()`, with automatic rule-based fallback evaluation.
+  - Scores candidate performance against 4 official HK-dir criteria (*Formidling & flyt*, *Uttale & forståelighet*, *Ordforråd*, *Grammatikk & setningsstruktur*) using OpenAI `gpt-4o` scheduled via Next.js `after()`, evaluating the candidate against the exact Del 1 monologue, Del 2 discussion, and randomly chosen Del 3 follow-up questions for their session.
 
 ---
 

@@ -151,15 +151,21 @@ interface TranscriptEntry {
 ### `SessionEngineState` (`engine_state`)
 ```typescript
 interface SessionEngineState {
-  stage: ExamStage;
-  del1NudgeUsed: boolean;
-  del2TurnCount: number;
-  del3QuestionIndex: number;
-  del2StartedAtMs?: number;
-  llmPromptTokens: number;
-  llmCompletionTokens: number;
-  ttsCharacters: number;
-  sttSeconds: number;
+  engine: {
+    stage: 'DEL1_MONOLOGUE' | 'DEL2_AI' | 'DEL2_HUMAN' | 'DEL3' | 'DONE';
+    del1Nudges: number;
+    del2Exchanges: number;
+    del2StartedAt?: number;
+    followUpIndex: number;
+  };
+  /** Randomly selected Del 3 follow-up questions for this specific session */
+  selectedFollowUpQuestionsNo?: string[];
+  usage: {
+    llmPromptTokens: number;
+    llmCompletionTokens: number;
+    ttsCharacters: number;
+    sttAudioSeconds: number;
+  };
 }
 ```
 

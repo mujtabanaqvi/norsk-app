@@ -26,13 +26,13 @@ test('Route Validation: startExamSchema validates required fields', () => {
   };
   assert.equal(startExamSchema.safeParse(missingUser).success, false);
 
-  // Reject missing topicId
+  // Allow missing topicId (triggers random exam & question selection)
   const missingTopic = {
     userId: 'usr_abc123',
     level: 'B1',
     coCandidateMode: 'AI_PEER',
   };
-  assert.equal(startExamSchema.safeParse(missingTopic).success, false);
+  assert.equal(startExamSchema.safeParse(missingTopic).success, true);
 
   // Reject invalid level
   const invalidLevel = {
