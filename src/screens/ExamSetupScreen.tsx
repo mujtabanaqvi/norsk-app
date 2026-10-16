@@ -28,7 +28,7 @@ const MIN_REQUIRED_QUOTA_SECONDS = 180;
 export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [targetLevel, setTargetLevel] = useState<CefrLevel>('B1');
   const [practiceMode, setPracticeMode] = useState<CoCandidateMode>('AI_PEER');
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+  const [selectedTopicId, setSelectedTopicId] = useState<string | null>('RANDOM');
 
   const [topics, setTopics] = useState<ExamTopic[]>([]);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
@@ -73,12 +73,15 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     return topics.filter((t) => t.level === targetLevel);
   }, [topics, targetLevel]);
 
-  // Auto-select first matching topic if current selected topic does not match level
+  // Keep 'RANDOM' selected by default; if a manual topic was chosen and no longer matches level, reset to 'RANDOM'
   useEffect(() => {
     if (filteredTopics.length > 0) {
+      if (selectedTopicId === 'RANDOM') {
+        return;
+      }
       const existsInFiltered = filteredTopics.some((t) => t.id === selectedTopicId);
       if (!existsInFiltered) {
-        setSelectedTopicId(filteredTopics[0].id);
+        setSelectedTopicId('RANDOM');
       }
     } else {
       setSelectedTopicId(null);
@@ -105,8 +108,8 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
    * Call POST /api/exam/start and navigate to Active Exam Room
    */
   const handleStartExam = async () => {
-    if (!selectedTopicId) {
-      Alert.alert('Velg tema', 'Vennligst velg et eksamenstema før du starter prøven.');
+    if (!selectedTopicId || filteredTopics.length === 0) {
+      Alert.alert('Velg tema', 'Ingen tilgjengelige eksamenstemaer for valgt nivå.');
       return;
     }
 
@@ -118,25 +121,34 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    const selectedTopic = topics.find((t) => t.id === selectedTopicId);
-    if (!selectedTopic) return;
+    const manualTopic =
+      selectedTopicId !== 'RANDOM'
+        ? topics.find((t) => t.id === selectedTopicId)
+        : undefined;
 
     setIsStarting(true);
     try {
       const result = await startExamSession({
-        topicId: selectedTopic.id,
+        topicId: selectedTopicId === 'RANDOM' ? 'RANDOM' : selectedTopicId,
         level: targetLevel,
         coCandidateMode: practiceMode,
       });
+
+      const resolvedTopicTitle =
+        result.topic?.titleNo || manualTopic?.titleNo || 'Muntlig prøve';
+      const resolvedMonologuePrompt =
+        result.topic?.monologuePromptNo || manualTopic?.monologuePromptNo;
+      const resolvedDiscussionPrompt =
+        result.topic?.discussionPromptNo || manualTopic?.discussionPromptNo;
 
       // Navigate to the Active Exam Room Screen
       navigation.navigate('ExamRoom', {
         sessionId: result.sessionId,
         level: targetLevel,
         coCandidateMode: practiceMode,
-        topicTitle: selectedTopic.titleNo,
-        monologuePromptNo: selectedTopic.monologuePromptNo,
-        discussionPromptNo: selectedTopic.discussionPromptNo,
+        topicTitle: resolvedTopicTitle,
+        monologuePromptNo: resolvedMonologuePrompt,
+        discussionPromptNo: resolvedDiscussionPrompt,
         initialReplies: result.replies || [],
         initialTranscript: result.transcript || [],
       });
@@ -329,41 +341,74 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                 </Text>
               </View>
             ) : (
-              filteredTopics.map((topic) => {
-                const isSelected = selectedTopicId === topic.id;
-                return (
-                  <TouchableOpacity
-                    key={topic.id}
-                    style={[
-                      styles.topicCard,
-                      isSelected && styles.topicCardSelected,
-                    ]}
-                    onPress={() => setSelectedTopicId(topic.id)}
-                    activeOpacity={0.8}
-                  >
-                    <View style={styles.topicCardTop}>
-                      <View style={styles.topicLevelBadge}>
-                        <Text style={styles.topicLevelBadgeText}>{topic.level}</Text>
-                      </View>
-                      <Text style={styles.topicCardTitle}>{topic.titleNo}</Text>
+              <>
+                {/* Random Exam Option (Default) */}
+                <TouchableOpacity
+                  style={[
+                    styles.topicCard,
+                    selectedTopicId === 'RANDOM' && styles.topicCardSelected,
+                  ]}
+                  onPress={() => setSelectedTopicId('RANDOM')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.topicCardTop}>
+                    <View style={styles.topicLevelBadge}>
+                      <Text style={styles.topicLevelBadgeText}>TILFELDIG</Text>
                     </View>
-
-                    <Text
-                      style={styles.topicCardPreview}
-                      numberOfLines={3}
-                      ellipsizeMode="tail"
-                    >
-                      {topic.monologuePromptNo || topic.discussionPromptNo}
+                    <Text style={styles.topicCardTitle}>
+                      Tilfeldig prøve (Anbefalt)
                     </Text>
+                  </View>
 
-                    {isSelected && (
-                      <View style={styles.selectedCheckRow}>
-                        <Text style={styles.selectedCheckText}>✓ Valgt tema</Text>
+                  <Text style={styles.topicCardPreview}>
+                    Som på den ekte Norskprøven trekkes eksamenstema og oppfølgingsspørsmål for nivå {targetLevel} tilfeldig fra databasen når du starter prøven ({filteredTopics.length} tilgjengelige prøver).
+                  </Text>
+
+                  {selectedTopicId === 'RANDOM' && (
+                    <View style={styles.selectedCheckRow}>
+                      <Text style={styles.selectedCheckText}>
+                        ✓ Tilfeldig trekning valgt
+                      </Text>
+                    </View>
+                  )}
+                </TouchableOpacity>
+
+                {filteredTopics.map((topic) => {
+                  const isSelected = selectedTopicId === topic.id;
+                  return (
+                    <TouchableOpacity
+                      key={topic.id}
+                      style={[
+                        styles.topicCard,
+                        isSelected && styles.topicCardSelected,
+                      ]}
+                      onPress={() => setSelectedTopicId(topic.id)}
+                      activeOpacity={0.8}
+                    >
+                      <View style={styles.topicCardTop}>
+                        <View style={styles.topicLevelBadge}>
+                          <Text style={styles.topicLevelBadgeText}>{topic.level}</Text>
+                        </View>
+                        <Text style={styles.topicCardTitle}>{topic.titleNo}</Text>
                       </View>
-                    )}
-                  </TouchableOpacity>
-                );
-              })
+
+                      <Text
+                        style={styles.topicCardPreview}
+                        numberOfLines={3}
+                        ellipsizeMode="tail"
+                      >
+                        {topic.monologuePromptNo || topic.discussionPromptNo}
+                      </Text>
+
+                      {isSelected && (
+                        <View style={styles.selectedCheckRow}>
+                          <Text style={styles.selectedCheckText}>✓ Valgt tema</Text>
+                        </View>
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </>
             )}
           </View>
         </ScrollView>

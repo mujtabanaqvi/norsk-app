@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
-import { eq, or } from 'drizzle-orm';
+import { and, eq, or } from 'drizzle-orm';
 import { db } from '@/src/db';
 import {
   examSessions,
   userQuotas,
   examTopics,
+  ExamTopic,
   TranscriptEntry,
   SessionEngineState,
 } from '@/src/db/schema';
 import { authenticateUser } from '@/lib/auth';
 import { initialState, openingActions, toUiStage } from '@/src/server/exam-engine';
+import {
+  pickRandomExamTopic,
+  pickRandomFollowUpQuestions,
+} from '@/src/server/exam-randomizer';
 import { generateLine } from '@/src/server/personas';
 
-// Validates the request body using Zod
+// Validates the request body using Zod (topicId is optional; omit or pass 'RANDOM' for random selection)
 export const startExamSchema = z.object({
   userId: z.string().min(1, 'userId is required'),
-  topicId: z.string().min(1, 'topicId is required'),
+  topicId: z.string().optional(),
   level: z.enum(['B1', 'B2']),
   coCandidateMode: z.enum(['AI_PEER', 'HUMAN_LOCAL']),
 });
@@ -99,17 +104,45 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 3. Fetch selected examTopics row by topicId (UUID or slug)
-    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(topicId);
-    const topicQuery = isUuid
-      ? or(eq(examTopics.id, topicId), eq(examTopics.slug, topicId))
-      : eq(examTopics.slug, topicId);
+    // 3. Resolve exam topic: randomly pick an active topic for the level, or look up specific topicId
+    let topic: ExamTopic | undefined | null;
+    const trimmedTopicId = topicId?.trim();
+    const shouldPickRandom =
+      !trimmedTopicId || trimmedTopicId.toUpperCase() === 'RANDOM';
 
-    const [topic] = await db
-      .select()
-      .from(examTopics)
-      .where(topicQuery)
-      .limit(1);
+    if (shouldPickRandom) {
+      const activeTopicsForLevel = await db
+        .select()
+        .from(examTopics)
+        .where(and(eq(examTopics.level, level), eq(examTopics.isActive, true)));
+
+      topic = pickRandomExamTopic(activeTopicsForLevel);
+
+      // Fallback if no active topics found for exact level: check any active topic
+      if (!topic) {
+        const anyActiveTopics = await db
+          .select()
+          .from(examTopics)
+          .where(eq(examTopics.isActive, true));
+        topic = pickRandomExamTopic(anyActiveTopics);
+      }
+    } else {
+      const isUuid =
+        /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+          trimmedTopicId
+        );
+      const topicQuery = isUuid
+        ? or(eq(examTopics.id, trimmedTopicId), eq(examTopics.slug, trimmedTopicId))
+        : eq(examTopics.slug, trimmedTopicId);
+
+      const [foundTopic] = await db
+        .select()
+        .from(examTopics)
+        .where(topicQuery)
+        .limit(1);
+
+      topic = foundTopic;
+    }
 
     if (!topic) {
       return NextResponse.json(
@@ -117,6 +150,12 @@ export async function POST(req: NextRequest) {
         { status: 404 }
       );
     }
+
+    // Randomly draw up to 3 Del 3 follow-up questions from the exam's question pool
+    const selectedFollowUpQuestionsNo = pickRandomFollowUpQuestions(
+      topic.followUpQuestionsNo,
+      3
+    );
 
     // 4. Generate initial engine state and opening greeting line
     const engine = initialState();
@@ -134,7 +173,7 @@ export async function POST(req: NextRequest) {
           titleNo: topic.titleNo,
           monologuePromptNo: topic.monologuePromptNo,
           discussionPromptNo: topic.discussionPromptNo,
-          followUpQuestionsNo: topic.followUpQuestionsNo,
+          followUpQuestionsNo: selectedFollowUpQuestionsNo,
         },
         transcript,
       });
@@ -154,6 +193,7 @@ export async function POST(req: NextRequest) {
 
     const sessionEngineState: SessionEngineState = {
       engine,
+      selectedFollowUpQuestionsNo,
       usage: {
         llmPromptTokens: promptTokens,
         llmCompletionTokens: completionTokens,
@@ -196,7 +236,7 @@ export async function POST(req: NextRequest) {
           titleNo: topic.titleNo,
           monologuePromptNo: topic.monologuePromptNo,
           discussionPromptNo: topic.discussionPromptNo,
-          followUpQuestionsNo: topic.followUpQuestionsNo,
+          followUpQuestionsNo: selectedFollowUpQuestionsNo,
         },
       },
       { status: 201 }

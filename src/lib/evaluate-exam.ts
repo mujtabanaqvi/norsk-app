@@ -384,6 +384,13 @@ export async function evaluateExamSession(sessionId: string): Promise<void> {
   const topicTitle = row.topic?.titleNo || 'Norsk muntlig eksamen';
   const monologuePrompt = row.topic?.monologuePromptNo || 'Gjør rede for dine tanker.';
   const discussionPrompt = row.topic?.discussionPromptNo || 'Diskuter temaet sammen.';
+  const sessionFollowUps =
+    Array.isArray(session.engineState?.selectedFollowUpQuestionsNo) &&
+    session.engineState.selectedFollowUpQuestionsNo.length > 0
+      ? session.engineState.selectedFollowUpQuestionsNo
+      : Array.isArray(row.topic?.followUpQuestionsNo)
+        ? row.topic.followUpQuestionsNo
+        : [];
 
   const transcript = (session.transcriptJson as TranscriptEntry[]) || [];
 
@@ -427,13 +434,17 @@ export async function evaluateExamSession(sessionId: string): Promise<void> {
 
   // 3. Format prompt for Vercel AI SDK generateObject
   const transcriptText = formatTranscriptForPrompt(transcript);
+  const followUpSection =
+    sessionFollowUps.length > 0
+      ? `\nOppfølgingsspørsmål (Del 3):\n${sessionFollowUps.map((q, idx) => `${idx + 1}. ${q}`).join('\n')}`
+      : '';
 
   const userPrompt = `
 Målnivå: ${targetLevel}
 Prøvemodus: ${coCandidateMode}
 Tema: ${topicTitle}
-Individuell monologoppgave: ${monologuePrompt}
-Samtaleoppgave: ${discussionPrompt}
+Individuell monologoppgave (Del 1): ${monologuePrompt}
+Samtaleoppgave (Del 2): ${discussionPrompt}${followUpSection}
 
 Transkripsjon fra prøven:
 ${transcriptText}

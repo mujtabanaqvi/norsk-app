@@ -125,7 +125,7 @@ export interface GetTopicsResponse {
  */
 export interface StartExamRequest {
   userId?: string;
-  topicId: string;
+  topicId?: string;
   level: CefrLevel;
   coCandidateMode: CoCandidateMode;
 }
@@ -144,7 +144,7 @@ export interface StartExamResponse {
   done: boolean;
   transcript: TranscriptTurn[];
   replies: ExamReply[];
-  topic?: {
+  topic: {
     id: string;
     titleNo: string;
     monologuePromptNo: string;

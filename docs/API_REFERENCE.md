@@ -16,14 +16,14 @@ Retrieves active HK-dir oral examination topics and fetches or initializes the u
 ---
 
 ## 2. `POST /api/exam/start`
-Validates candidate quota (`remainingAudioSeconds > 180`), creates a new `exam_sessions` row with initial `engineState` (`DEL1_MONOLOGUE`), and returns the opening Examiner greeting turn.
+Validates candidate quota (`remainingAudioSeconds > 180`), selects a random active exam for the requested `level` when `topicId` is omitted or `"RANDOM"` (or looks up a specific `topicId`), randomly draws up to 3 Del 3 follow-up questions from the exam's question pool (`selectedFollowUpQuestionsNo`), creates a new `exam_sessions` row with initial `engineState` (`DEL1_MONOLOGUE`), and returns the opening Examiner greeting turn.
 
 ### Request Body
 ```json
 {
   "level": "B1",
   "coCandidateMode": "AI_PEER",
-  "topicId": "e6a2bc41-2ff2-4981-b51c-43df52b4742a"
+  "topicId": "RANDOM"
 }
 ```
 
@@ -126,3 +126,14 @@ Polled by `ExamResultsScreen` every 3 seconds until `status === 'COMPLETED'` and
 
 ## 7. `GET /api/quota` & `POST /api/quota`
 Queries or tops up the candidate's remaining practice seconds (`remainingAudioSeconds`).
+
+---
+
+## 8. Web Admin Portal Endpoints (`/api/admin/exams`)
+Protected by the `x-admin-secret` header (checked against `process.env.ADMIN_SECRET`, defaulting to `admin123` in local development). Powers the Next.js Web Admin Portal at `/admin`.
+
+- **`GET /api/admin/exams`**: Lists all exams (`exam_topics`) ordered by `createdAt` DESC with `sessionCount`.
+- **`POST /api/admin/exams`**: Creates a new exam with `titleNo`, `level` (`'B1' | 'B2'`), `monologuePromptNo` (Del 1), `discussionPromptNo` (Del 2), `followUpQuestionsNo` (Del 3 question pool array), and `isActive`.
+- **`PATCH /api/admin/exams/[id]`**: Updates exam prompts, question pool, level, title, or `isActive` status.
+- **`DELETE /api/admin/exams/[id]`**: Unlinks historical sessions and deletes the exam topic row.
+

@@ -45,6 +45,8 @@ export interface SessionEngineState {
     del2StartedAt?: number;
     followUpIndex: number;
   };
+  /** Randomly selected Del 3 follow-up questions for this specific session */
+  selectedFollowUpQuestionsNo?: string[];
   usage: {
     llmPromptTokens: number;
     llmCompletionTokens: number;

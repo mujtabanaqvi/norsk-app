@@ -167,6 +167,12 @@ export async function POST(
       });
     }
 
+    const sessionSelectedFollowUps =
+      Array.isArray(existingState.selectedFollowUpQuestionsNo) &&
+      existingState.selectedFollowUpQuestionsNo.length > 0
+        ? existingState.selectedFollowUpQuestionsNo
+        : null;
+
     const topicData = {
       titleNo: topic?.titleNo || 'Muntlig eksamenstema',
       monologuePromptNo:
@@ -176,12 +182,13 @@ export async function POST(
         topic?.discussionPromptNo ||
         'Diskuter temaet sammen. Drøft fordeler, ulemper og mulige løsninger.',
       followUpQuestionsNo:
-        Array.isArray(topic?.followUpQuestionsNo) && topic.followUpQuestionsNo.length > 0
+        sessionSelectedFollowUps ??
+        (Array.isArray(topic?.followUpQuestionsNo) && topic.followUpQuestionsNo.length > 0
           ? topic.followUpQuestionsNo
           : [
               'Hvilke konsekvenser tror du dette vil få for samfunnet på sikt?',
               'Hvordan stiller du deg til motargumentene som finnes?',
-            ],
+            ]),
     };
 
     // 4. Advance deterministic exam state machine
@@ -241,6 +248,7 @@ export async function POST(
 
     const updatedEngineState: SessionEngineState = {
       engine: nextEngine,
+      selectedFollowUpQuestionsNo: existingState.selectedFollowUpQuestionsNo,
       usage: {
         llmPromptTokens: existingState.usage.llmPromptTokens + turnPromptTokens,
         llmCompletionTokens: existingState.usage.llmCompletionTokens + turnCompletionTokens,
