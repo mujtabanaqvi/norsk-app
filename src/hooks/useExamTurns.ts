@@ -304,7 +304,7 @@ export function useExamTurns({
         playsInSilentMode: true,
       });
 
-      await recorder.prepareToRecordAsync();
+      await recorder.prepareToRecordAsync(RECORDING_OPTIONS);
       recordingStartTimeRef.current = Date.now();
       hasDetectedSpeechRef.current = false;
       silenceStartRef.current = null;
@@ -332,13 +332,19 @@ export function useExamTurns({
       Date.now() - recordingStartTimeRef.current
     );
 
+    let stopStatusUrl: string | undefined;
     try {
-      await recorder.stop();
+      const stopResult = (await recorder.stop()) as unknown as
+        | { url?: string | null }
+        | undefined;
+      if (stopResult && typeof stopResult.url === 'string' && stopResult.url) {
+        stopStatusUrl = stopResult.url;
+      }
     } catch (err) {
       console.warn('[Recorder] Error stopping recorder:', err);
     }
 
-    const uri = recorder.uri || recorderState.url;
+    const uri = stopStatusUrl || recorder.uri || recorderState.url;
     if (!uri) {
       isStoppingRecordingRef.current = false;
       setHintMessage('Ingen lyd ble fanget opp. Prøv å trykke på mikrofonen igjen.');

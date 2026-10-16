@@ -36,6 +36,10 @@ export async function transcribe(
   mime: string | undefined,
   fileName?: string
 ): Promise<string> {
+  if (!audio || audio.size < 256) {
+    return '';
+  }
+
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
 
@@ -56,7 +60,12 @@ export async function transcribe(
     body: form,
   });
   if (!res.ok) {
-    throw new Error(`Transcription failed (${res.status}): ${await res.text()}`);
+    const errText = await res.text();
+    if (res.status === 400 && errText.includes('corrupted or unsupported')) {
+      console.warn('[STT] Short or empty audio clip rejected by OpenAI; prompting candidate to retry.');
+      return '';
+    }
+    throw new Error(`Transcription failed (${res.status}): ${errText}`);
   }
   const data = (await res.json()) as { text?: string };
   return (data.text || '').trim();

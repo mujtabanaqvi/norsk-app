@@ -1,5 +1,5 @@
 import { Platform } from 'react-native';
-import { API_BASE_URL } from './config';
+import { API_BASE_URL, getCandidateApiBaseUrls } from './config';
 import { getOrCreateUserId } from './identity';
 import type {
   CefrLevel,
@@ -12,11 +12,34 @@ import type {
 } from './types/exam';
 
 const DEFAULT_TIMEOUT_MS = 35_000;
+const FALLBACK_PROBE_TIMEOUT_MS = 6_000;
 
-async function fetchWithTimeout(
+const CANDIDATE_BASE_URLS = getCandidateApiBaseUrls({
+  envUrl: process.env.EXPO_PUBLIC_API_URL || process.env.REACT_NATIVE_API_URL,
+});
+
+let activeApiBaseUrl: string = API_BASE_URL;
+
+export function getActiveApiBaseUrl(): string {
+  return activeApiBaseUrl;
+}
+
+function buildUrlForBase(pathOrUrl: string, baseUrl: string): string {
+  for (const candidate of CANDIDATE_BASE_URLS) {
+    if (pathOrUrl.startsWith(candidate)) {
+      return `${baseUrl}${pathOrUrl.slice(candidate.length)}`;
+    }
+  }
+  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
+    return pathOrUrl;
+  }
+  return `${baseUrl}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
+}
+
+async function fetchSingleAttempt(
   url: string,
-  init: RequestInit = {},
-  timeoutMs = DEFAULT_TIMEOUT_MS
+  init: RequestInit,
+  timeoutMs: number
 ): Promise<Response> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -25,18 +48,88 @@ async function fetchWithTimeout(
       ...init,
       signal: controller.signal,
     });
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      throw new Error(
-        `Tidsavbrudd ved tilkobling til serveren (${API_BASE_URL}). Sjekk at Next.js-serveren kjører (npm run dev).`
-      );
-    }
-    throw new Error(
-      `Kunne ikke koble til serveren (${API_BASE_URL}). Sjekk at PC og telefon er på samme Wi-Fi og at npm run dev kjører.`
-    );
   } finally {
     clearTimeout(timer);
   }
+}
+
+async function fetchWithTimeout(
+  url: string,
+  init: RequestInit = {},
+  timeoutMs = DEFAULT_TIMEOUT_MS
+): Promise<Response> {
+  const orderedBases = [
+    activeApiBaseUrl,
+    ...CANDIDATE_BASE_URLS.filter((b) => b !== activeApiBaseUrl),
+  ];
+
+  let lastError: unknown = null;
+  const triedUrls: string[] = [];
+
+  for (let i = 0; i < orderedBases.length; i++) {
+    const base = orderedBases[i];
+    const targetUrl = buildUrlForBase(url, base);
+    triedUrls.push(base);
+
+    // Use full timeout for primary base URL, or when only 1 base exists
+    const attemptTimeout =
+      i === 0 ? timeoutMs : Math.min(timeoutMs, FALLBACK_PROBE_TIMEOUT_MS);
+
+    try {
+      const res = await fetchSingleAttempt(targetUrl, init, attemptTimeout);
+      activeApiBaseUrl = base;
+      return res;
+    } catch (err) {
+      lastError = err;
+      const errMsg = err instanceof Error ? err.message : String(err);
+      // Do not mask or retry client-side FormData/Body serialization errors as network errors
+      if (
+        errMsg.includes('Unsupported FormDataPart') ||
+        errMsg.includes('Unsupported BodyInit')
+      ) {
+        throw new Error(`Feil ved klargjøring av lyddata på enheten: ${errMsg}`);
+      }
+    }
+  }
+
+  const triedList = triedUrls.join(', ');
+  if (
+    lastError instanceof Error &&
+    (lastError.name === 'AbortError' || lastError.message.includes('aborted'))
+  ) {
+    throw new Error(
+      `Tidsavbrudd ved tilkobling til serveren (${triedList}). Sjekk at Next.js-serveren kjører (npm run dev).`
+    );
+  }
+
+  throw new Error(
+    `Kunne ikke koble til serveren (${triedList}). Sjekk at PC og telefon er på samme Wi-Fi og at npm run dev kjører.`
+  );
+}
+
+/**
+ * Read local recorded audio file into a Uint8Array on React Native (Android / iOS).
+ * Expo SDK 57 replaces global.fetch with expo/fetch, whose FormData serializer
+ * requires a Blob or an object with a `.bytes()` method rather than `{ uri, name, type }` alone.
+ */
+async function readNativeAudioBytes(uri: string): Promise<Uint8Array> {
+  try {
+    const { File: ExpoFile } = await import('expo-file-system');
+    const file = new ExpoFile(uri);
+    const bytes = await file.bytes();
+    if (bytes && bytes.byteLength > 0) {
+      return bytes;
+    }
+  } catch {
+    // Fall back to fetching the file:// URI directly via ExpoFetchModule's file interceptor
+  }
+
+  const fileRes = await fetch(uri);
+  if (!fileRes.ok) {
+    throw new Error(`Kunne ikke lese lydfil (${fileRes.status})`);
+  }
+  const buffer = await fileRes.arrayBuffer();
+  return new Uint8Array(buffer);
 }
 
 export function resolveAudioUrl(pathOrUrl: string): string {
@@ -44,12 +137,12 @@ export function resolveAudioUrl(pathOrUrl: string): string {
   if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
     return pathOrUrl;
   }
-  return `${API_BASE_URL}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
+  return `${activeApiBaseUrl}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
 }
 
 export async function fetchTopicsAndQuota(): Promise<GetTopicsResponse> {
   const userId = await getOrCreateUserId();
-  const endpoint = `${API_BASE_URL}/api/exam/topics?userId=${encodeURIComponent(userId)}`;
+  const endpoint = `${activeApiBaseUrl}/api/exam/topics?userId=${encodeURIComponent(userId)}`;
 
   const res = await fetchWithTimeout(endpoint, {
     method: 'GET',
@@ -73,7 +166,7 @@ export async function startExamSession(params: {
   coCandidateMode: CoCandidateMode;
 }): Promise<StartExamResponse> {
   const userId = await getOrCreateUserId();
-  const res = await fetchWithTimeout(`${API_BASE_URL}/api/exam/start`, {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/exam/start`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -111,7 +204,7 @@ export async function submitExamTurn(
   options: SubmitTurnOptions
 ): Promise<TurnResponse> {
   const userId = await getOrCreateUserId();
-  const endpoint = `${API_BASE_URL}/api/exam/${encodeURIComponent(sessionId)}/turn`;
+  const endpoint = `${activeApiBaseUrl}/api/exam/${encodeURIComponent(sessionId)}/turn`;
 
   // If no audio file is being uploaded (e.g., ending HUMAN_LOCAL discussion or textOverride)
   if (!options.audioUri) {
@@ -161,11 +254,15 @@ export async function submitExamTurn(
             ? 'audio/webm'
             : 'audio/m4a';
 
-    // React Native FormData file object convention
+    const audioBytes = await readNativeAudioBytes(uri);
+
+    // Compatible with both Expo SDK 57 expo/fetch (uses .bytes(), .name, .type)
+    // and legacy React Native XMLHttpRequest FormData (uses .uri, .name, .type)
     form.append('audio', {
       uri,
       name: `answer.${ext}`,
       type: mime,
+      bytes: async () => audioBytes,
     } as unknown as Blob);
   }
 
@@ -195,7 +292,7 @@ export async function submitExamTurn(
 export async function finishExamSession(sessionId: string): Promise<FinishExamResponse> {
   const userId = await getOrCreateUserId();
   const res = await fetchWithTimeout(
-    `${API_BASE_URL}/api/exam/${encodeURIComponent(sessionId)}/finish`,
+    `${activeApiBaseUrl}/api/exam/${encodeURIComponent(sessionId)}/finish`,
     {
       method: 'POST',
       headers: {
@@ -216,7 +313,7 @@ export async function finishExamSession(sessionId: string): Promise<FinishExamRe
 export async function fetchExamResults(sessionId: string): Promise<ExamResultsResponse> {
   const userId = await getOrCreateUserId();
   const res = await fetchWithTimeout(
-    `${API_BASE_URL}/api/exam/${encodeURIComponent(sessionId)}/results`,
+    `${activeApiBaseUrl}/api/exam/${encodeURIComponent(sessionId)}/results`,
     {
       method: 'GET',
       headers: {
@@ -235,4 +332,5 @@ export async function fetchExamResults(sessionId: string): Promise<ExamResultsRe
 
   return res.json();
 }
+
 

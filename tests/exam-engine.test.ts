@@ -219,3 +219,56 @@ test('Personas & Speech Helpers: templates, prompts, word counting, and MIME ext
   assert.equal(extensionForMime(undefined, 'recording.wav'), 'wav');
 });
 
+test('Mobile Audio Upload: Expo SDK 57 FormData part with .bytes() serializes to valid multipart/form-data for Next.js route handler', async () => {
+  const { convertFormDataAsync } = await import(
+    '../node_modules/expo/src/winter/fetch/convertFormData'
+  );
+
+  const sampleAudioBytes = new Uint8Array([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]);
+  const form = new FormData();
+  form.append('durationMs', '4200');
+  form.append('speaker', 'CANDIDATE_1');
+
+  // Simulate Expo Go native FormData entries with .bytes(), .name, .type, .uri
+  const nativePart = {
+    uri: 'file:///data/user/0/host.exp.exponent/cache/Audio/recording-123.m4a',
+    name: 'answer.m4a',
+    type: 'audio/m4a',
+    bytes: async () => sampleAudioBytes,
+  };
+
+  const fakeExpoFormData = {
+    entries: function* () {
+      yield ['durationMs', '4200'];
+      yield ['speaker', 'CANDIDATE_1'];
+      yield ['audio', nativePart];
+    },
+  } as unknown as FormData;
+
+  const { body, boundary } = await convertFormDataAsync(fakeExpoFormData);
+  assert.ok(body.byteLength > sampleAudioBytes.byteLength);
+
+  // Verify Next.js Web Request.formData() parses the multipart payload into a valid File/Blob
+  const req = new Request('http://localhost:3000/api/exam/test/turn', {
+    method: 'POST',
+    headers: {
+      'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    },
+    body: body as unknown as BodyInit,
+  });
+
+  const parsedForm = (await req.formData()) as unknown as {
+    get(name: string): unknown;
+  };
+  assert.equal(parsedForm.get('durationMs'), '4200');
+  assert.equal(parsedForm.get('speaker'), 'CANDIDATE_1');
+
+  const audioField = parsedForm.get('audio') as File | null;
+  assert.ok(audioField && typeof audioField === 'object' && 'arrayBuffer' in audioField);
+  assert.equal(audioField.name, 'answer.m4a');
+  assert.equal(audioField.type, 'audio/m4a');
+  const receivedBytes = new Uint8Array(await audioField.arrayBuffer());
+  assert.deepEqual(Array.from(receivedBytes), Array.from(sampleAudioBytes));
+});
+
+

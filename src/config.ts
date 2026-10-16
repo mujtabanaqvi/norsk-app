@@ -1,11 +1,63 @@
 import Constants from 'expo-constants';
-import { Platform } from 'react-native';
+import { NativeModules, Platform } from 'react-native';
 
 export interface DeriveApiUrlOptions {
   envUrl?: string;
   platformOs?: string;
   expoHostUri?: string | null;
   webHostname?: string | null;
+}
+
+/**
+ * Extract a clean hostname or IPv4 address from an Expo/Metro URI
+ * such as "192.168.1.182:8081", "exp://192.168.1.182:8081/--/", or
+ * "http://192.168.1.182:8081/index.bundle?platform=android".
+ */
+export function extractHostnameFromUri(rawUri?: string | null): string {
+  if (!rawUri) return '';
+  const trimmed = rawUri.trim();
+  if (!trimmed) return '';
+  const withoutScheme = trimmed.replace(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//, '');
+  const authority = withoutScheme.split('/')[0]?.split('?')[0] ?? '';
+  const host = authority.split(':')[0]?.trim() ?? '';
+  return host;
+}
+
+function detectRuntimeExpoHostUri(): string | null {
+  const anyConstants = Constants as unknown as {
+    expoConfig?: { hostUri?: string | null } | null;
+    expoGoConfig?: { debuggerHost?: string | null } | null;
+    manifest2?: {
+      extra?: {
+        expoGo?: { debuggerHost?: string | null };
+        expoClient?: { hostUri?: string | null };
+      };
+    } | null;
+    experienceUrl?: string | null;
+    linkingUri?: string | null;
+  };
+
+  const scriptURL: string | undefined = (
+    NativeModules as { SourceCode?: { scriptURL?: string } } | undefined
+  )?.SourceCode?.scriptURL;
+
+  const candidates = [
+    anyConstants.expoConfig?.hostUri,
+    anyConstants.expoGoConfig?.debuggerHost,
+    anyConstants.manifest2?.extra?.expoGo?.debuggerHost,
+    anyConstants.manifest2?.extra?.expoClient?.hostUri,
+    scriptURL,
+    anyConstants.experienceUrl,
+    anyConstants.linkingUri,
+  ];
+
+  for (const candidate of candidates) {
+    const host = extractHostnameFromUri(candidate);
+    if (host) {
+      return candidate ?? null;
+    }
+  }
+  return null;
 }
 
 /**
@@ -18,14 +70,15 @@ export interface DeriveApiUrlOptions {
 export function deriveApiBaseUrl(opts: DeriveApiUrlOptions = {}): string {
   const envUrl = opts.envUrl?.trim();
   const platformOs = opts.platformOs ?? Platform.OS;
-  const hostUri = opts.expoHostUri ?? Constants.expoConfig?.hostUri ?? null;
+  const hostUri =
+    opts.expoHostUri !== undefined ? opts.expoHostUri : detectRuntimeExpoHostUri();
   const webHost =
     opts.webHostname ??
     (typeof window !== 'undefined' && window.location?.hostname
       ? window.location.hostname
       : null);
 
-  const hostFromExpo = hostUri ? hostUri.split(':')[0].trim() : '';
+  const hostFromExpo = extractHostnameFromUri(hostUri);
   const isLanHost =
     Boolean(hostFromExpo) &&
     hostFromExpo !== 'localhost' &&
@@ -61,7 +114,44 @@ export function deriveApiBaseUrl(opts: DeriveApiUrlOptions = {}): string {
   return 'http://localhost:3000';
 }
 
+/**
+ * Ordered list of candidate API base URLs to try on mobile/emulator.
+ * Allows automatic fallback between LAN IP (for physical phones on Wi-Fi)
+ * and 10.0.2.2 / localhost (for Android Emulator / iOS Simulator when Expo runs in LAN mode).
+ */
+export function getCandidateApiBaseUrls(opts: DeriveApiUrlOptions = {}): string[] {
+  const primary = deriveApiBaseUrl(opts);
+  const platformOs = opts.platformOs ?? Platform.OS;
+  if (platformOs === 'web') {
+    return [primary];
+  }
+
+  const hostUri =
+    opts.expoHostUri !== undefined ? opts.expoHostUri : detectRuntimeExpoHostUri();
+  const hostFromExpo = extractHostnameFromUri(hostUri);
+  const candidates: string[] = [primary];
+
+  if (
+    hostFromExpo &&
+    hostFromExpo !== 'localhost' &&
+    hostFromExpo !== '127.0.0.1' &&
+    hostFromExpo !== '10.0.2.2'
+  ) {
+    candidates.push(`http://${hostFromExpo}:3000`);
+  }
+
+  if (platformOs === 'android') {
+    candidates.push('http://10.0.2.2:3000');
+    candidates.push('http://localhost:3000');
+  } else if (platformOs === 'ios') {
+    candidates.push('http://localhost:3000');
+  }
+
+  return Array.from(new Set(candidates));
+}
+
 export const API_BASE_URL: string = deriveApiBaseUrl({
   envUrl: process.env.EXPO_PUBLIC_API_URL || process.env.REACT_NATIVE_API_URL,
 });
+
 
