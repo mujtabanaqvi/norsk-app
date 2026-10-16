@@ -8,28 +8,19 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
-  SafeAreaView,
   StatusBar,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { fetchTopicsAndQuota, startExamSession } from '../api';
 import type {
   CefrLevel,
   CoCandidateMode,
   ExamTopic,
-  GetTopicsResponse,
-  StartExamRequest,
-  StartExamResponse,
   RootStackParamList,
 } from '../types/exam';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamSetup'>;
-
-// Fallback host if env is not injected in React Native bundler
-const DEFAULT_API_BASE_URL = 'http://localhost:3000';
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  process.env.REACT_NATIVE_API_URL ||
-  DEFAULT_API_BASE_URL;
 
 // Minimum audio quota required by backend (180 seconds / 3 minutes)
 const MIN_REQUIRED_QUOTA_SECONDS = 180;
@@ -58,23 +49,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     setFetchError(null);
 
     try {
-      // Backend supports ?userId= fallback or test candidate ID
-      const testUserId = 'candidate_mobile_user';
-      const endpoint = `${API_BASE_URL}/api/exam/topics?userId=${encodeURIComponent(testUserId)}`;
-
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-          'x-user-id': testUserId,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error(`Kunne ikke hente eksamensevner (${response.status})`);
-      }
-
-      const data: GetTopicsResponse = await response.json();
+      const data = await fetchTopicsAndQuota();
       setTopics(data.topics || []);
 
       if (data.quota && typeof data.quota.remainingAudioSeconds === 'number') {
@@ -148,40 +123,22 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsStarting(true);
     try {
-      const payload: StartExamRequest = {
-        userId: 'candidate_mobile_user',
+      const result = await startExamSession({
         topicId: selectedTopic.id,
         level: targetLevel,
         coCandidateMode: practiceMode,
-      };
-
-      const response = await fetch(`${API_BASE_URL}/api/exam/start`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-user-id': payload.userId || 'candidate_mobile_user',
-        },
-        body: JSON.stringify(payload),
       });
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.message || errorData.error || `Feil ved oppstart av rom (${response.status})`
-        );
-      }
-
-      const result: StartExamResponse = await response.json();
-
-      // Navigate to the LiveKit Active Exam Room Screen
+      // Navigate to the Active Exam Room Screen
       navigation.navigate('ExamRoom', {
         sessionId: result.sessionId,
-        roomName: result.roomName,
-        token: result.token,
-        livekitUrl: result.livekitUrl,
         level: targetLevel,
         coCandidateMode: practiceMode,
         topicTitle: selectedTopic.titleNo,
+        monologuePromptNo: selectedTopic.monologuePromptNo,
+        discussionPromptNo: selectedTopic.discussionPromptNo,
+        initialReplies: result.replies || [],
+        initialTranscript: result.transcript || [],
       });
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Oppstart av muntlig prøve mislyktes';

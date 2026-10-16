@@ -7,14 +7,15 @@ import {
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  SafeAreaView,
   StatusBar,
   Animated,
   Platform,
   UIManager,
   Share,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { fetchExamResults } from '../api';
 import type {
   RootStackParamList,
   ExamResultsResponse,
@@ -34,13 +35,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamResults'>;
-
-// API Base URL fallback
-const DEFAULT_API_BASE_URL = 'http://localhost:3000';
-const API_BASE_URL =
-  process.env.EXPO_PUBLIC_API_URL ||
-  process.env.REACT_NATIVE_API_URL ||
-  DEFAULT_API_BASE_URL;
 
 // Polling interval in milliseconds
 const POLLING_INTERVAL_MS = 3000;
@@ -237,6 +231,9 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     };
   }, [isLoading, pulseAnim, rotateAnim]);
 
+  const resultsDataRef = useRef<ExamResultsResponse | null>(null);
+  resultsDataRef.current = resultsData;
+
   /**
    * Poll results from backend API
    */
@@ -252,22 +249,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     try {
-      const endpoint = `${API_BASE_URL}/api/exam/${sessionId}/results`;
-      const response = await fetch(endpoint, {
-        method: 'GET',
-        headers: {
-          Accept: 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 404) {
-          throw new Error('Eksamensesjonen ble ikke funnet.');
-        }
-        throw new Error(`Kunne ikke hente resultat (${response.status})`);
-      }
-
-      const data: ExamResultsResponse = await response.json();
+      const data = await fetchExamResults(sessionId);
       setResultsData(data);
       setPollError(null);
 
@@ -286,7 +268,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Feil ved henting av vurdering';
       // If we haven't loaded anything yet, surface error
-      if (!resultsData) {
+      if (!resultsDataRef.current) {
         setPollError(message);
       }
     } finally {
@@ -294,10 +276,10 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
         setIsRefreshing(false);
       }
     }
-  }, [sessionId, resultsData]);
+  }, [sessionId]);
 
   /**
-   * Setup polling every 3 seconds while active or evaluation is null
+   * Setup polling every 3 seconds while active or evaluation is null, with 3-minute timeout
    */
   useEffect(() => {
     // Initial fetch immediately
@@ -308,6 +290,20 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
       fetchResults();
     }, POLLING_INTERVAL_MS);
 
+    // Timeout safety net (stop polling after 180s / 3 minutes)
+    const timeoutTimer = setTimeout(() => {
+      if (pollTimerRef.current) {
+        clearInterval(pollTimerRef.current);
+        pollTimerRef.current = null;
+      }
+      if (!resultsDataRef.current?.evaluationJson) {
+        setIsLoading(false);
+        setPollError(
+          'Vurderingen tok lenger tid enn forventet. Vennligst trykk «Prøv på nytt» eller gå tilbake.'
+        );
+      }
+    }, 180_000);
+
     return () => {
       if (pollTimerRef.current) {
         clearInterval(pollTimerRef.current);
@@ -317,6 +313,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
         clearInterval(loadingStepTimerRef.current);
         loadingStepTimerRef.current = null;
       }
+      clearTimeout(timeoutTimer);
     };
   }, [fetchResults]);
 

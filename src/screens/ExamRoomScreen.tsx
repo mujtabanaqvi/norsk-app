@@ -6,7 +6,6 @@ import {
   TouchableOpacity,
   ScrollView,
   Alert,
-  SafeAreaView,
   StatusBar,
   Animated,
   ActivityIndicator,
@@ -14,35 +13,13 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import {
-  LiveKitRoom,
-  AudioSession,
-  registerGlobals,
-  useRoomContext,
-  useRemoteParticipants,
-} from '@livekit/react-native';
-import { RoomEvent, ConnectionState } from 'livekit-client';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useExamTurns } from '../hooks/useExamTurns';
 import type {
   RootStackParamList,
-  CefrLevel,
-  CoCandidateMode,
-  TranscriptTurn,
-  SpeakerRole,
   ExamStage,
 } from '../types/exam';
-
-// Ensure WebRTC globals are registered for React Native (when native WebRTC binary is present)
-if (Platform.OS !== 'web') {
-  try {
-    registerGlobals();
-  } catch (error) {
-    console.warn(
-      '[LiveKit] Native WebRTC module not found (Expo Go sandbox detected). For live mic WebRTC in mobile, use an Expo Development Build: npx expo run:android or npx expo run:ios.',
-      error
-    );
-  }
-}
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -127,216 +104,96 @@ const AudioWaveIndicator: React.FC<{
   );
 };
 
-/**
- * Inner Active Exam Room Content
- * Operates inside the LiveKitRoom provider with direct access to room context and hooks
- */
-interface ActiveExamContentProps {
-  sessionId: string;
-  roomName: string;
-  level: CefrLevel;
-  coCandidateMode: CoCandidateMode;
-  topicTitle: string;
-  onEndExam: () => void;
-}
+export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
+  const {
+    sessionId,
+    level,
+    coCandidateMode,
+    topicTitle,
+    monologuePromptNo,
+    discussionPromptNo,
+    initialReplies,
+    initialTranscript,
+  } = route.params;
 
-const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
-  sessionId,
-  level,
-  coCandidateMode,
-  topicTitle,
-  onEndExam,
-}) => {
-  const room = useRoomContext();
-  const remoteParticipants = useRemoteParticipants();
+  const hasNavigatedRef = useRef<boolean>(false);
 
-  // Exam phase tracking
-  const [currentStage, setCurrentStage] = useState<ExamStage>('DEL_1');
-  const [isEndingDiscussion, setIsEndingDiscussion] = useState<boolean>(false);
-  const [discussionEndedToast, setDiscussionEndedToast] = useState<boolean>(false);
+  const handleNavigateToResults = useCallback(() => {
+    if (hasNavigatedRef.current) return;
+    hasNavigatedRef.current = true;
+    navigation.replace('ExamResults', { sessionId });
+  }, [navigation, sessionId]);
 
-  // Participant speaking states
-  const [isLocalSpeaking, setIsLocalSpeaking] = useState<boolean>(false);
-  const [isRemoteSpeaking, setIsRemoteSpeaking] = useState<boolean>(false);
-  const [activeAiSpeaker, setActiveAiSpeaker] = useState<'examiner' | 'co_candidate'>('examiner');
+  const {
+    phase,
+    stage,
+    activeAiSpeaker,
+    currentReplyText,
+    transcripts,
+    candidateSpeaker,
+    setCandidateSpeaker,
+    recordingDurationMs,
+    errorMessage,
+    hintMessage,
+    startRecording,
+    stopRecordingAndSubmit,
+    skipCurrentSpeech,
+    endHumanDiscussion,
+    endExamEarly,
+    dismissError,
+  } = useExamTurns({
+    sessionId,
+    coCandidateMode,
+    initialReplies: initialReplies || [],
+    initialTranscript: initialTranscript || [],
+    onExamComplete: handleNavigateToResults,
+  });
 
   // Exam elapsed timer
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
-  const [isConnected, setIsConnected] = useState<boolean>(false);
-
-  // Live transcript drawer
-  const [transcripts, setTranscripts] = useState<TranscriptTurn[]>([]);
   const [isDrawerExpanded, setIsDrawerExpanded] = useState<boolean>(false);
-  const transcriptScrollRef = useRef<any>(null);
+  const transcriptScrollRef = useRef<ScrollView | null>(null);
 
-  // Timer interval
   useEffect(() => {
-    let timer: ReturnType<typeof setInterval> | null = null;
-    if (isConnected) {
-      timer = setInterval(() => {
-        setElapsedSeconds((prev) => prev + 1);
-      }, 1000);
-    }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [isConnected]);
+    const timer = setInterval(() => {
+      setElapsedSeconds((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
 
-  // Format MM:SS timer
+  // Auto-scroll transcript when new turns arrive
+  useEffect(() => {
+    if (isDrawerExpanded) {
+      setTimeout(() => {
+        transcriptScrollRef.current?.scrollToEnd({ animated: true });
+      }, 100);
+    }
+  }, [transcripts.length, isDrawerExpanded]);
+
   const formattedTimer = useMemo(() => {
     const minutes = Math.floor(elapsedSeconds / 60);
     const seconds = elapsedSeconds % 60;
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   }, [elapsedSeconds]);
 
-  // Set up LiveKit room event listeners
-  useEffect(() => {
-    if (!room) return;
+  const formattedRecordingTime = useMemo(() => {
+    const totalSec = Math.floor(recordingDurationMs / 1000);
+    const min = Math.floor(totalSec / 60);
+    const sec = totalSec % 60;
+    return `${min.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`;
+  }, [recordingDurationMs]);
 
-    const handleConnected = () => {
-      setIsConnected(true);
-    };
-
-    const handleDisconnected = () => {
-      setIsConnected(false);
-    };
-
-    const handleActiveSpeakersChanged = () => {
-      // Check local participant speaking state
-      const localSpeaking = room.localParticipant?.isSpeaking ?? false;
-      setIsLocalSpeaking(localSpeaking);
-
-      // Check remote participants speaking state
-      const anyRemoteSpeaking = remoteParticipants.some((p) => p.isSpeaking);
-      setIsRemoteSpeaking(anyRemoteSpeaking);
-    };
-
-    // Receive data messages (e.g. transcript turns, stage updates, speaker transitions)
-    const handleDataReceived = (payload: Uint8Array) => {
-      try {
-        const textDecoder = typeof TextDecoder !== 'undefined' ? new TextDecoder() : null;
-        const text = textDecoder
-          ? textDecoder.decode(payload)
-          : String.fromCharCode.apply(null, Array.from(payload));
-
-        const data = JSON.parse(text);
-
-        // Stage transitions emitted from worker
-        if (data.stage && ['DEL_1', 'DEL_2', 'DEL_3'].includes(data.stage)) {
-          setCurrentStage(data.stage as ExamStage);
-        }
-
-        // Active speaker persona changes (Examiner vs CoCandidate)
-        if (data.activeSpeaker === 'examiner' || data.activeSpeaker === 'co_candidate') {
-          setActiveAiSpeaker(data.activeSpeaker);
-        }
-
-        // Realtime transcript turn delivered over DataChannel
-        if (data.type === 'TRANSCRIPT_TURN' && data.text) {
-          const newTurn: TranscriptTurn = {
-            id: data.id || `${Date.now()}_${Math.random()}`,
-            speaker: data.speaker || 'participant',
-            role: (data.role as SpeakerRole) || 'EXAMINER',
-            text: data.text,
-            timestamp: data.timestamp || Date.now(),
-            isFinal: true,
-          };
-
-          setTranscripts((prev) => [...prev, newTurn]);
-
-          // Auto-scroll transcript drawer to bottom
-          setTimeout(() => {
-            transcriptScrollRef.current?.scrollToEnd({ animated: true });
-          }, 100);
-        }
-      } catch {
-        // Ignore binary or malformed data packets
-      }
-    };
-
-    // STT Transcription Received Event from LiveKit
-    const handleTranscriptionReceived = (transcriptions: any[]) => {
-      if (!Array.isArray(transcriptions) || transcriptions.length === 0) return;
-
-      for (const t of transcriptions) {
-        if (!t.text) continue;
-        const role: SpeakerRole = t.participantIdentity?.includes('agent')
-          ? activeAiSpeaker === 'co_candidate'
-            ? 'AI_COCANDIDATE'
-            : 'EXAMINER'
-          : 'CANDIDATE_1';
-
-        const newTurn: TranscriptTurn = {
-          id: t.id || `${Date.now()}_${Math.random()}`,
-          speaker: t.participantIdentity || 'participant',
-          role,
-          text: t.text,
-          timestamp: Date.now(),
-          isFinal: t.isFinal ?? true,
-        };
-
-        setTranscripts((prev) => [...prev, newTurn]);
-      }
-
-      setTimeout(() => {
-        transcriptScrollRef.current?.scrollToEnd({ animated: true });
-      }, 100);
-    };
-
-    if (room.state === ConnectionState.Connected) {
-      setIsConnected(true);
-    }
-
-    room.on(RoomEvent.Connected, handleConnected);
-    room.on(RoomEvent.Disconnected, handleDisconnected);
-    room.on(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakersChanged);
-    room.on(RoomEvent.DataReceived, handleDataReceived);
-    room.on(RoomEvent.TranscriptionReceived, handleTranscriptionReceived);
-
-    return () => {
-      room.off(RoomEvent.Connected, handleConnected);
-      room.off(RoomEvent.Disconnected, handleDisconnected);
-      room.off(RoomEvent.ActiveSpeakersChanged, handleActiveSpeakersChanged);
-      room.off(RoomEvent.DataReceived, handleDataReceived);
-      room.off(RoomEvent.TranscriptionReceived, handleTranscriptionReceived);
-    };
-  }, [room, remoteParticipants, activeAiSpeaker]);
-
-  /**
-   * Local Duo Mode (HUMAN_LOCAL):
-   * Sends LiveKit DataChannel message "END_DISCUSSION" to exit Passive Moderator Mode.
-   */
-  const handleEndDiscussion = async () => {
-    if (!room || !room.localParticipant) return;
-
-    setIsEndingDiscussion(true);
-    try {
-      const message = JSON.stringify({ action: 'END_DISCUSSION' });
-      const encodedData = new TextEncoder().encode(message);
-
-      await room.localParticipant.publishData(encodedData, { reliable: true });
-
-      setDiscussionEndedToast(true);
-      setCurrentStage('DEL_3');
-      setActiveAiSpeaker('examiner');
-
-      setTimeout(() => {
-        setDiscussionEndedToast(false);
-      }, 4000);
-    } catch (err) {
-      Alert.alert(
-        'Feil ved overgang',
-        'Kunne ikke sende signal til sensor. Vennligst prøv igjen.'
-      );
-    } finally {
-      setIsEndingDiscussion(false);
-    }
-  };
-
-  /**
-   * Prompt confirmation before exiting exam and requesting evaluation
-   */
   const handleConfirmEndExam = () => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const ok = window.confirm(
+        'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere din HK-dir vurdering.'
+      );
+      if (ok) {
+        endExamEarly();
+      }
+      return;
+    }
+
     Alert.alert(
       'Avslutt prøve',
       'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere din HK-dir vurdering.',
@@ -345,7 +202,9 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
         {
           text: 'Avslutt og få vurdering',
           style: 'destructive',
-          onPress: onEndExam,
+          onPress: () => {
+            endExamEarly();
+          },
         },
       ]
     );
@@ -356,11 +215,25 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
     setIsDrawerExpanded(!isDrawerExpanded);
   };
 
-  // Determine speaker states for Examiner vs AI Medkandidat
-  const isExaminerSpeaking =
-    isRemoteSpeaking && activeAiSpeaker === 'examiner';
-  const isAiCoCandidateSpeaking =
-    isRemoteSpeaking && activeAiSpeaker === 'co_candidate';
+  const isExaminerSpeaking = phase === 'speaking' && activeAiSpeaker === 'examiner';
+  const isAiCoCandidateSpeaking = phase === 'speaking' && activeAiSpeaker === 'co_candidate';
+  const isLocalSpeaking = phase === 'recording';
+
+  const statusBadgeLabel =
+    phase === 'recording'
+      ? 'OPPTAK'
+      : phase === 'thinking'
+        ? 'TENKER'
+        : phase === 'speaking'
+          ? 'SENSOR TALER'
+          : 'KLAR';
+
+  const currentTaskDescription =
+    stage === 'DEL_1'
+      ? monologuePromptNo || 'Presenter dine tanker om temaet i en kort monolog.'
+      : stage === 'DEL_2'
+        ? discussionPromptNo || 'Diskuter temaet med samtalepartneren din.'
+        : 'Svar på oppfølgingsspørsmålene fra sensoren.';
 
   return (
     <SafeAreaView style={styles.roomSafeArea}>
@@ -370,8 +243,17 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
       <View style={styles.topBar}>
         <View style={styles.topBarLeft}>
           <View style={styles.liveIndicator}>
-            <View style={[styles.liveDot, isConnected && styles.liveDotConnected]} />
-            <Text style={styles.liveText}>{isConnected ? 'LIVE' : 'KOBLER TIL'}</Text>
+            <View
+              style={[
+                styles.liveDot,
+                phase === 'recording'
+                  ? styles.liveDotRecording
+                  : phase === 'thinking'
+                    ? styles.liveDotThinking
+                    : styles.liveDotConnected,
+              ]}
+            />
+            <Text style={styles.liveText}>{statusBadgeLabel}</Text>
           </View>
           <Text style={styles.timerText}>{formattedTimer}</Text>
         </View>
@@ -389,27 +271,25 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
 
       {/* Phase Segmented Pills */}
       <View style={styles.phaseContainer}>
-        {(['DEL_1', 'DEL_2', 'DEL_3'] as ExamStage[]).map((stage) => {
-          const isActive = currentStage === stage;
+        {(['DEL_1', 'DEL_2', 'DEL_3'] as ExamStage[]).map((pillStage) => {
+          const isActive = stage === pillStage;
           const label =
-            stage === 'DEL_1'
+            pillStage === 'DEL_1'
               ? 'Del 1: Monolog'
-              : stage === 'DEL_2'
-              ? 'Del 2: Samtale'
-              : 'Del 3: Oppfølging';
+              : pillStage === 'DEL_2'
+                ? 'Del 2: Samtale'
+                : 'Del 3: Oppfølging';
           return (
-            <TouchableOpacity
-              key={stage}
+            <View
+              key={pillStage}
               style={[styles.phasePill, isActive && styles.phasePillActive]}
-              onPress={() => setCurrentStage(stage)}
-              activeOpacity={0.7}
             >
               <Text
                 style={[styles.phasePillText, isActive && styles.phasePillTextActive]}
               >
                 {label}
               </Text>
-            </TouchableOpacity>
+            </View>
           );
         })}
       </View>
@@ -419,6 +299,22 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
         contentContainerStyle={styles.mainScrollContent}
         showsVerticalScrollIndicator={false}
       >
+        {/* Current Task / Active Speech Card */}
+        <View style={styles.promptBannerCard}>
+          <Text style={styles.promptBannerLabel}>
+            {phase === 'speaking'
+              ? activeAiSpeaker === 'co_candidate'
+                ? 'AI Medkandidat sier:'
+                : 'Sensor sier:'
+              : `Oppgave (${stage === 'DEL_1' ? 'Del 1' : stage === 'DEL_2' ? 'Del 2' : 'Del 3'}):`}
+          </Text>
+          <Text style={styles.promptBannerText}>
+            {phase === 'speaking' && currentReplyText
+              ? currentReplyText
+              : currentTaskDescription}
+          </Text>
+        </View>
+
         {/* Participant Card 1: Sensor (AI Examiner) */}
         <View
           style={[
@@ -432,7 +328,7 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
             </View>
             <View style={styles.participantMeta}>
               <Text style={styles.participantName}>Sensor (AI Sensor)</Text>
-              <Text style={styles.participantRole}>Offisiell eksaminator</Text>
+              <Text style={styles.participantRole}>Offisiell eksaminator (HK-dir)</Text>
             </View>
             <View
               style={[
@@ -446,7 +342,7 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
                   isExaminerSpeaking && styles.statusBadgeTextSpeaking,
                 ]}
               >
-                {isExaminerSpeaking ? 'Taler nå' : 'Lytter aktivt'}
+                {isExaminerSpeaking ? 'Taler nå' : 'Lytter'}
               </Text>
             </View>
           </View>
@@ -456,13 +352,13 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
           </View>
         </View>
 
-        {/* Participant Card 2: Co-Candidate Slot */}
+        {/* Participant Card 2: Co-Candidate or Candidate Card */}
         {coCandidateMode === 'AI_PEER' ? (
-          /* AI_PEER Card */
           <View
             style={[
               styles.participantCard,
               isAiCoCandidateSpeaking && styles.participantCardActiveCo,
+              isLocalSpeaking && styles.participantCardActiveLocal,
             ]}
           >
             <View style={styles.participantHeader}>
@@ -470,30 +366,46 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
                 <Text style={styles.avatarLetter}>M</Text>
               </View>
               <View style={styles.participantMeta}>
-                <Text style={styles.participantName}>AI Medkandidat</Text>
-                <Text style={styles.participantRole}>Samtalepartner (Nivå {level})</Text>
+                <Text style={styles.participantName}>
+                  {stage === 'DEL_2' ? 'AI Medkandidat & Deg' : 'Kandidat (Deg)'}
+                </Text>
+                <Text style={styles.participantRole}>
+                  {stage === 'DEL_2'
+                    ? `Samtalepartner på nivå ${level}`
+                    : `Målnivå ${level}`}
+                </Text>
               </View>
               <View
                 style={[
                   styles.statusBadge,
                   isAiCoCandidateSpeaking
                     ? styles.statusBadgeSpeakingCo
-                    : styles.statusBadgeIdle,
+                    : isLocalSpeaking
+                      ? styles.statusBadgeSpeakingLocal
+                      : styles.statusBadgeIdle,
                 ]}
               >
                 <Text
                   style={[
                     styles.statusBadgeText,
-                    isAiCoCandidateSpeaking && styles.statusBadgeTextSpeakingCo,
+                    (isAiCoCandidateSpeaking || isLocalSpeaking) &&
+                      styles.statusBadgeTextSpeaking,
                   ]}
                 >
-                  {isAiCoCandidateSpeaking ? 'Taler nå' : 'Venter på tur'}
+                  {isAiCoCandidateSpeaking
+                    ? 'Medkandidat taler'
+                    : isLocalSpeaking
+                      ? 'Du snakker nå'
+                      : 'Klar'}
                 </Text>
               </View>
             </View>
 
             <View style={styles.participantWaveRow}>
-              <AudioWaveIndicator isSpeaking={isAiCoCandidateSpeaking} color="#A855F7" />
+              <AudioWaveIndicator
+                isSpeaking={isAiCoCandidateSpeaking || isLocalSpeaking}
+                color={isAiCoCandidateSpeaking ? '#A855F7' : '#10B981'}
+              />
             </View>
           </View>
         ) : (
@@ -512,7 +424,10 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
                 <Text style={styles.participantName}>
                   Kandidat 1 & Kandidat 2 (Delt mikrofon)
                 </Text>
-                <Text style={styles.participantRole}>Fysisk til stede i rommet</Text>
+                <Text style={styles.participantRole}>
+                  Aktiv taler:{' '}
+                  {candidateSpeaker === 'CANDIDATE_2' ? 'Kandidat 2' : 'Kandidat 1'}
+                </Text>
               </View>
               <View
                 style={[
@@ -526,9 +441,37 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
                     isLocalSpeaking && styles.statusBadgeTextSpeakingLocal,
                   ]}
                 >
-                  {isLocalSpeaking ? 'Mikrofon aktiv' : 'Lytter'}
+                  {isLocalSpeaking ? 'Mikrofon aktiv' : 'Klar'}
                 </Text>
               </View>
+            </View>
+
+            {/* Candidate 1 / Candidate 2 Selector for HUMAN_LOCAL */}
+            <View style={styles.speakerSelectorRow}>
+              {(['CANDIDATE_1', 'CANDIDATE_2'] as const).map((cand) => {
+                const selected = candidateSpeaker === cand;
+                return (
+                  <TouchableOpacity
+                    key={cand}
+                    style={[
+                      styles.speakerSelectButton,
+                      selected && styles.speakerSelectButtonActive,
+                    ]}
+                    onPress={() => setCandidateSpeaker(cand)}
+                    disabled={phase === 'recording' || phase === 'thinking'}
+                    activeOpacity={0.8}
+                  >
+                    <Text
+                      style={[
+                        styles.speakerSelectButtonText,
+                        selected && styles.speakerSelectButtonTextActive,
+                      ]}
+                    >
+                      {cand === 'CANDIDATE_1' ? '👤 Kandidat 1' : '👤 Kandidat 2'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
             <View style={styles.participantWaveRow}>
@@ -537,42 +480,136 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
           </View>
         )}
 
+        {/* Hint / Retry Notification */}
+        {hintMessage && (
+          <View style={styles.hintBanner}>
+            <Text style={styles.hintBannerText}>{hintMessage}</Text>
+          </View>
+        )}
+
+        {/* Error Banner with Retry */}
+        {phase === 'error' && errorMessage && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerTitle}>Tilkoblings- eller opptaksfeil</Text>
+            <Text style={styles.errorBannerText}>{errorMessage}</Text>
+            <TouchableOpacity
+              style={styles.errorRetryButton}
+              onPress={dismissError}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.errorRetryButtonText}>Prøv på nytt</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Turn-Based Microphone Action Card */}
+        <View style={styles.micControlCard}>
+          {phase === 'speaking' && (
+            <View style={styles.micStateBox}>
+              <Text style={styles.micStatusTitle}>
+                {activeAiSpeaker === 'co_candidate'
+                  ? '🔊 AI Medkandidat snakker...'
+                  : '🔊 Sensor snakker...'}
+              </Text>
+              <Text style={styles.micStatusSubtext}>
+                Lytt til oppgaven. Det blir din tur straks talen er ferdig.
+              </Text>
+              <TouchableOpacity
+                style={styles.skipSpeechButton}
+                onPress={skipCurrentSpeech}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.skipSpeechButtonText}>
+                  Hopp over tale — Svar nå →
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {phase === 'listening' && (
+            <View style={styles.micStateBox}>
+              <Text style={styles.micStatusTitle}>Din tur til å snakke</Text>
+              <Text style={styles.micStatusSubtext}>
+                Trykk på knappen under for å starte opptaket. Opptaket stopper automatisk ved pause, eller når du trykker «Ferdig».
+              </Text>
+              <TouchableOpacity
+                style={styles.recordStartButton}
+                onPress={startRecording}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.recordStartButtonText}>
+                  🎙️ Trykk for å snakke
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {phase === 'recording' && (
+            <View style={styles.micStateBox}>
+              <Text style={styles.micStatusTitleRecording}>
+                🔴 Opptak pågår ({formattedRecordingTime})
+              </Text>
+              <Text style={styles.micStatusSubtext}>
+                Snakk tydelig på norsk. Trykk «Ferdig å snakke» når du har svart.
+              </Text>
+              <TouchableOpacity
+                style={styles.recordStopButton}
+                onPress={stopRecordingAndSubmit}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.recordStopButtonText}>
+                  ⏹ Ferdig å snakke — Send svar
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {phase === 'thinking' && (
+            <View style={styles.micStateBox}>
+              <ActivityIndicator size="large" color="#38BDF8" />
+              <Text style={[styles.micStatusTitle, { marginTop: 10 }]}>
+                Behandler svaret ditt...
+              </Text>
+              <Text style={styles.micStatusSubtext}>
+                Transkriberer norsk tale og genererer neste respons
+              </Text>
+            </View>
+          )}
+
+          {phase === 'done' && (
+            <View style={styles.micStateBox}>
+              <ActivityIndicator size="small" color="#10B981" />
+              <Text style={[styles.micStatusTitle, { marginTop: 8 }]}>
+                Prøven er fullført! Henter vurdering...
+              </Text>
+            </View>
+          )}
+        </View>
+
         {/* Local Duo Mode (HUMAN_LOCAL) Moderator Controls during Del 2 */}
-        {coCandidateMode === 'HUMAN_LOCAL' && currentStage === 'DEL_2' && (
+        {coCandidateMode === 'HUMAN_LOCAL' && stage === 'DEL_2' && (
           <View style={styles.moderatorBox}>
             <View style={styles.moderatorIconRow}>
               <Text style={styles.moderatorIcon}>👥</Text>
-              <Text style={styles.moderatorTitle}>Passiv Sensormodus Aktiv</Text>
+              <Text style={styles.moderatorTitle}>Del 2: Samtale mellom Kandidat 1 og 2</Text>
             </View>
 
             <Text style={styles.moderatorDescription}>
-              Del 2: Diskuter oppgaven med personen ved siden av deg. Sensoren lytter uten å avbryte.
+              Ta opp flere replikker mellom Kandidat 1 og Kandidat 2. Sensoren lytter passivt uten å avbryte. Når dere er ferdige med diskusjonen, trykk på knappen under for å gå til Del 3.
             </Text>
-
-            {discussionEndedToast && (
-              <View style={styles.toastBox}>
-                <Text style={styles.toastText}>
-                  ✓ Diskusjon fullført. Sensor gjenopptar ordet for Del 3!
-                </Text>
-              </View>
-            )}
 
             <TouchableOpacity
               style={[
                 styles.endDiscussionButton,
-                isEndingDiscussion && styles.endDiscussionButtonDisabled,
+                phase === 'thinking' && styles.endDiscussionButtonDisabled,
               ]}
-              onPress={handleEndDiscussion}
-              disabled={isEndingDiscussion}
+              onPress={endHumanDiscussion}
+              disabled={phase === 'thinking'}
               activeOpacity={0.8}
             >
-              {isEndingDiscussion ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={styles.endDiscussionButtonText}>
-                  Fullfør diskusjon — Gå til Del 3 (Oppfølgingsspørsmål)
-                </Text>
-              )}
+              <Text style={styles.endDiscussionButtonText}>
+                Fullfør diskusjon — Gå til Del 3 (Oppfølgingsspørsmål)
+              </Text>
             </TouchableOpacity>
           </View>
         )}
@@ -593,7 +630,7 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
           <View style={styles.drawerHandleBar} />
           <View style={styles.transcriptHeaderRow}>
             <Text style={styles.transcriptHeaderTitle}>
-              Transkripsjon i sanntid ({transcripts.length})
+              Transkripsjon ({transcripts.length})
             </Text>
             <Text style={styles.drawerExpandHint}>
               {isDrawerExpanded ? 'Skjul ▾' : 'Vis transkripsjon ▴'}
@@ -610,7 +647,7 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
           >
             {transcripts.length === 0 ? (
               <Text style={styles.emptyTranscriptText}>
-                Transkripsjon starter automatisk når deltakerne snakker...
+                Transkripsjon vises her etter hvert som deltakerne snakker...
               </Text>
             ) : (
               transcripts.map((turn, index) => {
@@ -633,10 +670,10 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
                           {isExaminer
                             ? 'Sensor'
                             : isPeer
-                            ? 'AI Medkandidat'
-                            : isCandidate2
-                            ? 'Kandidat 2'
-                            : 'Kandidat 1'}
+                              ? 'AI Medkandidat'
+                              : isCandidate2
+                                ? 'Kandidat 2'
+                                : 'Kandidat 1'}
                         </Text>
                       </View>
                       <Text style={styles.turnTimestamp}>
@@ -671,102 +708,7 @@ const ActiveExamContent: React.FC<ActiveExamContentProps> = ({
   );
 };
 
-/**
- * Main Active Exam Room Screen Component
- * Manages AudioSession lifecycle and wraps view in LiveKitRoom
- */
-export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
-  const {
-    sessionId,
-    roomName,
-    token,
-    livekitUrl,
-    level,
-    coCandidateMode,
-    topicTitle,
-  } = route.params;
-
-  const [isAudioSessionReady, setIsAudioSessionReady] = useState<boolean>(false);
-
-  // Initialize and tear down LiveKit AudioSession
-  useEffect(() => {
-    let isMounted = true;
-
-    const initAudio = async () => {
-      try {
-        await AudioSession.startAudioSession();
-        if (isMounted) {
-          setIsAudioSessionReady(true);
-        }
-      } catch (err) {
-        console.warn('AudioSession.startAudioSession error:', err);
-        if (isMounted) {
-          setIsAudioSessionReady(true); // Allow room to mount even if hardware audio throws
-        }
-      }
-    };
-
-    initAudio();
-
-    return () => {
-      isMounted = false;
-      AudioSession.stopAudioSession().catch((err) => {
-        console.warn('AudioSession.stopAudioSession error:', err);
-      });
-    };
-  }, []);
-
-  /**
-   * Disconnect from room and navigate to results screen
-   */
-  const handleEndExam = useCallback(() => {
-    // Navigating to ExamResults automatically unmounts LiveKitRoom, disconnecting from server
-    // and triggering Agent Worker's shutdown Neon transaction.
-    navigation.replace('ExamResults', { sessionId });
-  }, [navigation, sessionId]);
-
-  if (!isAudioSessionReady) {
-    return (
-      <View style={styles.loadingScreen}>
-        <ActivityIndicator size="large" color="#38BDF8" />
-        <Text style={styles.loadingScreenText}>Klargjør lydsystem og mikrofon...</Text>
-      </View>
-    );
-  }
-
-  return (
-    <LiveKitRoom
-      serverUrl={livekitUrl}
-      token={token}
-      connect={true}
-      audio={true}
-      video={false}
-      onDisconnected={handleEndExam}
-    >
-      <ActiveExamContent
-        sessionId={sessionId}
-        roomName={roomName}
-        level={level}
-        coCandidateMode={coCandidateMode}
-        topicTitle={topicTitle}
-        onEndExam={handleEndExam}
-      />
-    </LiveKitRoom>
-  );
-};
-
 const styles = StyleSheet.create({
-  loadingScreen: {
-    flex: 1,
-    backgroundColor: '#0F172A',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  loadingScreenText: {
-    marginTop: 16,
-    color: '#94A3B8',
-    fontSize: 14,
-  },
   roomSafeArea: {
     flex: 1,
     backgroundColor: '#0F172A',
@@ -803,6 +745,12 @@ const styles = StyleSheet.create({
   },
   liveDotConnected: {
     backgroundColor: '#10B981',
+  },
+  liveDotRecording: {
+    backgroundColor: '#EF4444',
+  },
+  liveDotThinking: {
+    backgroundColor: '#F59E0B',
   },
   liveText: {
     fontSize: 11,
@@ -867,7 +815,26 @@ const styles = StyleSheet.create({
   },
   mainScrollContent: {
     padding: 16,
-    gap: 16,
+    gap: 14,
+  },
+  promptBannerCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 12,
+    padding: 14,
+    borderLeftWidth: 4,
+    borderLeftColor: '#38BDF8',
+  },
+  promptBannerLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#38BDF8',
+    textTransform: 'uppercase',
+    marginBottom: 4,
+  },
+  promptBannerText: {
+    fontSize: 14,
+    color: '#F8FAFC',
+    lineHeight: 20,
   },
   participantCard: {
     backgroundColor: '#1E293B',
@@ -960,14 +927,38 @@ const styles = StyleSheet.create({
   statusBadgeTextSpeaking: {
     color: '#FFFFFF',
   },
-  statusBadgeTextSpeakingCo: {
-    color: '#FFFFFF',
-  },
   statusBadgeTextSpeakingLocal: {
     color: '#FFFFFF',
   },
+  speakerSelectorRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 12,
+  },
+  speakerSelectButton: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#475569',
+    backgroundColor: '#0F172A',
+    alignItems: 'center',
+  },
+  speakerSelectButtonActive: {
+    borderColor: '#10B981',
+    backgroundColor: 'rgba(16, 185, 129, 0.18)',
+  },
+  speakerSelectButtonText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#94A3B8',
+  },
+  speakerSelectButtonTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
+  },
   participantWaveRow: {
-    marginTop: 16,
+    marginTop: 12,
     height: 28,
     alignItems: 'center',
     justifyContent: 'center',
@@ -981,13 +972,127 @@ const styles = StyleSheet.create({
   waveBar: {
     borderRadius: 2,
   },
+  hintBanner: {
+    backgroundColor: 'rgba(245, 158, 11, 0.15)',
+    borderRadius: 10,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: '#F59E0B',
+  },
+  hintBannerText: {
+    color: '#FDE68A',
+    fontSize: 13,
+    lineHeight: 18,
+    textAlign: 'center',
+  },
+  errorBanner: {
+    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#EF4444',
+    alignItems: 'center',
+  },
+  errorBannerTitle: {
+    color: '#FCA5A5',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 4,
+  },
+  errorBannerText: {
+    color: '#FECACA',
+    fontSize: 13,
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  errorRetryButton: {
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  errorRetryButtonText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  micControlCard: {
+    backgroundColor: '#1E293B',
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1.5,
+    borderColor: '#334155',
+    alignItems: 'center',
+  },
+  micStateBox: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  micStatusTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#F8FAFC',
+    textAlign: 'center',
+  },
+  micStatusTitleRecording: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#34D399',
+    textAlign: 'center',
+  },
+  micStatusSubtext: {
+    fontSize: 12,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginTop: 4,
+    marginBottom: 14,
+    lineHeight: 18,
+  },
+  recordStartButton: {
+    width: '100%',
+    backgroundColor: '#0284C7',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordStartButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  recordStopButton: {
+    width: '100%',
+    backgroundColor: '#059669',
+    paddingVertical: 16,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  recordStopButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  skipSpeechButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#475569',
+    backgroundColor: '#0F172A',
+  },
+  skipSpeechButtonText: {
+    color: '#38BDF8',
+    fontSize: 12,
+    fontWeight: '600',
+  },
   moderatorBox: {
-    backgroundColor: '#1E1B4B', // Indigo 950
+    backgroundColor: '#1E1B4B',
     borderRadius: 16,
     padding: 16,
     borderWidth: 1.5,
     borderColor: '#6366F1',
-    marginTop: 8,
   },
   moderatorIconRow: {
     flexDirection: 'row',
@@ -1007,18 +1112,7 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#C7D2FE',
     lineHeight: 19,
-    marginBottom: 16,
-  },
-  toastBox: {
-    backgroundColor: '#065F46',
-    padding: 10,
-    borderRadius: 8,
-    marginBottom: 12,
-  },
-  toastText: {
-    color: '#A7F3D0',
-    fontSize: 12,
-    fontWeight: '600',
+    marginBottom: 14,
   },
   endDiscussionButton: {
     backgroundColor: '#4F46E5',

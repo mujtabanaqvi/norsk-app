@@ -21,11 +21,12 @@ export const PRICING_RATES = {
   OPENAI_GPT_4_1_MINI_PROMPT_PER_TOKEN: 0.15 / 1_000_000,
   OPENAI_GPT_4_1_MINI_COMPLETION_PER_TOKEN: 0.60 / 1_000_000,
 
-  // ElevenLabs Flash v2.5 ($0.075 / 1,000 characters)
+  // ElevenLabs TTS ($0.075 / 1,000 characters)
+  ELEVENLABS_TTS_PER_CHARACTER: 0.075 / 1_000,
   ELEVENLABS_FLASH_V2_5_PER_CHARACTER: 0.075 / 1_000,
 
-  // Deepgram Nova-3 ($0.0043 / audio minute => $0.0043 / 60 per second)
-  DEEPGRAM_NOVA_3_PER_SECOND: 0.0043 / 60,
+  // OpenAI gpt-4o-transcribe ($0.006 / audio minute => $0.0001 / second)
+  OPENAI_STT_PER_SECOND: 0.006 / 60,
 };
 
 /**
@@ -42,8 +43,8 @@ export function calculateEstimatedCostUsd(usage: UsageInput): CostBreakdown {
     completionTokens * PRICING_RATES.OPENAI_GPT_4_1_MINI_COMPLETION_PER_TOKEN;
   const totalLlmCostUsd = llmPromptCostUsd + llmCompletionCostUsd;
 
-  const ttsCostUsd = ttsChars * PRICING_RATES.ELEVENLABS_FLASH_V2_5_PER_CHARACTER;
-  const sttCostUsd = audioSeconds * PRICING_RATES.DEEPGRAM_NOVA_3_PER_SECOND;
+  const ttsCostUsd = ttsChars * PRICING_RATES.ELEVENLABS_TTS_PER_CHARACTER;
+  const sttCostUsd = audioSeconds * PRICING_RATES.OPENAI_STT_PER_SECOND;
 
   const totalEstimatedCostUsd = totalLlmCostUsd + ttsCostUsd + sttCostUsd;
 
@@ -57,4 +58,3 @@ export function calculateEstimatedCostUsd(usage: UsageInput): CostBreakdown {
     totalEstimatedCostUsdFormatted: totalEstimatedCostUsd.toFixed(6),
   };
 }
-

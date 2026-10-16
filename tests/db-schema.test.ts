@@ -43,6 +43,7 @@ test('Schema: verifies all PostgreSQL tables and columns match prompt specificat
   assert.ok(examSessions.status, 'exam_sessions.status exists');
   assert.ok(examSessions.transcriptJson, 'exam_sessions.transcriptJson exists');
   assert.ok(examSessions.evaluationJson, 'exam_sessions.evaluationJson exists');
+  assert.ok(examSessions.engineState, 'exam_sessions.engineState exists');
   assert.ok(examSessions.startedAt, 'exam_sessions.startedAt exists');
   assert.ok(examSessions.completedAt, 'exam_sessions.completedAt exists');
 

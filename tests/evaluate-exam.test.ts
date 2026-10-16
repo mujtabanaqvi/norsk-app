@@ -189,74 +189,87 @@ test('Evaluate Exam: Schema rejects out-of-range scores and invalid enum values'
   assert.equal(invalidRole.success, false);
 });
 
-test('Evaluate Exam: evaluateExamSession function signature and error handling', async () => {
-  assert.equal(typeof evaluateExamSession, 'function');
+const skipLiveIntegration = process.env.RUN_INTEGRATION !== '1';
 
-  // Passing non-existent UUID session should throw clean error
-  const fakeSessionId = '00000000-0000-0000-0000-000000000000';
-  await assert.rejects(
-    async () => {
-      await evaluateExamSession(fakeSessionId);
-    },
-    {
-      name: 'Error',
-      message: `Exam session with ID "${fakeSessionId}" not found.`,
-    }
-  );
-});
+test(
+  'Evaluate Exam: evaluateExamSession function signature and error handling',
+  { skip: skipLiveIntegration },
+  async () => {
+    assert.equal(typeof evaluateExamSession, 'function');
 
-test('Evaluate Exam: handles empty transcript cleanly without throwing and writes insufficient data note', async () => {
-  const { db } = await import('../src/db/index');
-  const { examSessions, userQuotas, usageLedger } = await import('../src/db/schema');
-  const { eq } = await import('drizzle-orm');
-
-  const testUserId = 'test_empty_eval_user';
-  // Ensure user quota exists
-  await db
-    .insert(userQuotas)
-    .values({
-      userId: testUserId,
-      remainingAudioSeconds: 1800,
-    })
-    .onConflictDoNothing();
-
-  // Create an exam session with empty transcript
-  const [session] = await db
-    .insert(examSessions)
-    .values({
-      userId: testUserId,
-      level: 'B1',
-      coCandidateMode: 'AI_PEER',
-      status: 'COMPLETED',
-      transcriptJson: [],
-    })
-    .returning();
-
-  try {
-    // Should complete cleanly (Promise<void>)
-    await evaluateExamSession(session.id);
-
-    // Verify evaluationJson was marked with insufficient data
-    const [updated] = await db
-      .select()
-      .from(examSessions)
-      .where(eq(examSessions.id, session.id))
-      .limit(1);
-
-    assert.ok(updated.evaluationJson);
-    assert.equal(updated.evaluationJson.insufficientData, true);
-    assert.equal(updated.evaluationJson.candidates.length, 1);
-    assert.equal(updated.evaluationJson.candidates[0].passedTargetLevel, false);
-    assert.equal(updated.evaluationJson.candidates[0].assessedLevel, 'Under B1');
-    assert.ok(updated.evaluationJson.candidates[0].overallSummaryNo.includes('Utilstrekkelig'));
-  } finally {
-    // Clean up test session
-    await db.delete(examSessions).where(eq(examSessions.id, session.id));
-    await db.delete(userQuotas).where(eq(userQuotas.userId, testUserId));
+    // Passing non-existent UUID session should throw clean error
+    const fakeSessionId = '00000000-0000-0000-0000-000000000000';
+    await assert.rejects(
+      async () => {
+        await evaluateExamSession(fakeSessionId);
+      },
+      {
+        name: 'Error',
+        message: `Exam session with ID "${fakeSessionId}" not found.`,
+      }
+    );
   }
-});
+);
 
-test('Evaluate Exam: evaluates session with transcript, updates ledger and quota atomically', async () => {
+test(
+  'Evaluate Exam: handles empty transcript cleanly without throwing and writes insufficient data note',
+  { skip: skipLiveIntegration },
+  async () => {
+    const { db } = await import('../src/db/index');
+    const { examSessions, userQuotas } = await import('../src/db/schema');
+    const { eq } = await import('drizzle-orm');
+
+    const testUserId = 'test_empty_eval_user';
+    // Ensure user quota exists
+    await db
+      .insert(userQuotas)
+      .values({
+        userId: testUserId,
+        remainingAudioSeconds: 1800,
+      })
+      .onConflictDoNothing();
+
+    // Create an exam session with empty transcript
+    const [session] = await db
+      .insert(examSessions)
+      .values({
+        userId: testUserId,
+        level: 'B1',
+        coCandidateMode: 'AI_PEER',
+        status: 'COMPLETED',
+        transcriptJson: [],
+      })
+      .returning();
+
+    try {
+      // Should complete cleanly (Promise<void>)
+      await evaluateExamSession(session.id);
+
+      // Verify evaluationJson was marked with insufficient data
+      const [updated] = await db
+        .select()
+        .from(examSessions)
+        .where(eq(examSessions.id, session.id))
+        .limit(1);
+
+      assert.ok(updated.evaluationJson);
+      assert.equal(updated.evaluationJson.insufficientData, true);
+      assert.equal(updated.evaluationJson.candidates.length, 1);
+      assert.equal(updated.evaluationJson.candidates[0].passedTargetLevel, false);
+      assert.equal(updated.evaluationJson.candidates[0].assessedLevel, 'Under B1');
+      assert.ok(updated.evaluationJson.candidates[0].overallSummaryNo.includes('Utilstrekkelig'));
+    } finally {
+      // Clean up test session
+      await db.delete(examSessions).where(eq(examSessions.id, session.id));
+      await db.delete(userQuotas).where(eq(userQuotas.userId, testUserId));
+    }
+  }
+);
+
+test(
+  'Evaluate Exam: evaluates session with transcript, updates ledger and quota atomically',
+  { skip: skipLiveIntegration },
+  async () => {
   const { db } = await import('../src/db/index');
   const { examSessions, userQuotas, usageLedger } = await import('../src/db/schema');
   const { eq } = await import('drizzle-orm');

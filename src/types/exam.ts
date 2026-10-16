@@ -1,6 +1,6 @@
 /**
  * Shared Type Definitions for Norskprøven Oral Exam
- * Matches the Next.js control-plane schema, Zod validation, and agent worker protocols.
+ * Matches the Next.js control-plane schema, Zod validation, and turn-based exam engine.
  */
 
 export type CefrLevel = 'B1' | 'B2';
@@ -31,7 +31,7 @@ export interface ExamTopic {
 }
 
 /**
- * Realtime transcript turn emitted during active exam sessions
+ * Transcript turn stored and displayed during active exam sessions
  */
 export interface TranscriptTurn {
   id?: string;
@@ -39,7 +39,20 @@ export interface TranscriptTurn {
   role: SpeakerRole;
   text: string;
   timestamp: number;
+  stage?: string;
+  durationMs?: number;
   isFinal?: boolean;
+}
+
+/**
+ * Single AI reply turn returned by /api/exam/start or /api/exam/[sessionId]/turn
+ */
+export interface ExamReply {
+  index: number;
+  speaker: 'examiner' | 'co_candidate';
+  role: 'EXAMINER' | 'AI_COCANDIDATE';
+  text: string;
+  audioUrl: string;
 }
 
 /**
@@ -118,19 +131,49 @@ export interface StartExamRequest {
 }
 
 /**
+ * Exam phase for Norskprøven oral test structure
+ */
+export type ExamStage = 'DEL_1' | 'DEL_2' | 'DEL_3' | 'DONE';
+
+/**
  * POST /api/exam/start response payload
  */
 export interface StartExamResponse {
   sessionId: string;
-  roomName: string;
-  token: string;
-  livekitUrl: string;
+  stage: ExamStage;
+  done: boolean;
+  transcript: TranscriptTurn[];
+  replies: ExamReply[];
+  topic?: {
+    id: string;
+    titleNo: string;
+    monologuePromptNo: string;
+    discussionPromptNo: string;
+    followUpQuestionsNo: string[];
+  };
 }
 
 /**
- * Exam phase for Norskprøven oral test structure
+ * POST /api/exam/[sessionId]/turn response payload
  */
-export type ExamStage = 'DEL_1' | 'DEL_2' | 'DEL_3';
+export interface TurnResponse {
+  sessionId: string;
+  retry?: boolean;
+  stage: ExamStage;
+  done: boolean;
+  candidateText: string;
+  transcript: TranscriptTurn[];
+  replies: ExamReply[];
+  message?: string;
+}
+
+/**
+ * POST /api/exam/[sessionId]/finish response payload
+ */
+export interface FinishExamResponse {
+  sessionId: string;
+  status: ExamSessionStatus;
+}
 
 /**
  * React Navigation Stack parameter list
@@ -139,12 +182,13 @@ export type RootStackParamList = {
   ExamSetup: undefined;
   ExamRoom: {
     sessionId: string;
-    roomName: string;
-    token: string;
-    livekitUrl: string;
     level: CefrLevel;
     coCandidateMode: CoCandidateMode;
     topicTitle: string;
+    monologuePromptNo?: string;
+    discussionPromptNo?: string;
+    initialReplies: ExamReply[];
+    initialTranscript: TranscriptTurn[];
   };
   ExamResults: {
     sessionId: string;
@@ -182,5 +226,3 @@ export interface ExamResultsResponse {
   error?: string;
   message?: string;
 }
-
-

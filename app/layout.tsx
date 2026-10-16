@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 
 export const metadata: Metadata = {
-  title: 'Norskprøven Muntlig B1/B2 Control Plane',
-  description: 'Backend control plane for Norwegian oral exam practice with LiveKit',
+  title: 'Norskprøven Muntlig B1/B2 Simulator Backend',
+  description: 'Backend API for Norwegian oral exam practice (HK-dir B1/B2)',
 };
 
 export default function RootLayout({
@@ -16,4 +16,3 @@ export default function RootLayout({
     </html>
   );
 }
-

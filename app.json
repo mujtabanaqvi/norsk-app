@@ -22,7 +22,13 @@
       ]
     },
     "plugins": [
-      "@livekit/react-native-expo-plugin"
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Norskprøven muntlig simulator trenger tilgang til mikrofonen for å vurdere din muntlige uttale og flyt."
+        }
+      ],
+      "expo-secure-store"
     ]
   }
 }

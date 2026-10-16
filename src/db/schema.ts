@@ -30,6 +30,27 @@ export interface TranscriptEntry {
   role: 'EXAMINER' | 'AI_COCANDIDATE' | 'CANDIDATE_1' | 'CANDIDATE_2';
   text: string;
   timestamp: number;
+  /** Exam part the utterance belongs to (DEL_1 | DEL_2 | DEL_3) */
+  stage?: string;
+  /** Recorded speaking duration for candidate utterances (ms) */
+  durationMs?: number;
+}
+
+// Turn-based exam engine state + accumulated usage, persisted per session
+export interface SessionEngineState {
+  engine: {
+    stage: 'DEL1_MONOLOGUE' | 'DEL2_AI' | 'DEL2_HUMAN' | 'DEL3' | 'DONE';
+    del1Nudges: number;
+    del2Exchanges: number;
+    del2StartedAt?: number;
+    followUpIndex: number;
+  };
+  usage: {
+    llmPromptTokens: number;
+    llmCompletionTokens: number;
+    ttsCharacters: number;
+    sttAudioSeconds: number;
+  };
 }
 
 // Criterion Score structure
@@ -121,6 +142,7 @@ export const examSessions = pgTable(
     status: sessionStatusEnum('status').notNull().default('ACTIVE'),
     transcriptJson: jsonb('transcript_json').$type<TranscriptEntry[]>(),
     evaluationJson: jsonb('evaluation_json').$type<ExamEvaluation>(),
+    engineState: jsonb('engine_state').$type<SessionEngineState>(),
     startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
     completedAt: timestamp('completed_at', { withTimezone: true }),
   },

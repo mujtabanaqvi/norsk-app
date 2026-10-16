@@ -89,12 +89,18 @@ export const CandidateEvaluationSchema = z.object({
 });
 
 /**
- * Complete Exam Evaluation Schema
+ * LLM Schema for OpenAI Structured Outputs (all fields must be required)
  */
-export const ExamEvaluationSchema = z.object({
+export const LlmExamEvaluationSchema = z.object({
   candidates: z
     .array(CandidateEvaluationSchema)
     .describe('Array of candidate evaluations (1 candidate for AI_PEER, 2 candidates for HUMAN_LOCAL)'),
+});
+
+/**
+ * Complete Exam Evaluation Schema stored in database
+ */
+export const ExamEvaluationSchema = LlmExamEvaluationSchema.extend({
   evaluatedAt: z.string().optional().describe('ISO timestamp of when the evaluation took place'),
   insufficientData: z.boolean().optional().describe('Flag indicating whether insufficient speech was recorded'),
   notes: z.string().optional().describe('Examiner administrative or diagnostic notes'),
@@ -456,22 +462,56 @@ ${
       `[Evaluation] Invoking Vercel AI SDK generateObject (gpt-4o) for session ${sessionId}`
     );
 
-    const result = await generateObject({
-      model: openai('gpt-4o'),
-      schema: ExamEvaluationSchema,
-      system: HK_DIR_EXAMINER_SYSTEM_PROMPT,
-      prompt: userPrompt,
-      temperature: 0.2,
-    });
+    try {
+      const result = await generateObject({
+        model: openai('gpt-4o'),
+        schema: LlmExamEvaluationSchema,
+        system: HK_DIR_EXAMINER_SYSTEM_PROMPT,
+        prompt: userPrompt,
+        temperature: 0.2,
+      });
 
-    evaluation = {
-      ...result.object,
-      evaluatedAt: new Date().toISOString(),
-    };
+      let candidates = result.object.candidates;
 
-    const usage = result.usage as any;
-    promptTokens = usage?.promptTokens ?? usage?.inputTokens ?? 0;
-    completionTokens = usage?.completionTokens ?? usage?.outputTokens ?? 0;
+      // In HUMAN_LOCAL mode, ensure both CANDIDATE_1 and CANDIDATE_2 are present
+      if (coCandidateMode === 'HUMAN_LOCAL') {
+        const hasCand1 = candidates.some((c) => c.speakerRole === 'CANDIDATE_1');
+        const hasCand2 = candidates.some((c) => c.speakerRole === 'CANDIDATE_2');
+        if (!hasCand1) {
+          candidates.unshift(createInsufficientDataCandidate('CANDIDATE_1', targetLevel));
+        }
+        if (!hasCand2) {
+          candidates.push(createInsufficientDataCandidate('CANDIDATE_2', targetLevel));
+        }
+      }
+
+      evaluation = {
+        candidates,
+        evaluatedAt: new Date().toISOString(),
+      };
+
+      const usage = result.usage as any;
+      promptTokens = usage?.promptTokens ?? usage?.inputTokens ?? 0;
+      completionTokens = usage?.completionTokens ?? usage?.outputTokens ?? 0;
+    } catch (llmErr) {
+      console.error(
+        `[Evaluation] LLM evaluation error for session ${sessionId}:`,
+        llmErr
+      );
+      console.log(`[Evaluation] Falling back to offline evaluation for session ${sessionId}`);
+      const offlineResult = generateOfflineFallbackEvaluation(
+        targetLevel,
+        coCandidateMode,
+        transcript,
+        topicTitle
+      );
+      evaluation = {
+        ...offlineResult.evaluation,
+        notes: `Offline evaluation fallback due to LLM error: ${llmErr instanceof Error ? llmErr.message : String(llmErr)}`,
+      };
+      promptTokens = offlineResult.promptTokens;
+      completionTokens = offlineResult.completionTokens;
+    }
   } else {
     console.log(
       `[Evaluation] OPENAI_API_KEY not configured with live key. Generating offline HK-dir evaluation for session ${sessionId}`

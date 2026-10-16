@@ -1,10 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { eq, or } from 'drizzle-orm';
-import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { db } from '@/src/db';
-import { examSessions, userQuotas, examTopics } from '@/src/db/schema';
+import {
+  examSessions,
+  userQuotas,
+  examTopics,
+  TranscriptEntry,
+  SessionEngineState,
+} from '@/src/db/schema';
 import { authenticateUser } from '@/lib/auth';
+import { initialState, openingActions, toUiStage } from '@/src/server/exam-engine';
+import { generateLine } from '@/src/server/personas';
 
 // Validates the request body using Zod
 export const startExamSchema = z.object({
@@ -111,7 +118,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // 4. Insert new row into examSessions with status: 'ACTIVE'
+    // 4. Generate initial engine state and opening greeting line
+    const engine = initialState();
+    const actions = openingActions();
+    const transcript: TranscriptEntry[] = [];
+    let promptTokens = 0;
+    let completionTokens = 0;
+    let ttsCharacters = 0;
+
+    for (const action of actions) {
+      const line = await generateLine(action, {
+        level,
+        mode: coCandidateMode,
+        topic: {
+          titleNo: topic.titleNo,
+          monologuePromptNo: topic.monologuePromptNo,
+          discussionPromptNo: topic.discussionPromptNo,
+          followUpQuestionsNo: topic.followUpQuestionsNo,
+        },
+        transcript,
+      });
+
+      promptTokens += line.promptTokens;
+      completionTokens += line.completionTokens;
+      ttsCharacters += line.text.length;
+
+      transcript.push({
+        speaker: action.persona,
+        role: action.persona === 'examiner' ? 'EXAMINER' : 'AI_COCANDIDATE',
+        text: line.text,
+        timestamp: Date.now(),
+        stage: toUiStage(engine.stage),
+      });
+    }
+
+    const sessionEngineState: SessionEngineState = {
+      engine,
+      usage: {
+        llmPromptTokens: promptTokens,
+        llmCompletionTokens: completionTokens,
+        ttsCharacters,
+        sttAudioSeconds: 0,
+      },
+    };
+
+    // 5. Insert new row into examSessions with status: 'ACTIVE', transcript, and engineState
     const [session] = await db
       .insert(examSessions)
       .values({
@@ -120,68 +171,33 @@ export async function POST(req: NextRequest) {
         level,
         coCandidateMode,
         status: 'ACTIVE',
+        transcriptJson: transcript,
+        engineState: sessionEngineState,
       })
       .returning();
 
-    // 5. LiveKit RoomServiceClient & AccessToken setup
-    const livekitUrl = process.env.LIVEKIT_URL;
-    const apiKey = process.env.LIVEKIT_API_KEY;
-    const apiSecret = process.env.LIVEKIT_API_SECRET;
-
-    if (!livekitUrl || !apiKey || !apiSecret) {
-      console.error('[Start Exam] Missing LiveKit environment variables');
-      return NextResponse.json(
-        { error: 'Server misconfiguration: LiveKit credentials missing' },
-        { status: 500 }
-      );
-    }
-
-    const roomName = `exam_${session.id}`;
-    const roomMetadata = JSON.stringify({
-      sessionId: session.id,
-      userId,
-      level,
-      coCandidateMode,
-      topic: {
-        titleNo: topic.titleNo,
-        monologuePromptNo: topic.monologuePromptNo,
-        discussionPromptNo: topic.discussionPromptNo,
-        followUpQuestionsNo: topic.followUpQuestionsNo,
-      },
-    });
-
-    // Create LiveKit room
-    const livekitHttpHost = livekitUrl.replace(/^ws(s)?:\/\//i, 'https://');
-    const roomServiceClient = new RoomServiceClient(livekitHttpHost, apiKey, apiSecret);
-
-    await roomServiceClient.createRoom({
-      name: roomName,
-      emptyTimeout: 300,
-      metadata: roomMetadata,
-    });
-
-    // Generate participant AccessToken
-    const token = new AccessToken(apiKey, apiSecret, {
-      identity: userId,
-      ttl: '2h',
-    });
-
-    token.addGrant({
-      room: roomName,
-      roomJoin: true,
-      canPublish: true,
-      canSubscribe: true,
-      canPublishData: true,
-    });
-
-    const jwtToken = await token.toJwt();
+    const replies = transcript.map((entry, index) => ({
+      index,
+      speaker: entry.speaker as 'examiner' | 'co_candidate',
+      role: entry.role,
+      text: entry.text,
+      audioUrl: `/api/exam/${session.id}/speech/${index}`,
+    }));
 
     return NextResponse.json(
       {
         sessionId: session.id,
-        roomName,
-        token: jwtToken,
-        livekitUrl: process.env.LIVEKIT_URL,
+        stage: toUiStage(engine.stage),
+        done: false,
+        transcript,
+        replies,
+        topic: {
+          id: topic.id,
+          titleNo: topic.titleNo,
+          monologuePromptNo: topic.monologuePromptNo,
+          discussionPromptNo: topic.discussionPromptNo,
+          followUpQuestionsNo: topic.followUpQuestionsNo,
+        },
       },
       { status: 201 }
     );

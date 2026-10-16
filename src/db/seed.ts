@@ -73,6 +73,8 @@ export const TEST_USER_ID = 'test_user_candidate_1';
 export async function seed() {
   console.log('--- Starting idempotent database seed ---');
 
+  await pool.query('ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS engine_state jsonb;');
+
   // 1. Seed realistic Norskprøven muntlig topics (2 B1, 2 B2)
   for (const topic of SAMPLE_TOPICS) {
     await db
