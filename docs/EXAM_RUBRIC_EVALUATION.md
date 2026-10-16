@@ -67,26 +67,26 @@ interface ConcreteCorrection {
 ## 5. Execution Lifecycle & Database Ingestion
 
 ```
-[LiveKit Voice Worker Shutdown]
-              │
-              ▼
+[POST /api/exam/[sessionId]/finish]
+               │
+               ▼ (Next.js after())
 [evaluateExamSession(sessionId)]
-              │
-              ├── 1. Read transcript & topic from Neon DB
-              │
-              ├── 2. Check for sufficient candidate speech (>= 10 words)
-              │      (If < 10 words, mark insufficientData: true)
-              │
-              ├── 3. Send transcript to OpenAI GPT-4o (or offline fallback)
-              │      (Structured output via Zod ExamEvaluationSchema)
-              │
-              ├── 4. Update exam_sessions.evaluation_json in Neon
-              │
-              ├── 5. Insert audit record in usage_ledger (source: 'POST_EXAM_RUBRIC_EVAL')
-              │
-              └── 6. Increment user_quotas.total_llm_tokens_used and total_cost_usd
+               │
+               ├── 1. Read transcript & topic from Neon DB
+               │
+               ├── 2. Check for sufficient candidate speech (>= 10 words)
+               │      (If < 10 words, mark insufficientData: true)
+               │
+               ├── 3. Send transcript to OpenAI GPT-4o (or offline fallback)
+               │      (Structured output via Zod ExamEvaluationSchema)
+               │
+               ├── 4. Update exam_sessions.evaluation_json in Neon
+               │
+               ├── 5. Insert audit record in usage_ledger (source: 'POST_EXAM_RUBRIC_EVAL')
+               │
+               └── 6. Increment user_quotas.total_llm_tokens_used and total_cost_usd
 ```
 
 - **Model**: OpenAI `gpt-4o` with temperature `0.2` and strict JSON schema output.
-- **Cost Tracking**: Evaluator tokens are audited in `usage_ledger` with model `gpt-4o` ($2.50 / 1M prompt, $10.00 / 1M completion).
+- **Cost Tracking**: Evaluator tokens are audited in `usage_ledger` with model `gpt-4o` (\$2.50 / 1M prompt, \$10.00 / 1M completion).
 - **Offline / Sandbox Fallback**: If `OPENAI_API_KEY` is not present, the evaluator produces a deterministic rule-based evaluation report based on utterance counts and vocabulary metrics, ensuring seamless test execution.

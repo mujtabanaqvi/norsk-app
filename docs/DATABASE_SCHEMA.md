@@ -43,6 +43,7 @@ erDiagram
         co_candidate_mode co_candidate_mode "AI_PEER | HUMAN_LOCAL"
         session_status status "ACTIVE | COMPLETED | FAILED"
         jsonb transcript_json
+        jsonb engine_state
         jsonb evaluation_json
         timestamp started_at
         timestamp completed_at
@@ -76,9 +77,9 @@ Catalog of official HK-dir B1 and B2 oral examination topics.
 | `slug` | `VARCHAR(100)` | `NOT NULL`, `UNIQUE` | URL-safe identifier (e.g. `'kollektivtransport-gratis'`). |
 | `title_no` | `TEXT` | `NOT NULL` | Official Norwegian title. |
 | `level` | `cefr_level` | `NOT NULL` | Target level (`'B1'` or `'B2'`). |
-| `monologue_prompt_no` | `TEXT` | `NOT NULL` | Prompt for Part 1 individual monologue. |
-| `discussion_prompt_no`| `TEXT` | `NOT NULL` | Prompt for Part 2 debate/discussion. |
-| `follow_up_questions_no`| `JSONB` | `NOT NULL`, `$type<string[]>` | Array of follow-up questions for Part 3. |
+| `monologue_prompt_no` | `TEXT` | `NOT NULL` | Prompt for Del 1 individual monologue. |
+| `discussion_prompt_no`| `TEXT` | `NOT NULL` | Prompt for Del 2 debate/discussion. |
+| `follow_up_questions_no`| `JSONB` | `NOT NULL`, `$type<string[]>` | Array of follow-up questions for Del 3. |
 | `is_active` | `BOOLEAN` | `NOT NULL`, `DEFAULT true` | Topic availability flag. |
 | `created_at` | `TIMESTAMPTZ`| `NOT NULL`, `DEFAULT now()` | Topic creation timestamp. |
 
@@ -90,13 +91,13 @@ Tracks candidate audio seconds balance and cumulative provider billing metrics.
 | `user_id` | `VARCHAR(128)` | `PRIMARY KEY` | Candidate user ID. |
 | `remaining_audio_seconds` | `INTEGER` | `NOT NULL`, `DEFAULT 1800` | Practice balance in seconds. Must be > 180 to start exam. |
 | `total_llm_tokens_used` | `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative LLM prompt + completion tokens. |
-| `total_tts_characters_used`| `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative synthesized characters via ElevenLabs. |
+| `total_tts_characters_used`| `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative synthesized characters via ElevenLabs / OpenAI TTS. |
 | `total_stt_seconds_used` | `NUMERIC(10, 2)` | `NOT NULL`, `DEFAULT '0'` | Cumulative transcribed candidate speech seconds. |
 | `total_cost_usd` | `NUMERIC(10, 6)` | `NOT NULL`, `DEFAULT '0'` | Lifetime estimated cost across all providers. |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Last update timestamp. |
 
 ### 2.3 `exam_sessions`
-Records each practice exam session, conversational transcript turns, and post-exam rubric scorecard.
+Records each practice exam session, deterministic engine state, conversational transcript turns, and post-exam rubric scorecard.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
@@ -107,6 +108,7 @@ Records each practice exam session, conversational transcript turns, and post-ex
 | `co_candidate_mode` | `co_candidate_mode` | `NOT NULL` | `'AI_PEER'` or `'HUMAN_LOCAL'`. |
 | `status` | `session_status` | `NOT NULL`, `DEFAULT 'ACTIVE'` | `'ACTIVE'`, `'COMPLETED'`, or `'FAILED'` (indexed). |
 | `transcript_json` | `JSONB` | `NULLABLE`, `$type<TranscriptEntry[]>` | Full conversation transcript turns. |
+| `engine_state` | `JSONB` | `NULLABLE`, `$type<SessionEngineState>` | Turn-based state machine stage & accumulated usage metrics. |
 | `evaluation_json` | `JSONB` | `NULLABLE`, `$type<ExamEvaluation>` | Complete post-exam HK-dir evaluation. |
 | `started_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Session start timestamp. |
 | `completed_at` | `TIMESTAMPTZ` | `NULLABLE` | Session finish timestamp. |
@@ -134,11 +136,30 @@ Granular audit records of resource consumption per session and source.
 
 ### `TranscriptEntry` (`transcript_json`)
 ```typescript
+type ExamStage = 'DEL1_MONOLOGUE' | 'DEL2_AI' | 'DEL2_HUMAN' | 'DEL3' | 'DONE';
+
 interface TranscriptEntry {
-  speaker: string; // e.g. "Examiner", "Kandidat"
-  role: 'EXAMINER' | 'AI_COCANDIDATE' | 'CANDIDATE_1' | 'CANDIDATE_2';
+  speaker: string; // e.g. "Sensor", "Kandidat", "Medkandidat (AI)"
+  role: 'EXAMINER' | 'AI_CO_CANDIDATE' | 'AI_COCANDIDATE' | 'CANDIDATE_1' | 'CANDIDATE_2';
   text: string;
   timestamp: number; // Milliseconds Unix epoch
+  stage?: ExamStage;
+  durationMs?: number;
+}
+```
+
+### `SessionEngineState` (`engine_state`)
+```typescript
+interface SessionEngineState {
+  stage: ExamStage;
+  del1NudgeUsed: boolean;
+  del2TurnCount: number;
+  del3QuestionIndex: number;
+  del2StartedAtMs?: number;
+  llmPromptTokens: number;
+  llmCompletionTokens: number;
+  ttsCharacters: number;
+  sttSeconds: number;
 }
 ```
 
@@ -184,20 +205,7 @@ interface ExamEvaluation {
 
 ## 4. Drizzle Configuration & Migration Commands
 
-The Drizzle configuration resides in `drizzle.config.ts`:
-```typescript
-export default defineConfig({
-  schema: './src/db/schema.ts',
-  out: './drizzle',
-  dialect: 'postgresql',
-  dbCredentials: {
-    url: process.env.DIRECT_DATABASE_URL || process.env.DATABASE_URL || '',
-  },
-});
-```
-
+- **Seed Database & Apply Schema**: `npm run db:seed` (creates/updates `engine_state` and populates official topics and test user quota).
 - **Push Schema**: `npm run db:push` (applies schema directly to database).
 - **Generate Migrations**: `npm run db:generate` (creates SQL migration files in `drizzle/`).
-- **Execute Migrations**: `npm run db:migrate` (runs pending migrations).
-- **Seed Database**: `npm run db:seed` (populates official topics and test user quota).
 - **Inspect DB in Browser**: `npm run db:studio` (opens Drizzle Studio).
