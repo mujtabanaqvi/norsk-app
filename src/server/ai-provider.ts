@@ -48,6 +48,7 @@ function getAzureClient() {
       baseURL: endpoint.replace(/\/+$/, '') + (endpoint.includes('/openai') ? '' : '/openai'),
       apiKey,
       apiVersion,
+      useDeploymentBasedUrls: true,
     });
   }
 
@@ -56,6 +57,7 @@ function getAzureClient() {
       resourceName,
       apiKey,
       apiVersion,
+      useDeploymentBasedUrls: true,
     });
   }
 
@@ -95,7 +97,7 @@ export function getConversationModel(): LanguageModel {
   if (provider === 'azure') {
     const azure = getAzureClient();
     const deployment = getConversationModelName();
-    return azure(deployment);
+    return azure.chat(deployment);
   }
 
   const modelName = getConversationModelName();
@@ -111,7 +113,7 @@ export function getEvaluationModel(): LanguageModel {
   if (provider === 'azure') {
     const azure = getAzureClient();
     const deployment = process.env.AZURE_OPENAI_EVAL_DEPLOYMENT || 'gpt-4o';
-    return azure(deployment);
+    return azure.chat(deployment);
   }
 
   const modelName = process.env.OPENAI_EVAL_MODEL || 'gpt-4o';

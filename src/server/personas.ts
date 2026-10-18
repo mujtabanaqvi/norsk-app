@@ -3,7 +3,11 @@
  * Fixed exam phrases use templates (fast, reliable); conversational lines use gpt-4.1-mini.
  */
 import { generateText } from 'ai';
-import { getConversationModel, getConversationModelName } from './ai-provider';
+import {
+  getConversationModel,
+  getConversationModelName,
+  getActiveAiProvider,
+} from './ai-provider';
 import type { SpeakerAction } from './exam-engine';
 import type { TranscriptEntry } from '../db/schema';
 
@@ -136,12 +140,23 @@ export async function generateLine(
 
   const { system, prompt } = buildPrompt(action, ctx);
   try {
+    const isAzure = getActiveAiProvider() === 'azure';
     const result = await generateText({
       model: getConversationModel(),
       system,
       prompt,
       temperature: 0.7,
-      maxOutputTokens: 160,
+      ...(isAzure
+        ? {
+            providerOptions: {
+              openai: {
+                maxCompletionTokens: 160,
+              },
+            },
+          }
+        : {
+            maxOutputTokens: 160,
+          }),
     });
     const usage = result.usage as { inputTokens?: number; outputTokens?: number } | undefined;
     const text = result.text.trim().replace(/^(Sensor|Medkandidat)\s*:\s*/i, '');

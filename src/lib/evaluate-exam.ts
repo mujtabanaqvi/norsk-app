@@ -2,7 +2,11 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import { generateObject } from 'ai';
-import { getEvaluationModel, isProviderConfigured } from '../server/ai-provider';
+import {
+  getEvaluationModel,
+  isProviderConfigured,
+  getActiveAiProvider,
+} from '../server/ai-provider';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/index';
@@ -474,7 +478,7 @@ ${
         schema: LlmExamEvaluationSchema,
         system: HK_DIR_EXAMINER_SYSTEM_PROMPT,
         prompt: userPrompt,
-        temperature: 0.2,
+        ...(getActiveAiProvider() === 'azure' ? {} : { temperature: 0.2 }),
       });
 
       let candidates = result.object.candidates;
