@@ -66,13 +66,22 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    if (error?.message?.includes('Invalid password') || error?.message?.includes('not found')) {
+    const errorMsg = String(error?.body?.message || error?.message || '');
+    if (
+      errorMsg.includes('Invalid password') ||
+      errorMsg.includes('Invalid email') ||
+      errorMsg.includes('not found') ||
+      errorMsg.includes('INVALID_EMAIL_OR_PASSWORD')
+    ) {
       return NextResponse.json(
         { error: 'Invalid Credentials', message: 'Ugyldig e-post eller passord' },
         { status: 401 }
       );
     }
     console.error('Login error:', error);
-    return NextResponse.json({ error: error?.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Login Error', message: error?.body?.message || error?.message || 'Innlogging mislyktes' },
+      { status: 500 }
+    );
   }
 }

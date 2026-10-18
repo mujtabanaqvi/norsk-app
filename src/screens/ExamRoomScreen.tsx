@@ -152,7 +152,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   // Exam elapsed timer
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [isDrawerExpanded, setIsDrawerExpanded] = useState<boolean>(false);
-  const transcriptScrollRef = useRef<ScrollView | null>(null);
+  const transcriptScrollRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {

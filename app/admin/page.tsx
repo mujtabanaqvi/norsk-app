@@ -32,6 +32,15 @@ export default function AdminPortalPage() {
   const [levelFilter, setLevelFilter] = useState<'ALL' | 'B1' | 'B2'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
 
+  // Tab navigation
+  const [activeTab, setActiveTab] = useState<'EXAMS' | 'CONFIG'>('EXAMS');
+
+  // Config tab state
+  const [tierPolicies, setTierPolicies] = useState<any>(null);
+  const [referralSettings, setReferralSettings] = useState<any>(null);
+  const [isLoadingConfig, setIsLoadingConfig] = useState<boolean>(false);
+  const [isSavingConfig, setIsSavingConfig] = useState<boolean>(false);
+
   // Form state (Create / Edit)
   const [isFormOpen, setIsFormOpen] = useState<boolean>(false);
   const [editingExamId, setEditingExamId] = useState<string | null>(null);
@@ -89,16 +98,99 @@ export default function AdminPortalPage() {
     }
   }, []);
 
+  const fetchConfigsWithSecret = useCallback(async (secretToUse: string) => {
+    setIsLoadingConfig(true);
+    try {
+      const res = await fetch('/api/admin/config', {
+        headers: {
+          Accept: 'application/json',
+          'x-admin-secret': secretToUse,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTierPolicies(data.tiers);
+        setReferralSettings(data.referral);
+      }
+    } catch (err) {
+      console.error('Failed to load configs:', err);
+    } finally {
+      setIsLoadingConfig(false);
+    }
+  }, []);
+
+  const handleUpdateTier = async (tier: string, dailyLimit: number, priceCents: number) => {
+    setIsSavingConfig(true);
+    setGlobalError(null);
+    setSuccessBanner(null);
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'x-admin-secret': adminSecret,
+        },
+        body: JSON.stringify({
+          tier,
+          dailyTestLimit: dailyLimit,
+          priceCents,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || body.error || 'Feil ved lagring');
+      }
+      setSuccessBanner(`Abonnementsplan ${tier} er oppdatert!`);
+      await fetchConfigsWithSecret(adminSecret);
+    } catch (err: any) {
+      setGlobalError(err.message || 'Feil ved lagring av abonnementsplan');
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
+  const handleUpdateReferral = async (bonusDailyTests: number, durationDays: number) => {
+    setIsSavingConfig(true);
+    setGlobalError(null);
+    setSuccessBanner(null);
+    try {
+      const res = await fetch('/api/admin/config', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'application/json',
+          'x-admin-secret': adminSecret,
+        },
+        body: JSON.stringify({
+          bonusDailyTests,
+          durationDays,
+        }),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || body.error || 'Feil ved lagring');
+      }
+      setSuccessBanner('Verveinnstillinger er oppdatert!');
+      await fetchConfigsWithSecret(adminSecret);
+    } catch (err: any) {
+      setGlobalError(err.message || 'Feil ved lagring av verveinnstillinger');
+    } finally {
+      setIsSavingConfig(false);
+    }
+  };
+
   useEffect(() => {
     const saved =
       typeof window !== 'undefined' ? sessionStorage.getItem(SESSION_STORAGE_KEY) : null;
     if (saved) {
       setAdminSecret(saved);
       fetchExamsWithSecret(saved);
+      fetchConfigsWithSecret(saved);
     } else {
       setIsCheckingAuth(false);
     }
-  }, [fetchExamsWithSecret]);
+  }, [fetchExamsWithSecret, fetchConfigsWithSecret]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -380,14 +472,50 @@ export default function AdminPortalPage() {
             </p>
           </div>
           <div style={styles.headerActions}>
-            <button onClick={openCreateForm} style={styles.primaryButton}>
-              + Opprett ny eksamen
-            </button>
+            {activeTab === 'EXAMS' && (
+              <button onClick={openCreateForm} style={styles.primaryButton}>
+                + Opprett ny eksamen
+              </button>
+            )}
             <button onClick={handleLogout} style={styles.secondaryButton}>
               Logg ut
             </button>
           </div>
         </header>
+
+        {/* Tab Navigation */}
+        <div style={{ display: 'flex', gap: '12px', marginBottom: '24px', borderBottom: '1px solid #334155', paddingBottom: '12px' }}>
+          <button
+            onClick={() => setActiveTab('EXAMS')}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '14px',
+              backgroundColor: activeTab === 'EXAMS' ? '#0284C7' : '#1E293B',
+              color: activeTab === 'EXAMS' ? '#FFFFFF' : '#94A3B8',
+            }}
+          >
+            📚 Eksamener &amp; Temaer
+          </button>
+          <button
+            onClick={() => setActiveTab('CONFIG')}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '14px',
+              backgroundColor: activeTab === 'CONFIG' ? '#0284C7' : '#1E293B',
+              color: activeTab === 'CONFIG' ? '#FFFFFF' : '#94A3B8',
+            }}
+          >
+            ⚙️ Abonnement &amp; Verveinnstillinger
+          </button>
+        </div>
 
         {/* Metrics Row */}
         <section style={styles.metricsGrid}>
@@ -593,8 +721,10 @@ export default function AdminPortalPage() {
           </section>
         )}
 
-        {/* Filter Bar */}
-        <section style={styles.filterBar}>
+        {activeTab === 'EXAMS' ? (
+          <div>
+            {/* Filter Bar */}
+            <section style={styles.filterBar}>
           <div style={styles.filterGroup}>
             <span style={styles.filterLabel}>Nivå:</span>
             {(['ALL', 'B1', 'B2'] as const).map((lvl) => (
@@ -730,6 +860,177 @@ export default function AdminPortalPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+        </div>
+        ) : (
+          /* Subscription Tiers & Referral Configuration Tab */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+            <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #334155' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '6px' }}>
+                Abonnementsplaner &amp; Daglige Testgrenser
+              </h2>
+              <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '20px' }}>
+                Endre hvor mange tester gratis og betalte brukere kan ta per kalenderdøgn (nullstilles ved midnatt).
+              </p>
+
+              {isLoadingConfig ? (
+                <div>Laster inn abonnementsinnstillinger...</div>
+              ) : tierPolicies ? (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
+                  {/* Free Tier */}
+                  <div style={{ backgroundColor: '#0F172A', padding: '20px', borderRadius: '10px', border: '1px solid #334155' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#F8FAFC', marginBottom: '12px' }}>
+                      Gratis Nivå (Free)
+                    </div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={styles.label}>Daglige tester per døgn:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        defaultValue={tierPolicies.FREE?.dailyTestLimit || 1}
+                        id="free_limit"
+                        style={styles.input}
+                      />
+                    </div>
+                    <button
+                      disabled={isSavingConfig}
+                      onClick={() => {
+                        const input = document.getElementById('free_limit') as HTMLInputElement;
+                        handleUpdateTier('FREE', parseInt(input.value, 10), 0);
+                      }}
+                      style={styles.primaryButton}
+                    >
+                      Lagre Gratis Nivå
+                    </button>
+                  </div>
+
+                  {/* Standard Tier */}
+                  <div style={{ backgroundColor: '#0F172A', padding: '20px', borderRadius: '10px', border: '1px solid #0284C7' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#38BDF8', marginBottom: '12px' }}>
+                      Standard Nivå
+                    </div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={styles.label}>Daglige tester per døgn:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        defaultValue={tierPolicies.STANDARD?.dailyTestLimit || 5}
+                        id="standard_limit"
+                        style={styles.input}
+                      />
+                    </div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={styles.label}>Månedspris i NOK (kr):</label>
+                      <input
+                        type="number"
+                        min="0"
+                        defaultValue={(tierPolicies.STANDARD?.priceCents || 14900) / 100}
+                        id="standard_price"
+                        style={styles.input}
+                      />
+                    </div>
+                    <button
+                      disabled={isSavingConfig}
+                      onClick={() => {
+                        const limitInput = document.getElementById('standard_limit') as HTMLInputElement;
+                        const priceInput = document.getElementById('standard_price') as HTMLInputElement;
+                        handleUpdateTier('STANDARD', parseInt(limitInput.value, 10), parseInt(priceInput.value, 10) * 100);
+                      }}
+                      style={styles.primaryButton}
+                    >
+                      Lagre Standard Nivå
+                    </button>
+                  </div>
+
+                  {/* Premium Tier */}
+                  <div style={{ backgroundColor: '#0F172A', padding: '20px', borderRadius: '10px', border: '1px solid #F59E0B' }}>
+                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#F59E0B', marginBottom: '12px' }}>
+                      Premium Nivå
+                    </div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={styles.label}>Daglige tester per døgn:</label>
+                      <input
+                        type="number"
+                        min="1"
+                        defaultValue={tierPolicies.PREMIUM?.dailyTestLimit || 20}
+                        id="premium_limit"
+                        style={styles.input}
+                      />
+                    </div>
+                    <div style={{ marginBottom: '14px' }}>
+                      <label style={styles.label}>Månedspris i NOK (kr):</label>
+                      <input
+                        type="number"
+                        min="0"
+                        defaultValue={(tierPolicies.PREMIUM?.priceCents || 29900) / 100}
+                        id="premium_price"
+                        style={styles.input}
+                      />
+                    </div>
+                    <button
+                      disabled={isSavingConfig}
+                      onClick={() => {
+                        const limitInput = document.getElementById('premium_limit') as HTMLInputElement;
+                        const priceInput = document.getElementById('premium_price') as HTMLInputElement;
+                        handleUpdateTier('PREMIUM', parseInt(limitInput.value, 10), parseInt(priceInput.value, 10) * 100);
+                      }}
+                      style={{ ...styles.primaryButton, backgroundColor: '#F59E0B', color: '#0F172A' }}
+                    >
+                      Lagre Premium Nivå
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+
+            {/* Referral Settings Card */}
+            <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #334155' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '6px' }}>
+                Verveprogram Innstillinger (Referrals)
+              </h2>
+              <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '20px' }}>
+                Konfigurer hvor mange ekstra tester en bruker mottar per dag når en vervet venn registrerer seg, og varigheten på bonusen.
+              </p>
+
+              {referralSettings && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', alignItems: 'end' }}>
+                  <div>
+                    <label style={styles.label}>Ekstra tester per dag per vervet venn:</label>
+                    <input
+                      type="number"
+                      min="1"
+                      defaultValue={referralSettings.bonusDailyTests || 2}
+                      id="ref_bonus"
+                      style={styles.input}
+                    />
+                  </div>
+                  <div>
+                    <label style={styles.label}>Varighet (dager):</label>
+                    <input
+                      type="number"
+                      min="1"
+                      defaultValue={referralSettings.durationDays || 7}
+                      id="ref_duration"
+                      style={styles.input}
+                    />
+                  </div>
+                  <div>
+                    <button
+                      disabled={isSavingConfig}
+                      onClick={() => {
+                        const bonusInput = document.getElementById('ref_bonus') as HTMLInputElement;
+                        const durationInput = document.getElementById('ref_duration') as HTMLInputElement;
+                        handleUpdateReferral(parseInt(bonusInput.value, 10), parseInt(durationInput.value, 10));
+                      }}
+                      style={{ ...styles.primaryButton, width: '100%' }}
+                    >
+                      Lagre Verveinnstillinger
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         )}
       </div>

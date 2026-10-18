@@ -19,7 +19,7 @@ export default function App() {
     <SafeAreaProvider>
       <AuthProvider>
         <NavigationContainer>
-          <StatusBar barStyle="light-content" backgroundColor="#0B0F19" />
+          <StatusBar barStyle="light-content" />
           <Stack.Navigator
             initialRouteName="ExamSetup"
             screenOptions={{

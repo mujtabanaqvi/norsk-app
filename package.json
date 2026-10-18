@@ -34,6 +34,7 @@
     "better-auth": "^1.7.10",
     "drizzle-orm": "^0.45.3",
     "expo": "^57.0.27",
+    "expo-asset": "~57.0.20",
     "expo-audio": "~57.0.5",
     "expo-constants": "~57.0.22",
     "expo-secure-store": "~57.0.4",

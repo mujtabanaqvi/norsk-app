@@ -56,6 +56,10 @@ export async function POST(req: NextRequest) {
         email: normalizedEmail,
         password,
         name: name || normalizedEmail.split('@')[0],
+        referralCode: newReferralCode,
+        referredByUserId: referrerUserId,
+        role: 'USER',
+        subscriptionTier: 'FREE',
       },
     });
 
@@ -68,7 +72,7 @@ export async function POST(req: NextRequest) {
 
     const createdUserId = signUpRes.user.id;
 
-    // Update custom referral & tier fields on the user
+    // Ensure referral code is saved
     await db
       .update(users)
       .set({
@@ -122,13 +126,21 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (error: any) {
-    if (error?.message?.includes('already exists') || error?.code === '23505') {
+    const errorMsg = String(error?.body?.message || error?.message || '');
+    if (
+      errorMsg.includes('already exists') ||
+      errorMsg.includes('USER_ALREADY_EXISTS') ||
+      error?.code === '23505'
+    ) {
       return NextResponse.json(
         { error: 'Email Already Registered', message: 'En bruker med denne e-postadressen eksisterer allerede' },
         { status: 409 }
       );
     }
     console.error('Registration error:', error);
-    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 });
+    return NextResponse.json(
+      { error: 'Registration Error', message: error?.body?.message || error?.message || 'Registrering mislyktes' },
+      { status: 500 }
+    );
   }
 }
