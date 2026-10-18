@@ -10,7 +10,7 @@ This guide describes how to configure, run, test, and contribute to the **Norskp
 - **Package Manager**: `npm` (v10+).
 - **PostgreSQL**: Neon Serverless PostgreSQL instance.
 - **AI Provider Credentials**:
-  - **OpenAI**: API key with access to `gpt-4o-transcribe`, `gpt-4.1-mini`, and `gpt-4o`.
+  - **OpenAI / Azure AI Foundry**: Either direct OpenAI (`OPENAI_API_KEY`) or Azure AI Foundry (`AI_PROVIDER=azure`, `AZURE_OPENAI_RESOURCE_NAME`, `AZURE_OPENAI_API_KEY`, etc.). See [Azure AI Foundry Setup Guide](file:///c:/Users/syed_/source/repos/norsk-app/docs/AZURE_AI_FOUNDRY_SETUP.md) for full setup instructions.
   - **ElevenLabs**: API key and Voice IDs for Examiner Sensor and Peer Co-Candidate (optional; automatically falls back to OpenAI `gpt-4o-mini-tts` if unset).
 - **Mobile Testing**: **Expo Go** app installed on iOS/Android phone, an Android Emulator, or a modern web browser.
 
@@ -21,8 +21,21 @@ This guide describes how to configure, run, test, and contribute to the **Norskp
 Create a `.env.local` file in the root directory (see `.env.example`):
 
 ```env
-# 1. AI Provider Credentials
+# 1. AI Provider Toggle ('openai' | 'azure')
+AI_PROVIDER=openai
+
+# Direct OpenAI Configuration
 OPENAI_API_KEY=sk-your-openai-api-key
+
+# Azure AI Foundry Configuration (used when AI_PROVIDER=azure)
+# AZURE_OPENAI_RESOURCE_NAME=your-resource-name
+# AZURE_OPENAI_API_KEY=your-azure-api-key
+# AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4.1-mini
+# AZURE_OPENAI_EVAL_DEPLOYMENT=gpt-4.1
+# AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper
+# AZURE_OPENAI_API_VERSION=2024-10-21
+
+# ElevenLabs Speech Synthesis
 ELEVEN_API_KEY=your-elevenlabs-api-key
 ELEVEN_EXAMINER_VOICE_ID=21m00Tcm4TlvDq8ikWAM
 ELEVEN_COCANDIDATE_VOICE_ID=AZnzlk1XvdvUeBnXmlld

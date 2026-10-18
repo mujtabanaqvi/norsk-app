@@ -3,11 +3,11 @@
  * Fixed exam phrases use templates (fast, reliable); conversational lines use gpt-4.1-mini.
  */
 import { generateText } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { getConversationModel, getConversationModelName } from './ai-provider';
 import type { SpeakerAction } from './exam-engine';
 import type { TranscriptEntry } from '../db/schema';
 
-export const CONVERSATION_MODEL = process.env.OPENAI_CHAT_MODEL || 'gpt-4.1-mini';
+export const CONVERSATION_MODEL = getConversationModelName();
 
 export interface PersonaContext {
   level: 'B1' | 'B2';
@@ -137,7 +137,7 @@ export async function generateLine(
   const { system, prompt } = buildPrompt(action, ctx);
   try {
     const result = await generateText({
-      model: openai(CONVERSATION_MODEL),
+      model: getConversationModel(),
       system,
       prompt,
       temperature: 0.7,

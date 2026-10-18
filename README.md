@@ -37,7 +37,20 @@ npm install
 Copy `.env.example` to `.env.local` and configure your credentials:
 ```env
 # AI Providers
+# AI Provider Switch ('openai' | 'azure')
+AI_PROVIDER=openai
+
+# Direct OpenAI Configuration
 OPENAI_API_KEY=sk-your-openai-api-key
+
+# Azure AI Foundry Configuration (when AI_PROVIDER=azure)
+# AZURE_OPENAI_RESOURCE_NAME=your-azure-resource-name
+# AZURE_OPENAI_API_KEY=your-azure-api-key
+# AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4.1-mini
+# AZURE_OPENAI_EVAL_DEPLOYMENT=gpt-4.1
+# AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper
+# AZURE_OPENAI_API_VERSION=2024-10-21
+
 ELEVEN_API_KEY=your-elevenlabs-api-key
 ELEVEN_EXAMINER_VOICE_ID=21m00Tcm4TlvDq8ikWAM
 ELEVEN_COCANDIDATE_VOICE_ID=AZnzlk1XvdvUeBnXmlld

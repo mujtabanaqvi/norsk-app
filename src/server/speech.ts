@@ -3,9 +3,9 @@
  * Both are called over plain REST so the server controls file names, mime types and streaming.
  */
 import type { Persona } from './exam-engine';
+import { getSttEndpointConfig } from './ai-provider';
 
 const OPENAI_BASE = 'https://api.openai.com/v1';
-export const STT_MODEL = process.env.OPENAI_STT_MODEL || 'gpt-4o-transcribe';
 export const ELEVEN_MODEL = process.env.ELEVEN_MODEL_ID || 'eleven_multilingual_v2';
 
 const MIME_EXT: Record<string, string> = {
@@ -30,6 +30,7 @@ export function extensionForMime(mime: string | undefined, fallbackName?: string
 
 /**
  * Transcribe a Norwegian audio clip. Returns an empty string for silence.
+ * Works seamlessly with both OpenAI direct and Azure AI Foundry Whisper deployments.
  */
 export async function transcribe(
   audio: Blob,
@@ -40,13 +41,11 @@ export async function transcribe(
     return '';
   }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error('OPENAI_API_KEY is not configured');
-
+  const endpointConfig = getSttEndpointConfig();
   const ext = extensionForMime(mime, fileName);
   const form = new FormData();
   form.append('file', new File([audio], `answer.${ext}`, { type: mime || `audio/${ext}` }));
-  form.append('model', STT_MODEL);
+  form.append('model', endpointConfig.modelOrDeployment);
   form.append('language', 'no');
   form.append(
     'prompt',
@@ -54,15 +53,15 @@ export async function transcribe(
   );
   form.append('response_format', 'json');
 
-  const res = await fetch(`${OPENAI_BASE}/audio/transcriptions`, {
+  const res = await fetch(endpointConfig.url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${apiKey}` },
+    headers: endpointConfig.headers,
     body: form,
   });
   if (!res.ok) {
     const errText = await res.text();
     if (res.status === 400 && errText.includes('corrupted or unsupported')) {
-      console.warn('[STT] Short or empty audio clip rejected by OpenAI; prompting candidate to retry.');
+      console.warn('[STT] Short or empty audio clip rejected by provider; prompting candidate to retry.');
       return '';
     }
     throw new Error(`Transcription failed (${res.status}): ${errText}`);

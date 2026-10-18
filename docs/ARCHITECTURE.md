@@ -30,13 +30,14 @@ This document describes the architectural topology, service interactions, and li
 └──────────┬───────────────────────────────┬───────────────────┘
            │                               │
            ▼                               ▼
-┌────────────────────────────┐   ┌─────────────────────────────┐
-│ AI Speech & LLM Providers  │   │  Neon PostgreSQL (Drizzle)  │
-│  ├── OpenAI Transcribe STT │   │  ├── exam_topics            │
-│  ├── OpenAI GPT-4.1-mini   │   │  ├── user_quotas            │
-│  ├── ElevenLabs TTS Stream │   │  ├── exam_sessions          │
-│  └── OpenAI GPT-4o Grader  │   │  └── usage_ledger           │
-└────────────────────────────┘   └─────────────────────────────┘
+┌─────────────────────────────────────┐   ┌─────────────────────────────┐
+│ AI Provider Layer (ai-provider.ts)  │   │  Neon PostgreSQL (Drizzle)  │
+│  ├── OpenAI Direct OR Azure Foundry │   │  ├── exam_topics            │
+│  │   ├── STT: Whisper               │   │  ├── user_quotas            │
+│  │   ├── LLM: gpt-4o-mini / gpt-4.1 │   │  ├── exam_sessions          │
+│  │   └── Eval: gpt-4o (structured)  │   │  └── usage_ledger           │
+│  └── ElevenLabs / OpenAI TTS Stream │   └─────────────────────────────┘
+└─────────────────────────────────────┘
 ```
 
 ---

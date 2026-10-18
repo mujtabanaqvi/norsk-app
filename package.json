@@ -21,6 +21,7 @@
     "mobile:ios": "expo start --ios"
   },
   "dependencies": {
+    "@ai-sdk/azure": "^4.0.103",
     "@ai-sdk/openai": "^4.0.84",
     "@expo/metro-runtime": "~57.0.16",
     "@neondatabase/serverless": "^1.2.0",

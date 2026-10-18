@@ -2,7 +2,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import { generateObject } from 'ai';
-import { openai } from '@ai-sdk/openai';
+import { getEvaluationModel, isProviderConfigured } from '../server/ai-provider';
 import { z } from 'zod';
 import { eq, sql } from 'drizzle-orm';
 import { db } from '../db/index';
@@ -461,21 +461,16 @@ ${
   let promptTokens = 0;
   let completionTokens = 0;
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  const isRealApiKey =
-    apiKey &&
-    apiKey !== 'sk-xxxxxxx' &&
-    !apiKey.startsWith('sk-placeholder') &&
-    apiKey.trim().length > 15;
+  const hasLiveAi = isProviderConfigured();
 
-  if (isRealApiKey) {
+  if (hasLiveAi) {
     console.log(
-      `[Evaluation] Invoking Vercel AI SDK generateObject (gpt-4o) for session ${sessionId}`
+      `[Evaluation] Invoking Vercel AI SDK generateObject for session ${sessionId}`
     );
 
     try {
       const result = await generateObject({
-        model: openai('gpt-4o'),
+        model: getEvaluationModel(),
         schema: LlmExamEvaluationSchema,
         system: HK_DIR_EXAMINER_SYSTEM_PROMPT,
         prompt: userPrompt,
