@@ -78,53 +78,57 @@ export function buildPrompt(
     const system = `Du er en medkandidat som tar Norskprøven muntlig på nivå ${level} sammen med brukeren.
 Samtaleoppgave: "${topic.discussionPromptNo}"
 ${levelStyle(level)}
-Regler:
-- Svar med 2–3 korte, muntlige setninger (maks ca. 45 ord). Ingen lister, ingen emojier, ingen rollebetegnelser.
-- Del egne meninger og enkle erfaringer, vær gjerne litt uenig, og still ofte et oppfølgingsspørsmål til brukeren.
-- Ikke rett brukerens språkfeil og ikke opptre som lærer eller sensor.`;
+Regler for naturlig samtale:
+- Svar med 2–4 naturlige, muntlige setninger (maks ca. 55 ord). Ingen lister, ingen emojier, ingen rollebetegnelser eller meta-kommentarer.
+- FORBUDT: Aldri si tomme bekreftelser eller klisjeer som "Det er et godt poeng", "Det var et godt poeng", "Jeg er enig med deg", eller "Interessant synspunkt".
+- Reager direkte på det kandidaten faktisk sa. Vis en ekte holdning eller personlig erfaring, og utfordre eller nyansér argumentet ("Men hvis man tenker på...", "Samtidig opplever mange at...", "På en måte, men hva med...", "Tror du ikke at...").
+- Vær en aktiv og engasjert samtalepartner som driver diskusjonen framover med et genuint spørsmål eller et motargument.
+- Ikke rett brukerens språkfeil og opptre aldri som lærer eller sensor.`;
     const task =
       action.intent === 'PEER_OPEN'
-        ? 'Start samtalen: hils kort, si din første mening om oppgaven og spør hva brukeren mener.'
+        ? 'Start diskusjonen naturlig: presenter umiddelbart en klar, personlig mening eller vinkling om oppgaven, begrunn den kort, og spør hva brukeren tenker om dette.'
         : action.intent === 'PEER_WRAP_UP'
-          ? 'Avrund samtalen høflig: oppsummer kort hva dere har snakket om og si at du synes det var en fin samtale. Ikke still flere spørsmål.'
-          : 'Svar på det brukeren nettopp sa, og hold samtalen i gang.';
-    return { system, prompt: `Samtalen så langt:\n${history}\n\nOppgave: ${task}` };
+          ? 'Avrund diskusjonen høflig og naturlig: nevn kort en felles konklusjon eller motsetning dere diskuterte, og si at det var en god diskusjon. Ikke still nye spørsmål.'
+          : 'Hør nøye på kandidatens siste innlegg i samtaleloggen. Kommentér direkte på et konkret poeng eller eksempel de nevnte, si hva du selv mener eller argumentér fra en annen vinkel, og still et oppfølgende spørsmål som utfordrer eller utforsker synspunktet deres videre.';
+    return { system, prompt: `Samtalen så langt:\n${history}\n\nOppgave for neste innlegg: ${task}` };
   }
 
   // Examiner
   const system = `Du er en offisiell sensor for Norskprøven muntlig på nivå ${level} (HK-dir).
-Tema: "${topic.titleNo}". ${levelStyle(level)}
+Tema for prøven: "${topic.titleNo}". ${levelStyle(level)}
 Regler:
-- Vær vennlig, profesjonell og kort (maks ca. 40 ord). Ingen lister, ingen emojier, ingen rollebetegnelser.
-- Ikke gi tilbakemelding på språket eller vurder kandidaten underveis.`;
+- Vær vennlig, profesjonell, lyttende og konsis (maks ca. 45 ord). Ingen lister, ingen emojier, ingen rollebetegnelser.
+- Reager som et ekte menneske som har lyttet oppmerksomt: knytt neste spørsmål eller oppfordring direkte til det kandidaten nettopp snakket om (f.eks. "Siden du snakket om...", "Du nevnte at...").
+- Aldri bruk mekaniske fraser som bare "Takk." eller "Ja, interessant." alene. Vis med en kort setning eller formulering at du hørte innholdet, før du stiller spørsmålet.
+- Ikke gi vurdering, karakter eller tilbakemelding på grammatikk/ordforråd underveis.`;
 
   let task: string;
   if (action.intent === 'NUDGE') {
-    task = `Kandidatens monolog var kort. Be vennlig kandidaten om å utdype, f.eks. ved å gi et eksempel, fortelle om egne erfaringer eller begrunne meningen sin. Monologoppgaven er: "${topic.monologuePromptNo}"`;
+    task = `Kandidatens monolog var for kort. Vis kort at du hørte hva kandidaten begynte å snakke om, og be dem vennlig utdype med et konkret eksempel eller en begrunnelse for synspunktet sitt. Monologoppgaven er: "${topic.monologuePromptNo}"`;
   } else {
     const q = topic.followUpQuestionsNo[action.followUpIndex ?? 0] ?? '';
     task = action.transitionToDel3
-      ? `Takk for samtalen og si at dere nå går over til del tre med noen oppfølgingsspørsmål. Still deretter dette spørsmålet (du kan omformulere litt): "${q}"`
-      : `Gi en svært kort, nøytral kvittering (f.eks. "Takk." eller "Ja, interessant.") og still deretter dette spørsmålet (du kan omformulere litt): "${q}"`;
+      ? `Takk kort for diskusjonen og forklar at dere nå går over til del tre med noen oppfølgingsspørsmål. Still deretter dette oppfølgingsspørsmålet, og tilpass gjerne formuleringen litt slik at det flyter naturlig fra det kandidaten har snakket om: "${q}"`
+      : `Knytt an til det kandidaten nettopp svarte i samtaleloggen, og still dette oppfølgingsspørsmålet på en naturlig, muntlig måte: "${q}"`;
   }
-  return { system, prompt: `Samtalen så langt:\n${history}\n\nOppgave: ${task}` };
+  return { system, prompt: `Samtalen så langt:\n${history}\n\nOppgave for sensoren: ${task}` };
 }
 
 function fallbackLine(action: SpeakerAction, ctx: PersonaContext): string {
   switch (action.intent) {
     case 'NUDGE':
-      return 'Takk. Kan du si litt mer om dette? Gi gjerne et eksempel fra ditt eget liv.';
+      return 'Takk for det du delte. Kan du utdype litt mer om dette, og kanskje gi et konkret eksempel fra egne erfaringer?';
     case 'PEER_OPEN':
-      return 'Hei! Jeg synes dette er et interessant tema. Hva mener du om det?';
+      return 'Jeg har tenkt en del på dette, og jeg mener at dette påvirker hverdagen vår mer enn vi tror. Hva tenker du om saken?';
     case 'PEER_WRAP_UP':
-      return 'Takk, det var en fin samtale. Jeg synes vi har fått fram mange gode poenger.';
+      return 'Takk for en god samtale! Vi fikk belyst flere sider av saken, og det var spennende å høre dine tanker.';
     case 'PEER_REPLY':
-      return 'Det er et godt poeng. Kan du forklare litt mer hvorfor du mener det?';
+      return 'Jeg forstår hvordan du ser det, men opplever du ikke også at det kan få andre konsekvenser i praksis? Hva tenker du om det?';
     case 'ASK_FOLLOWUP': {
       const q = ctx.topic.followUpQuestionsNo[action.followUpIndex ?? 0] ?? '';
       return action.transitionToDel3
-        ? `Takk for samtalen. Vi går nå over til del tre. ${q}`
-        : `Takk. ${q}`;
+        ? `Takk for en fin diskusjon. Nå går vi over til del tre med noen oppfølgingsspørsmål. ${q}`
+        : `Det er et relevant perspektiv. ${q}`;
     }
     default:
       return 'Takk.';

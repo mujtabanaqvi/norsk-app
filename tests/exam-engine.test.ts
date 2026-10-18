@@ -212,7 +212,27 @@ test('Personas & Speech Helpers: templates, prompts, word counting, and MIME ext
     }
   );
   assert.ok(promptObj.system.includes('B2'));
+  assert.ok(promptObj.system.includes('FORBUDT'));
   assert.ok(promptObj.prompt.includes('Jeg mener kollektivtransport er viktig.'));
+
+  const examinerPrompt = buildPrompt(
+    { persona: 'examiner', intent: 'ASK_FOLLOWUP', followUpIndex: 0 },
+    {
+      level: 'B1',
+      mode: 'AI_PEER',
+      topic: SAMPLE_TOPIC,
+      transcript: [
+        {
+          speaker: 'CANDIDATE_1',
+          role: 'CANDIDATE_1',
+          text: 'Jeg tar ofte bussen til jobben.',
+          timestamp: 2000,
+        },
+      ],
+    }
+  );
+  assert.ok(examinerPrompt.system.includes('oppmerksomt'));
+  assert.ok(examinerPrompt.prompt.includes('Jeg tar ofte bussen til jobben.'));
 
   assert.equal(extensionForMime('audio/m4a'), 'm4a');
   assert.equal(extensionForMime('audio/webm;codecs=opus'), 'webm');
