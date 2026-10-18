@@ -84,11 +84,28 @@ test('AI Provider: STT endpoint configuration for direct openai', () => {
   assert.equal(sttConfig.url, 'https://api.openai.com/v1/audio/transcriptions');
   assert.equal(sttConfig.headers['Authorization'], 'Bearer sk-test-key-1234567890');
 
-  // Cleanup
-  if (origProvider !== undefined) process.env.AI_PROVIDER = origProvider;
-  else delete process.env.AI_PROVIDER;
-
   if (origKey !== undefined) process.env.OPENAI_API_KEY = origKey;
   else delete process.env.OPENAI_API_KEY;
+});
+
+test('AI Provider: Azure AI Speech configuration resolution', () => {
+  const origKey = process.env.AZURE_OPENAI_API_KEY;
+  const origRegion = process.env.AZURE_SPEECH_REGION;
+
+  process.env.AZURE_OPENAI_API_KEY = 'test-azure-speech-key';
+  process.env.AZURE_SPEECH_REGION = 'swedencentral';
+
+  const { getAzureSpeechConfig } = require('../src/server/ai-provider');
+  const speechConfig = getAzureSpeechConfig();
+  assert.equal(speechConfig.apiKey, 'test-azure-speech-key');
+  assert.equal(speechConfig.region, 'swedencentral');
+  assert.equal(speechConfig.examinerVoice, 'nb-NO-PernilleNeural');
+  assert.equal(speechConfig.coCandidateVoice, 'nb-NO-FinnNeural');
+
+  if (origKey !== undefined) process.env.AZURE_OPENAI_API_KEY = origKey;
+  else delete process.env.AZURE_OPENAI_API_KEY;
+
+  if (origRegion !== undefined) process.env.AZURE_SPEECH_REGION = origRegion;
+  else delete process.env.AZURE_SPEECH_REGION;
 });
 

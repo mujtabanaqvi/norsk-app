@@ -180,3 +180,35 @@ export function getSttEndpointConfig(): SttEndpointConfig {
     modelOrDeployment: model,
   };
 }
+
+/**
+ * Information needed to execute Text-to-Speech (TTS).
+ */
+export interface AzureSpeechConfig {
+  apiKey: string;
+  region: string;
+  endpoint?: string;
+  examinerVoice: string;
+  coCandidateVoice: string;
+}
+
+/**
+ * Builds Azure AI Speech configuration for neural Norwegian voice synthesis.
+ */
+export function getAzureSpeechConfig(): AzureSpeechConfig {
+  const apiKey = process.env.AZURE_SPEECH_KEY || process.env.AZURE_OPENAI_API_KEY;
+  if (!apiKey) throw new Error('AZURE_SPEECH_KEY or AZURE_OPENAI_API_KEY is not configured');
+
+  const region = process.env.AZURE_SPEECH_REGION || 'swedencentral';
+  const endpoint = process.env.AZURE_SPEECH_ENDPOINT;
+  const examinerVoice = process.env.AZURE_SPEECH_EXAMINER_VOICE || 'nb-NO-PernilleNeural';
+  const coCandidateVoice = process.env.AZURE_SPEECH_COCANDIDATE_VOICE || 'nb-NO-FinnNeural';
+
+  return {
+    apiKey,
+    region,
+    endpoint,
+    examinerVoice,
+    coCandidateVoice,
+  };
+}

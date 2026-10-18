@@ -3,7 +3,7 @@
  * Both are called over plain REST so the server controls file names, mime types and streaming.
  */
 import type { Persona } from './exam-engine';
-import { getSttEndpointConfig } from './ai-provider';
+import { getSttEndpointConfig, getActiveAiProvider, getAzureSpeechConfig } from './ai-provider';
 
 const OPENAI_BASE = 'https://api.openai.com/v1';
 export const ELEVEN_MODEL = process.env.ELEVEN_MODEL_ID || 'eleven_multilingual_v2';
@@ -30,7 +30,7 @@ export function extensionForMime(mime: string | undefined, fallbackName?: string
 
 /**
  * Transcribe a Norwegian audio clip. Returns an empty string for silence.
- * Works seamlessly with both OpenAI direct and Azure AI Foundry Whisper deployments.
+ * Strict provider separation: routes strictly to Azure Whisper or OpenAI STT.
  */
 export async function transcribe(
   audio: Blob,
@@ -64,7 +64,7 @@ export async function transcribe(
       console.warn('[STT] Short or empty audio clip rejected by provider; prompting candidate to retry.');
       return '';
     }
-    throw new Error(`Transcription failed (${res.status}): ${errText}`);
+    throw new Error(`[${endpointConfig.provider.toUpperCase()} STT] Transcription failed (${res.status}): ${errText}`);
   }
   const data = (await res.json()) as { text?: string };
   return (data.text || '').trim();
@@ -77,40 +77,95 @@ function voiceFor(persona: Persona): string | undefined {
 }
 
 /**
- * Synthesize speech as an MP3 stream. Uses ElevenLabs when configured,
- * otherwise OpenAI gpt-4o-mini-tts.
+ * Synthesize speech using Azure AI Speech (Neural Norwegian voices).
+ * Strictly used when AI_PROVIDER=azure with zero calls to OpenAI or ElevenLabs.
+ */
+async function synthesizeAzureStream(
+  text: string,
+  persona: Persona
+): Promise<ReadableStream<Uint8Array>> {
+  const config = getAzureSpeechConfig();
+  const voiceName = persona === 'examiner' ? config.examinerVoice : config.coCandidateVoice;
+  const endpoint =
+    config.endpoint || `https://${config.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+
+  // Escape XML characters for SSML safety
+  const safeText = text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;');
+
+  const ssml = `<speak version="1.0" xml:lang="nb-NO"><voice xml:lang="nb-NO" name="${voiceName}">${safeText}</voice></speak>`;
+
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: {
+      'Ocp-Apim-Subscription-Key': config.apiKey,
+      'Content-Type': 'application/ssml+xml',
+      'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+      'User-Agent': 'norsk-app-control-plane',
+    },
+    body: ssml,
+  });
+
+  if (!res.ok || !res.body) {
+    const errText = await res.text().catch(() => '');
+    throw new Error(`[Azure TTS] Speech synthesis failed (${res.status}): ${errText}`);
+  }
+
+  return res.body;
+}
+
+/**
+ * Synthesize speech as an MP3 stream with strict provider isolation:
+ * - When AI_PROVIDER=azure: Strictly Azure AI Speech (no fallback to ElevenLabs or OpenAI).
+ * - When AI_PROVIDER=openai: ElevenLabs with fallback to OpenAI direct TTS.
  */
 export async function synthesizeStream(
   text: string,
   persona: Persona
 ): Promise<ReadableStream<Uint8Array>> {
+  const provider = getActiveAiProvider();
+
+  // 1. Strict Azure Route (100% Azure AI Foundry, zero fallback)
+  if (provider === 'azure') {
+    return synthesizeAzureStream(text, persona);
+  }
+
+  // 2. OpenAI Route (ElevenLabs primary with OpenAI TTS fallback)
   const elevenKey = process.env.ELEVEN_API_KEY;
   const voiceId = voiceFor(persona);
 
   if (elevenKey && voiceId) {
-    const res = await fetch(
-      `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128`,
-      {
-        method: 'POST',
-        headers: {
-          'xi-api-key': elevenKey,
-          'Content-Type': 'application/json',
-          Accept: 'audio/mpeg',
-        },
-        body: JSON.stringify({
-          text,
-          model_id: ELEVEN_MODEL,
-          language_code:
-            ELEVEN_MODEL.includes('v2_5') || ELEVEN_MODEL.includes('v3') ? 'no' : undefined,
-          voice_settings: { stability: 0.5, similarity_boost: 0.75 },
-        }),
-      }
-    );
-    if (res.ok && res.body) return res.body;
-    console.warn(
-      `[TTS] ElevenLabs failed (${res.status}); falling back to OpenAI TTS:`,
-      await res.text().catch(() => '')
-    );
+    try {
+      const res = await fetch(
+        `https://api.elevenlabs.io/v1/text-to-speech/${encodeURIComponent(voiceId)}/stream?output_format=mp3_44100_128`,
+        {
+          method: 'POST',
+          headers: {
+            'xi-api-key': elevenKey,
+            'Content-Type': 'application/json',
+            Accept: 'audio/mpeg',
+          },
+          body: JSON.stringify({
+            text,
+            model_id: ELEVEN_MODEL,
+            language_code:
+              ELEVEN_MODEL.includes('v2_5') || ELEVEN_MODEL.includes('v3') ? 'no' : undefined,
+            voice_settings: { stability: 0.5, similarity_boost: 0.75 },
+          }),
+        }
+      );
+      if (res.ok && res.body) return res.body;
+      console.warn(
+        `[TTS] ElevenLabs failed (${res.status}); falling back to OpenAI TTS:`,
+        await res.text().catch(() => '')
+      );
+    } catch (err) {
+      console.warn('[TTS] ElevenLabs network error; falling back to OpenAI TTS:', err);
+    }
   }
 
   const apiKey = process.env.OPENAI_API_KEY;
