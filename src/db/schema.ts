@@ -24,6 +24,16 @@ export const usageSourceEnum = pgEnum('usage_source', [
   'POST_EXAM_RUBRIC_EVAL',
 ]);
 
+export const userRoleEnum = pgEnum('user_role', ['USER', 'ADMIN']);
+export const subscriptionTierEnum = pgEnum('subscription_tier', ['FREE', 'STANDARD', 'PREMIUM']);
+export const subscriptionStatusEnum = pgEnum('subscription_status', [
+  'INACTIVE',
+  'ACTIVE',
+  'TRIALING',
+  'PAST_DUE',
+  'CANCELED',
+]);
+
 // Transcript structure stored in JSONB
 export interface TranscriptEntry {
   speaker: string;
@@ -183,7 +193,177 @@ export const usageLedger = pgTable(
   ]
 );
 
+/**
+ * 5. Better Auth Core Tables: user, session, account, verification
+ */
+export const user = pgTable('user', {
+  id: text('id').primaryKey(),
+  name: text('name').notNull(),
+  email: text('email').notNull().unique(),
+  emailVerified: boolean('email_verified').notNull().default(false),
+  image: text('image'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  // App-specific user attributes
+  role: userRoleEnum('role').notNull().default('USER'),
+  subscriptionTier: subscriptionTierEnum('subscription_tier').notNull().default('FREE'),
+  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  referralCode: varchar('referral_code', { length: 32 }).notNull().unique(),
+  referredByUserId: varchar('referred_by_user_id', { length: 128 }),
+});
+
+export const session = pgTable('session', {
+  id: text('id').primaryKey(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  token: text('token').notNull().unique(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  ipAddress: text('ip_address'),
+  userAgent: text('user_agent'),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+}, (table) => [
+  index('idx_session_user_id').on(table.userId),
+]);
+
+export const account = pgTable('account', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull(),
+  providerId: text('provider_id').notNull(),
+  userId: text('user_id').notNull().references(() => user.id, { onDelete: 'cascade' }),
+  accessToken: text('access_token'),
+  refreshToken: text('refresh_token'),
+  idToken: text('id_token'),
+  accessTokenExpiresAt: timestamp('access_token_expires_at', { withTimezone: true }),
+  refreshTokenExpiresAt: timestamp('refresh_token_expires_at', { withTimezone: true }),
+  scope: text('scope'),
+  password: text('password'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index('idx_account_user_id').on(table.userId),
+  index('idx_account_provider').on(table.providerId, table.accountId),
+]);
+
+export const verification = pgTable('verification', {
+  id: text('id').primaryKey(),
+  identifier: text('identifier').notNull(),
+  value: text('value').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow(),
+});
+
+// Backward-compatible alias for app queries
+export const users = user;
+export const oauthAccounts = account;
+
+/**
+ * 7. subscriptions Table
+ */
+export const subscriptions = pgTable('subscriptions', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: varchar('user_id', { length: 128 })
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }).notNull().unique(),
+  stripePriceId: varchar('stripe_price_id', { length: 255 }).notNull(),
+  tier: subscriptionTierEnum('tier').notNull(),
+  status: subscriptionStatusEnum('status').notNull().default('ACTIVE'),
+  currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
+  currentPeriodEnd: timestamp('current_period_end', { withTimezone: true }).notNull(),
+  cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * 8. tier_configs Table (Configurable limits and pricing)
+ */
+export const tierConfigs = pgTable('tier_configs', {
+  tier: subscriptionTierEnum('tier').primaryKey(),
+  dailyTestLimit: integer('daily_test_limit').notNull(),
+  priceCents: integer('price_cents').notNull().default(0), // in NOK øre or EUR cents
+  currency: varchar('currency', { length: 3 }).notNull().default('NOK'),
+  stripePriceId: varchar('stripe_price_id', { length: 255 }),
+  featuresJson: jsonb('features_json').$type<string[]>(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * 9. referral_rewards Table
+ */
+export const referralRewards = pgTable(
+  'referral_rewards',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    referrerUserId: varchar('referrer_user_id', { length: 128 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    referredUserId: varchar('referred_user_id', { length: 128 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    bonusTestsPerDay: integer('bonus_tests_per_day').notNull().default(1),
+    startsAt: timestamp('starts_at', { withTimezone: true }).notNull(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_referral_rewards_referrer').on(table.referrerUserId),
+    index('idx_referral_rewards_expires').on(table.expiresAt),
+  ]
+);
+
+/**
+ * 10. system_configs Table
+ */
+export const systemConfigs = pgTable('system_configs', {
+  key: varchar('key', { length: 64 }).primaryKey(),
+  value: text('value').notNull(),
+  description: text('description'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
 // Drizzle Relations
+export const usersRelations = relations(users, ({ many, one }) => ({
+  oauthAccounts: many(oauthAccounts),
+  subscriptions: many(subscriptions),
+  sessions: many(examSessions),
+  earnedRewards: many(referralRewards, { relationName: 'referrer' }),
+  referredRewards: many(referralRewards, { relationName: 'referred' }),
+  referredBy: one(users, {
+    fields: [users.referredByUserId],
+    references: [users.id],
+    relationName: 'userReferrals',
+  }),
+}));
+
+export const oauthAccountsRelations = relations(oauthAccounts, ({ one }) => ({
+  user: one(users, {
+    fields: [oauthAccounts.userId],
+    references: [users.id],
+  }),
+}));
+
+export const subscriptionsRelations = relations(subscriptions, ({ one }) => ({
+  user: one(users, {
+    fields: [subscriptions.userId],
+    references: [users.id],
+  }),
+}));
+
+export const referralRewardsRelations = relations(referralRewards, ({ one }) => ({
+  referrer: one(users, {
+    fields: [referralRewards.referrerUserId],
+    references: [users.id],
+    relationName: 'referrer',
+  }),
+  referred: one(users, {
+    fields: [referralRewards.referredUserId],
+    references: [users.id],
+    relationName: 'referred',
+  }),
+}));
+
 export const examTopicsRelations = relations(examTopics, ({ many }) => ({
   sessions: many(examSessions),
 }));
@@ -202,6 +382,10 @@ export const examSessionsRelations = relations(examSessions, ({ one, many }) => 
     fields: [examSessions.userId],
     references: [userQuotas.userId],
   }),
+  user: one(users, {
+    fields: [examSessions.userId],
+    references: [users.id],
+  }),
   ledgerEntries: many(usageLedger),
 }));
 
@@ -217,6 +401,24 @@ export const usageLedgerRelations = relations(usageLedger, ({ one }) => ({
 }));
 
 // Infer Types
+export type User = typeof users.$inferSelect;
+export type NewUser = typeof users.$inferInsert;
+
+export type OAuthAccount = typeof oauthAccounts.$inferSelect;
+export type NewOAuthAccount = typeof oauthAccounts.$inferInsert;
+
+export type Subscription = typeof subscriptions.$inferSelect;
+export type NewSubscription = typeof subscriptions.$inferInsert;
+
+export type TierConfig = typeof tierConfigs.$inferSelect;
+export type NewTierConfig = typeof tierConfigs.$inferInsert;
+
+export type ReferralReward = typeof referralRewards.$inferSelect;
+export type NewReferralReward = typeof referralRewards.$inferInsert;
+
+export type SystemConfig = typeof systemConfigs.$inferSelect;
+export type NewSystemConfig = typeof systemConfigs.$inferInsert;
+
 export type ExamTopic = typeof examTopics.$inferSelect;
 export type NewExamTopic = typeof examTopics.$inferInsert;
 

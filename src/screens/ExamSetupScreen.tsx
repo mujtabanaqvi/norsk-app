@@ -13,6 +13,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchTopicsAndQuota, startExamSession } from '../api';
+import { useAuth } from '../hooks/useAuth';
 import type {
   CefrLevel,
   CoCandidateMode,
@@ -160,9 +161,90 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const { user, dailyTestStatus, logout } = useAuth();
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" />
+
+      {/* Top User & Tier Header */}
+      <View style={{
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 20,
+        paddingTop: 8,
+        paddingBottom: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: '#1E293B',
+      }}>
+        {user ? (
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+            onPress={() => navigation.navigate('Subscription')}
+          >
+            <View style={{
+              backgroundColor: user.subscriptionTier === 'PREMIUM' ? '#F59E0B' : user.subscriptionTier === 'STANDARD' ? '#2563EB' : '#475569',
+              paddingHorizontal: 8,
+              paddingVertical: 3,
+              borderRadius: 6,
+            }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>
+                {user.subscriptionTier}
+              </Text>
+            </View>
+            <Text style={{ color: '#F8FAFC', fontSize: 14, fontWeight: '600' }}>
+              {user.name || user.email.split('@')[0]}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Auth')}
+            style={{
+              backgroundColor: '#1E293B',
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: '#334155',
+            }}
+          >
+            <Text style={{ color: '#38BDF8', fontSize: 13, fontWeight: '600' }}>
+              👤 Logg inn / Registrer
+            </Text>
+          </TouchableOpacity>
+        )}
+
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Referral')}
+            style={{
+              backgroundColor: 'rgba(16, 185, 129, 0.15)',
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700' }}>
+              🎁 Verv en venn
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Subscription')}
+            style={{
+              backgroundColor: 'rgba(245, 158, 11, 0.15)',
+              paddingHorizontal: 10,
+              paddingVertical: 5,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '700' }}>
+              ⭐ Oppgrader
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
 
       {/* Header Bar */}
       <View style={styles.header}>
@@ -189,6 +271,49 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
           </Text>
         </View>
       </View>
+
+      {/* Daily Tests Quota Status Bar */}
+      {dailyTestStatus && (
+        <View style={{
+          backgroundColor: dailyTestStatus.remainingToday > 0 ? '#1E293B' : 'rgba(239, 68, 68, 0.15)',
+          marginHorizontal: 20,
+          marginBottom: 12,
+          padding: 12,
+          borderRadius: 12,
+          borderWidth: 1,
+          borderColor: dailyTestStatus.remainingToday > 0 ? '#334155' : '#EF4444',
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+        }}>
+          <View>
+            <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '700' }}>
+              Øvingstester i dag: {dailyTestStatus.testsUsedToday} av {dailyTestStatus.totalAllowedToday} brukt
+            </Text>
+            <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 2 }}>
+              {dailyTestStatus.remainingToday > 0
+                ? `${dailyTestStatus.remainingToday} gjenstår (nullstilles ved midnatt)`
+                : 'Dagens grense er nådd. Nullstilles ved midnatt.'}
+              {dailyTestStatus.bonusTests > 0 && ` (+${dailyTestStatus.bonusTests} vervebonus)`}
+            </Text>
+          </View>
+          {dailyTestStatus.remainingToday === 0 && (
+            <TouchableOpacity
+              onPress={() => navigation.navigate('Subscription')}
+              style={{
+                backgroundColor: '#F59E0B',
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: '800' }}>
+                Lås opp flere
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       {/* Insufficient Quota Warning Banner */}
       {hasInsufficientQuota && (

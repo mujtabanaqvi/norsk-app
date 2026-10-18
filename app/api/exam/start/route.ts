@@ -104,6 +104,21 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Check daily test limit (free tier limit + active referral bonuses vs tests used today)
+    const { getUserDailyTestStatus } = await import('@/lib/tier-policy');
+    const dailyStatus = await getUserDailyTestStatus(userId);
+    if (!dailyStatus.canStartTest) {
+      return NextResponse.json(
+        {
+          error: 'Daily test limit reached',
+          message: `Du har nådd din daglige grense på ${dailyStatus.totalAllowedToday} test(er). Grensen nullstilles ved midnatt. Oppgrader for å ta flere tester.`,
+          code: 'DAILY_LIMIT_REACHED',
+          dailyStatus,
+        },
+        { status: 403 }
+      );
+    }
+
     // 3. Resolve exam topic: randomly pick an active topic for the level, or look up specific topicId
     let topic: ExamTopic | undefined | null;
     const trimmedTopicId = topicId?.trim();

@@ -20,6 +20,9 @@ export async function GET(req: NextRequest) {
       .where(eq(userQuotas.userId, user.userId))
       .limit(1);
 
+    const { getUserDailyTestStatus } = await import('@/lib/tier-policy');
+    const dailyTestStatus = await getUserDailyTestStatus(user.userId);
+
     if (!quota) {
       return NextResponse.json({
         userId: user.userId,
@@ -28,7 +31,8 @@ export async function GET(req: NextRequest) {
         totalLlmTokensUsed: 0,
         totalTokensUsed: 0,
         totalCostUsd: '0.000000',
-        hasSufficientQuotaForExam: true,
+        hasSufficientQuotaForExam: dailyTestStatus.canStartTest,
+        dailyTestStatus,
       });
     }
 
@@ -39,7 +43,8 @@ export async function GET(req: NextRequest) {
       totalLlmTokensUsed: quota.totalLlmTokensUsed,
       totalTokensUsed: quota.totalLlmTokensUsed,
       totalCostUsd: quota.totalCostUsd,
-      hasSufficientQuotaForExam: quota.remainingAudioSeconds >= 180,
+      hasSufficientQuotaForExam: quota.remainingAudioSeconds >= 180 && dailyTestStatus.canStartTest,
+      dailyTestStatus,
     });
   } catch (error) {
     if (error instanceof AuthenticationError) {

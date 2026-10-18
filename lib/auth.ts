@@ -1,9 +1,15 @@
 import { NextRequest } from 'next/server';
+import jwt from 'jsonwebtoken';
+import { db } from '@/src/db';
+import { users } from '@/src/db/schema';
+import { eq } from 'drizzle-orm';
 
 export interface AuthenticatedUser {
   userId: string;
   email?: string;
   role?: string;
+  subscriptionTier?: 'FREE' | 'STANDARD' | 'PREMIUM';
+  name?: string | null;
 }
 
 export class AuthenticationError extends Error {
@@ -13,16 +19,64 @@ export class AuthenticationError extends Error {
   }
 }
 
+const JWT_SECRET = process.env.JWT_SECRET || 'norsk-app-dev-secret-key-change-in-prod';
+
+/**
+ * Generate a JWT token for a user
+ */
+export function signUserToken(user: { id: string; email: string; role?: string }): string {
+  return jwt.sign(
+    {
+      sub: user.id,
+      email: user.email,
+      role: user.role || 'USER',
+    },
+    JWT_SECRET,
+    { expiresIn: '30d' }
+  );
+}
+
+/**
+ * Verify a JWT token
+ */
+export function verifyUserToken(token: string): { sub: string; email?: string; role?: string } {
+  try {
+    return jwt.verify(token, JWT_SECRET) as { sub: string; email?: string; role?: string };
+  } catch {
+    throw new AuthenticationError('Invalid or expired authentication token');
+  }
+}
+
+import { auth as betterAuthInstance } from './better-auth';
+
 /**
  * Authenticates the user from incoming Next.js API Request.
  * Supports:
- * 1. Bearer JWT / API Token header
- * 2. x-user-id header (for secure proxy or testing environments)
- * 3. Session cookie fallback
+ * 1. Better Auth session (via cookies/headers)
+ * 2. Bearer JWT / API Token header
+ * 3. x-user-id header (for backward compatibility / dev testing)
  */
 export async function authenticateUser(
   request: Request | NextRequest
 ): Promise<AuthenticatedUser> {
+  // 1. Try Better Auth session resolution
+  try {
+    const sessionData = await betterAuthInstance.api.getSession({
+      headers: request.headers,
+    });
+    if (sessionData && sessionData.user) {
+      return {
+        userId: sessionData.user.id,
+        email: sessionData.user.email,
+        name: sessionData.user.name,
+        role: (sessionData.user as any).role || 'USER',
+        subscriptionTier: (sessionData.user as any).subscriptionTier || 'FREE',
+      };
+    }
+  } catch {
+    // Continue to Bearer / header fallback
+  }
+
   const authHeader = request.headers.get('authorization');
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -32,36 +86,20 @@ export async function authenticateUser(
       throw new AuthenticationError('Empty Bearer token provided');
     }
 
-    // In production with JWTs:
-    // try {
-    //   const payload = jwt.verify(token, process.env.JWT_SECRET!);
-    //   return { userId: payload.sub as string, email: payload.email as string };
-    // } catch ...
-
-    // Support dev/test JWT simulation or parsed user identifier
-    if (token.startsWith('user_') || token.includes('-')) {
-      return { userId: token };
-    }
-
-    // Default base64 token or decoded sub
     try {
-      if (token.includes('.')) {
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
-          if (payload.sub || payload.userId || payload.id) {
-            return {
-              userId: (payload.sub || payload.userId || payload.id) as string,
-              email: payload.email,
-            };
-          }
-        }
-      }
+      const payload = verifyUserToken(token);
+      return {
+        userId: payload.sub,
+        email: payload.email,
+        role: payload.role,
+      };
     } catch {
-      // Fall through to fallback
+      // Fallback for mock/candidate token in dev/tests (e.g. user_xxx or candidate_xxx)
+      if (token.startsWith('candidate_') || token.startsWith('user_') || token.startsWith('test_')) {
+        return { userId: token };
+      }
+      throw new AuthenticationError('Invalid authentication token');
     }
-
-    return { userId: token };
   }
 
   // Header-based fallback (e.g. from reverse proxy, mobile client gateway, or dev runner)
@@ -73,3 +111,11 @@ export async function authenticateUser(
   throw new AuthenticationError('Missing or invalid authentication credentials');
 }
 
+/**
+ * Fetch full user record from database given authenticated user
+ */
+export async function getAuthenticatedUserRecord(request: Request | NextRequest) {
+  const auth = await authenticateUser(request);
+  const [userRecord] = await db.select().from(users).where(eq(users.id, auth.userId)).limit(1);
+  return { auth, user: userRecord || null };
+}

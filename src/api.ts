@@ -1,6 +1,6 @@
 import { Platform } from 'react-native';
 import { API_BASE_URL, getCandidateApiBaseUrls } from './config';
-import { getOrCreateUserId } from './identity';
+import { getOrCreateUserId, getAuthToken, setAuthToken, setStoredUser, clearAuthSession } from './identity';
 import type {
   CefrLevel,
   CoCandidateMode,
@@ -58,6 +58,12 @@ async function fetchWithTimeout(
   init: RequestInit = {},
   timeoutMs = DEFAULT_TIMEOUT_MS
 ): Promise<Response> {
+  const token = await getAuthToken();
+  const headers = new Headers(init.headers || {});
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  const modifiedInit = { ...init, headers };
   const orderedBases = [
     activeApiBaseUrl,
     ...CANDIDATE_BASE_URLS.filter((b) => b !== activeApiBaseUrl),
@@ -76,7 +82,7 @@ async function fetchWithTimeout(
       i === 0 ? timeoutMs : Math.min(timeoutMs, FALLBACK_PROBE_TIMEOUT_MS);
 
     try {
-      const res = await fetchSingleAttempt(targetUrl, init, attemptTimeout);
+      const res = await fetchSingleAttempt(targetUrl, modifiedInit, attemptTimeout);
       activeApiBaseUrl = base;
       return res;
     } catch (err) {
@@ -332,5 +338,120 @@ export async function fetchExamResults(sessionId: string): Promise<ExamResultsRe
 
   return res.json();
 }
+
+/**
+ * Authentication & Subscription API methods
+ */
+
+export async function registerWithEmail(params: {
+  email: string;
+  password: string;
+  name?: string;
+  referralCode?: string;
+}) {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || data.error || 'Registrering mislyktes');
+  }
+  if (data.token) {
+    await setAuthToken(data.token);
+    await setStoredUser(data.user);
+  }
+  return data;
+}
+
+export async function loginWithEmail(params: { email: string; password: string }) {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || data.error || 'Innlogging mislyktes');
+  }
+  if (data.token) {
+    await setAuthToken(data.token);
+    await setStoredUser(data.user);
+  }
+  return data;
+}
+
+export async function loginWithGoogleToken(idToken: string, referralCode?: string) {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/google`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ idToken, referralCode }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || data.error || 'Google-innlogging mislyktes');
+  }
+  if (data.token) {
+    await setAuthToken(data.token);
+    await setStoredUser(data.user);
+  }
+  return data;
+}
+
+export async function logoutUser() {
+  await clearAuthSession();
+}
+
+export async function fetchCurrentUser() {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/me`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    if (res.status === 401) {
+      await clearAuthSession();
+      return null;
+    }
+    throw new Error('Kunne ikke hente brukerprofil');
+  }
+  return res.json();
+}
+
+export async function fetchTierConfigs() {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/config/tiers`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    throw new Error('Kunne ikke hente abonnementsplaner');
+  }
+  return res.json();
+}
+
+export async function fetchReferrals() {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/referrals`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    throw new Error('Kunne ikke hente vervekode');
+  }
+  return res.json();
+}
+
+export async function createStripeCheckout(tier: 'STANDARD' | 'PREMIUM', successUrl?: string, cancelUrl?: string) {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/stripe/checkout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ tier, successUrl, cancelUrl }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(data.message || data.error || 'Kunne ikke starte betaling');
+  }
+  return data;
+}
+
 
 

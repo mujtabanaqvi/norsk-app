@@ -193,6 +193,9 @@ export type RootStackParamList = {
   ExamResults: {
     sessionId: string;
   };
+  Auth: undefined;
+  Subscription: undefined;
+  Referral: undefined;
 };
 
 /**
