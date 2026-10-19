@@ -1,7 +1,7 @@
 import React from 'react';
 import { StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import { ExamSetupScreen } from './src/screens/ExamSetupScreen';
@@ -13,28 +13,53 @@ import { ReferralScreen } from './src/screens/ReferralScreen';
 import { HowToScreen } from './src/screens/HowToScreen';
 import { TermsScreen } from './src/screens/TermsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
+import { Logo } from './src/components/ui';
+import { colors } from './src/theme';
 import type { RootStackParamList } from './src/types/exam';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const navigationTheme: Theme = {
+  ...DefaultTheme,
+  colors: {
+    ...DefaultTheme.colors,
+    primary: colors.red,
+    background: colors.bg,
+    card: colors.surface,
+    text: colors.text,
+    border: colors.border,
+    notification: colors.red,
+  },
+};
 
 function AppNavigation() {
   const { user, isLoading } = useAuth();
 
   if (isLoading) {
     return (
-      <View style={{ flex: 1, backgroundColor: '#0B0F19', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator size="large" color="#38BDF8" />
+      <View
+        style={{
+          flex: 1,
+          backgroundColor: colors.white,
+          alignItems: 'center',
+          justifyContent: 'center',
+          gap: 24,
+        }}
+      >
+        <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <Logo size={96} />
+        <ActivityIndicator size="small" color={colors.red} />
       </View>
     );
   }
 
   return (
-    <NavigationContainer>
-      <StatusBar barStyle="light-content" />
+    <NavigationContainer theme={navigationTheme}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
       <Stack.Navigator
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#0B0F19' },
+          contentStyle: { backgroundColor: colors.bg },
           animation: 'fade',
         }}
       >

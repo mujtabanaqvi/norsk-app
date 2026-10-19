@@ -1,10 +1,24 @@
 {
   "expo": {
-    "name": "Norskprøven Muntlig",
+    "name": "Snakkly",
     "slug": "norsk-app",
     "version": "1.0.0",
     "orientation": "portrait",
-    "userInterfaceStyle": "dark",
+    "userInterfaceStyle": "light",
+    "icon": "./assets/brand/snakkly-icon-512.png",
+    "backgroundColor": "#FFFFFF",
+    "primaryColor": "#BA0C2F",
+    "splash": {
+      "image": "./assets/brand/snakkly-logo-1024.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "web": {
+      "favicon": "./assets/brand/favicon.ico",
+      "name": "Snakkly · Norskprøven Muntlig",
+      "themeColor": "#BA0C2F",
+      "backgroundColor": "#F6F7FA"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "no.norskapp.muntlig",
@@ -14,6 +28,10 @@
     },
     "android": {
       "package": "no.norskapp.muntlig",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/brand/snakkly-icon-512.png",
+        "backgroundColor": "#FFFFFF"
+      },
       "permissions": [
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",

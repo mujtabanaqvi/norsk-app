@@ -3,17 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
   Alert,
   Linking,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { fetchTierConfigs, createStripeCheckout } from '../api';
 import { useAuth } from '../hooks/useAuth';
+import { Screen, AppHeader, Card, Badge, Button, Icon } from '../components/ui';
+import { colors, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 
@@ -63,6 +63,12 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const freePlan = plans?.FREE || {
+    priceCents: 0,
+    dailyTestLimit: 1,
+    features: ['1 test per dag', 'B1 og B2 temaer', 'AI-sensor og vurdering'],
+  };
+
   const standard = plans?.STANDARD || {
     priceCents: 14900,
     dailyTestLimit: 5,
@@ -75,197 +81,237 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     features: ['20 tester per dag', 'B1 og B2 temaer', 'Full historikk & uttaleanalyse', '24/7 tilgang'],
   };
 
+  const currentTier = user?.subscriptionTier || 'FREE';
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>← Tilbake</Text>
-        </TouchableOpacity>
+    <Screen>
+      <AppHeader
+        title="Abonnement"
+        onBack={() => navigation.goBack()}
+        bordered
+      />
 
-        <View style={styles.header}>
-          <Text style={styles.title}>Velg ditt abonnement</Text>
-          <Text style={styles.subtitle}>
-            Få ubegrenset selvtillit til muntlig prøve med flere daglige øvingstester.
-          </Text>
-        </View>
-
-        {isLoading ? (
-          <ActivityIndicator size="large" color="#38BDF8" style={{ marginTop: 40 }} />
-        ) : (
-          <View style={styles.cardsContainer}>
-            {/* Standard Plan */}
-            <View style={styles.card}>
-              <View style={styles.planHeader}>
-                <Text style={styles.planName}>Standard</Text>
-                <Text style={styles.planPrice}>
-                  {standard.priceCents / 100} kr <Text style={styles.planPeriod}>/ mnd</Text>
-                </Text>
-              </View>
-              <Text style={styles.badgeText}>🔥 {standard.dailyTestLimit} tester per dag</Text>
-              <View style={styles.featuresList}>
-                {standard.features?.map((f: string, i: number) => (
-                  <Text key={i} style={styles.featureItem}>
-                    ✓ {f}
-                  </Text>
-                ))}
-              </View>
-              <TouchableOpacity
-                style={styles.subscribeButton}
-                onPress={() => handleSubscribe('STANDARD')}
-                disabled={isProcessing}
-              >
-                <Text style={styles.subscribeButtonText}>Velg Standard</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Premium Plan */}
-            <View style={[styles.card, styles.premiumCard]}>
-              <View style={styles.popularTag}>
-                <Text style={styles.popularTagText}>MEST POPULÆR</Text>
-              </View>
-              <View style={styles.planHeader}>
-                <Text style={[styles.planName, { color: '#F59E0B' }]}>Premium</Text>
-                <Text style={styles.planPrice}>
-                  {premium.priceCents / 100} kr <Text style={styles.planPeriod}>/ mnd</Text>
-                </Text>
-              </View>
-              <Text style={[styles.badgeText, { color: '#F59E0B' }]}>
-                ⭐ {premium.dailyTestLimit} tester per dag (Ubegrenset)
-              </Text>
-              <View style={styles.featuresList}>
-                {premium.features?.map((f: string, i: number) => (
-                  <Text key={i} style={styles.featureItem}>
-                    ✓ {f}
-                  </Text>
-                ))}
-              </View>
-              <TouchableOpacity
-                style={[styles.subscribeButton, styles.premiumButton]}
-                onPress={() => handleSubscribe('PREMIUM')}
-                disabled={isProcessing}
-              >
-                <Text style={[styles.subscribeButtonText, { color: '#0F172A' }]}>
-                  Velg Premium
-                </Text>
-              </TouchableOpacity>
-            </View>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+          <View style={styles.hero}>
+            <Text style={styles.title}>Velg ditt abonnement</Text>
+            <Text style={styles.subtitle}>
+              Få ubegrenset selvtillit til muntlig prøve med flere daglige øvingstester.
+            </Text>
           </View>
-        )}
+
+          {isLoading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={colors.red} />
+            </View>
+          ) : (
+            <View style={styles.cardsContainer}>
+              {/* Free Plan */}
+              <Card style={styles.planCard}>
+                <View style={styles.planHeader}>
+                  <View style={styles.planTitleGroup}>
+                    <Text style={styles.planName}>Gratis</Text>
+                    {currentTier === 'FREE' && (
+                      <Badge label="NÅVÆRENDE" tone="neutral" />
+                    )}
+                  </View>
+                  <Text style={styles.planPrice}>
+                    0 kr <Text style={styles.planPeriod}>/ mnd</Text>
+                  </Text>
+                </View>
+
+                <Badge
+                  label={`${freePlan.dailyTestLimit} test per dag`}
+                  tone="neutral"
+                  icon="mic-outline"
+                  style={styles.quotaBadge}
+                />
+
+                <View style={styles.featuresList}>
+                  {freePlan.features?.map((f: string, i: number) => (
+                    <View key={i} style={styles.featureRow}>
+                      <Icon name="checkmark-circle" size={18} color={colors.success} />
+                      <Text style={styles.featureText}>{f}</Text>
+                    </View>
+                  ))}
+                </View>
+              </Card>
+
+              {/* Standard Plan */}
+              <Card style={[styles.planCard, styles.standardCard]}>
+                <View style={styles.planHeader}>
+                  <View style={styles.planTitleGroup}>
+                    <Text style={styles.planName}>Standard</Text>
+                    {currentTier === 'STANDARD' && (
+                      <Badge label="NÅVÆRENDE" tone="navy" />
+                    )}
+                  </View>
+                  <Text style={styles.planPrice}>
+                    {standard.priceCents / 100} kr <Text style={styles.planPeriod}>/ mnd</Text>
+                  </Text>
+                </View>
+
+                <Badge
+                  label={`${standard.dailyTestLimit} tester per dag`}
+                  tone="navy"
+                  icon="flash"
+                  style={styles.quotaBadge}
+                />
+
+                <View style={styles.featuresList}>
+                  {standard.features?.map((f: string, i: number) => (
+                    <View key={i} style={styles.featureRow}>
+                      <Icon name="checkmark-circle" size={18} color={colors.success} />
+                      <Text style={styles.featureText}>{f}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <Button
+                  title={currentTier === 'STANDARD' ? 'Aktivt abonnement' : 'Velg Standard'}
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  disabled={isProcessing || currentTier === 'STANDARD'}
+                  loading={isProcessing}
+                  onPress={() => handleSubscribe('STANDARD')}
+                />
+              </Card>
+
+              {/* Premium Plan */}
+              <Card style={[styles.planCard, styles.premiumCard]}>
+                <View style={styles.popularRow}>
+                  <Badge label="MEST POPULÆR" tone="gold" icon="star" />
+                  {currentTier === 'PREMIUM' && (
+                    <Badge label="NÅVÆRENDE" tone="gold" />
+                  )}
+                </View>
+
+                <View style={styles.planHeader}>
+                  <Text style={[styles.planName, { color: colors.gold }]}>Premium</Text>
+                  <Text style={styles.planPrice}>
+                    {premium.priceCents / 100} kr <Text style={styles.planPeriod}>/ mnd</Text>
+                  </Text>
+                </View>
+
+                <Badge
+                  label={`${premium.dailyTestLimit} tester per dag (Ubegrenset)`}
+                  tone="gold"
+                  icon="star"
+                  style={styles.quotaBadge}
+                />
+
+                <View style={styles.featuresList}>
+                  {premium.features?.map((f: string, i: number) => (
+                    <View key={i} style={styles.featureRow}>
+                      <Icon name="checkmark-circle" size={18} color={colors.success} />
+                      <Text style={styles.featureText}>{f}</Text>
+                    </View>
+                  ))}
+                </View>
+
+                <Button
+                  title={currentTier === 'PREMIUM' ? 'Aktivt abonnement' : 'Velg Premium'}
+                  variant="gold"
+                  size="lg"
+                  fullWidth
+                  icon="star"
+                  disabled={isProcessing || currentTier === 'PREMIUM'}
+                  loading={isProcessing}
+                  onPress={() => handleSubscribe('PREMIUM')}
+                />
+              </Card>
+            </View>
+          )}
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0B0F19',
-  },
   scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
+    padding: space.lg,
+    paddingBottom: space.xxxl,
   },
-  backButton: {
-    paddingVertical: 8,
-    marginBottom: 16,
+  container: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
   },
-  backButtonText: {
-    color: '#38BDF8',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  header: {
-    marginBottom: 24,
+  hero: {
+    marginBottom: space.xl,
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    marginBottom: 8,
+    ...type.display,
+    marginBottom: space.xs,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#94A3B8',
-    lineHeight: 22,
+    ...type.body,
+  },
+  loadingBox: {
+    paddingVertical: space.xxxl,
+    alignItems: 'center',
   },
   cardsContainer: {
-    gap: 20,
+    gap: space.lg,
   },
-  card: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
+  planCard: {
+    padding: space.xl,
+  },
+  standardCard: {
+    borderColor: colors.navy,
+    borderWidth: 1.5,
   },
   premiumCard: {
-    borderColor: '#F59E0B',
-    backgroundColor: '#1E2433',
-    position: 'relative',
+    borderColor: colors.gold,
+    borderWidth: 1.5,
   },
-  popularTag: {
-    position: 'absolute',
-    top: -12,
-    right: 20,
-    backgroundColor: '#F59E0B',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  popularTagText: {
-    color: '#0F172A',
-    fontSize: 11,
-    fontWeight: '800',
+  popularRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: space.sm,
   },
   planHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'baseline',
-    marginBottom: 8,
+    marginBottom: space.sm,
+  },
+  planTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
   },
   planName: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    ...type.title,
   },
   planPrice: {
     fontSize: 24,
     fontWeight: '800',
-    color: '#F8FAFC',
+    color: colors.text,
   },
   planPeriod: {
     fontSize: 14,
-    color: '#94A3B8',
-    fontWeight: '400',
+    color: colors.textMuted,
+    fontWeight: '500',
   },
-  badgeText: {
-    color: '#38BDF8',
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 16,
+  quotaBadge: {
+    marginBottom: space.lg,
   },
   featuresList: {
-    gap: 8,
-    marginBottom: 20,
+    gap: space.sm,
+    marginBottom: space.lg,
   },
-  featureItem: {
-    color: '#CBD5E1',
-    fontSize: 14,
-    lineHeight: 20,
-  },
-  subscribeButton: {
-    backgroundColor: '#2563EB',
-    borderRadius: 12,
-    paddingVertical: 14,
+  featureRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: space.sm,
   },
-  premiumButton: {
-    backgroundColor: '#F59E0B',
-  },
-  subscribeButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  featureText: {
+    ...type.body,
+    color: colors.text,
+    flex: 1,
   },
 });
-

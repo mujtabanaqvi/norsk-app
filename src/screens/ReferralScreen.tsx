@@ -3,17 +3,17 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
   ScrollView,
   ActivityIndicator,
   Share,
   Alert,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { fetchReferrals } from '../api';
 import { useAuth } from '../hooks/useAuth';
+import { Screen, AppHeader, Card, Badge, Button, Icon } from '../components/ui';
+import { colors, radius, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Referral'>;
 
@@ -44,7 +44,7 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
     if (!data?.referralCode) return;
     try {
       await Share.share({
-        message: `Hei! Øv til muntlig Norskprøve med meg på Norsk App. Registrer deg med vervekoden min ${data.referralCode} for å få tilgang!`,
+        message: `Hei! Øv til muntlig Norskprøve med meg på Snakkly. Registrer deg med vervekoden min ${data.referralCode} for å få tilgang!`,
       });
     } catch (err: any) {
       console.error('Share error:', err);
@@ -53,20 +53,29 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
 
   if (!user) {
     return (
-      <SafeAreaView style={styles.safeArea}>
+      <Screen>
+        <AppHeader
+          title="Verv en venn"
+          onBack={() => navigation.goBack()}
+          bordered
+        />
         <View style={styles.emptyContainer}>
+          <View style={styles.giftCircle}>
+            <Icon name="gift-outline" size={32} color={colors.red} />
+          </View>
           <Text style={styles.title}>Verv en venn</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.subtitle, { textAlign: 'center', marginBottom: space.xl }]}>
             Logg inn for å få din personlige vervekode og motta ekstra daglige tester i 1 uke for hver venn du verver!
           </Text>
-          <TouchableOpacity
-            style={styles.loginButton}
+          <Button
+            title="Logg inn / Registrer deg"
+            variant="primary"
+            size="lg"
+            icon="person-outline"
             onPress={() => navigation.navigate('Auth')}
-          >
-            <Text style={styles.loginButtonText}>Logg inn / Registrer deg</Text>
-          </TouchableOpacity>
+          />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
@@ -74,190 +83,189 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
   const durationDays = data?.referralSettings?.durationDays || 7;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-          <Text style={styles.backButtonText}>← Tilbake</Text>
-        </TouchableOpacity>
+    <Screen>
+      <AppHeader
+        title="Verv en venn"
+        onBack={() => navigation.goBack()}
+        bordered
+      />
 
-        <View style={styles.header}>
-          <Text style={styles.title}>Verv en venn 🎉</Text>
-          <Text style={styles.subtitle}>
-            Få +{bonusPerDay} ekstra tester per dag i {durationDays} dager for hver venn som registrerer seg med din kode!
-          </Text>
-        </View>
-
-        {isLoading ? (
-          <ActivityIndicator size="large" color="#38BDF8" style={{ marginTop: 40 }} />
-        ) : (
-          <View style={styles.content}>
-            {/* Referral Code Box */}
-            <View style={styles.codeBox}>
-              <Text style={styles.codeLabel}>DIN PERSONLIGE VERVEKODE</Text>
-              <Text style={styles.codeValue}>{data?.referralCode || '------'}</Text>
-              <TouchableOpacity style={styles.shareButton} onPress={handleShare}>
-                <Text style={styles.shareButtonText}>Del kode med venner</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Stats Overview */}
-            <View style={styles.statsCard}>
-              <View style={styles.statCol}>
-                <Text style={styles.statNumber}>{data?.stats?.totalReferredCount || 0}</Text>
-                <Text style={styles.statLabel}>Venner vervet</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+          <View style={styles.hero}>
+            <View style={styles.heroTopRow}>
+              <View style={styles.giftCircleSmall}>
+                <Icon name="gift-outline" size={22} color={colors.red} />
               </View>
-              <View style={styles.dividerVertical} />
-              <View style={styles.statCol}>
-                <Text style={[styles.statNumber, { color: '#10B981' }]}>
-                  +{data?.stats?.currentBonusTestsPerDay || 0}
+              <Text style={styles.title}>Verv en venn</Text>
+            </View>
+            <Text style={styles.subtitle}>
+              Få +{bonusPerDay} ekstra tester per dag i {durationDays} dager for hver venn som registrerer seg med din kode!
+            </Text>
+          </View>
+
+          {isLoading ? (
+            <View style={styles.loadingBox}>
+              <ActivityIndicator size="large" color={colors.red} />
+            </View>
+          ) : (
+            <View style={styles.content}>
+              {/* Referral Code Ticket Card */}
+              <View style={styles.ticketCard}>
+                <Text style={styles.codeLabel}>DIN PERSONLIGE VERVEKODE</Text>
+                <Text selectable style={styles.codeValue}>
+                  {data?.referralCode || '------'}
                 </Text>
-                <Text style={styles.statLabel}>Ekstra tester i dag</Text>
+                <Button
+                  title="Del kode med venner"
+                  variant="primary"
+                  size="lg"
+                  icon="share-outline"
+                  fullWidth
+                  onPress={handleShare}
+                />
               </View>
-            </View>
 
-            {/* Referral History */}
-            <View style={styles.historyCard}>
-              <Text style={styles.historyTitle}>Dine vervebonuser</Text>
-              {data?.rewards && data.rewards.length > 0 ? (
-                data.rewards.map((r: any, idx: number) => {
-                  const isActive = new Date(r.expiresAt) > new Date();
-                  return (
-                    <View key={idx} style={styles.rewardItem}>
-                      <View>
-                        <Text style={styles.rewardItemText}>
-                          +{r.bonusTestsPerDay} tester/dag
-                        </Text>
-                        <Text style={styles.rewardSubtext}>
-                          Utløper: {new Date(r.expiresAt).toLocaleDateString('no-NO')}
-                        </Text>
-                      </View>
+              {/* Stats Overview */}
+              <Card style={styles.statsCard}>
+                <View style={styles.statCol}>
+                  <Text style={styles.statNumber}>{data?.stats?.totalReferredCount || 0}</Text>
+                  <Text style={styles.statLabel}>Venner vervet</Text>
+                </View>
+                <View style={styles.dividerVertical} />
+                <View style={styles.statCol}>
+                  <Text style={[styles.statNumber, { color: colors.success }]}>
+                    +{data?.stats?.currentBonusTestsPerDay || 0}
+                  </Text>
+                  <Text style={styles.statLabel}>Ekstra tester i dag</Text>
+                </View>
+              </Card>
+
+              {/* Referral History */}
+              <Card>
+                <Text style={styles.historyTitle}>Dine vervebonuser</Text>
+                {data?.rewards && data.rewards.length > 0 ? (
+                  data.rewards.map((r: any, idx: number) => {
+                    const isActive = new Date(r.expiresAt) > new Date();
+                    return (
                       <View
+                        key={idx}
                         style={[
-                          styles.statusBadge,
-                          isActive ? styles.badgeActive : styles.badgeExpired,
+                          styles.rewardItem,
+                          idx === data.rewards.length - 1 && { borderBottomWidth: 0 },
                         ]}
                       >
-                        <Text
-                          style={[
-                            styles.statusBadgeText,
-                            isActive ? styles.textActive : styles.textExpired,
-                          ]}
-                        >
-                          {isActive ? 'AKTIV' : 'UTLØPT'}
-                        </Text>
+                        <View>
+                          <Text style={styles.rewardItemText}>
+                            +{r.bonusTestsPerDay} tester/dag
+                          </Text>
+                          <Text style={styles.rewardSubtext}>
+                            Utløper: {new Date(r.expiresAt).toLocaleDateString('no-NO')}
+                          </Text>
+                        </View>
+                        <Badge
+                          label={isActive ? 'AKTIV' : 'UTLØPT'}
+                          tone={isActive ? 'success' : 'neutral'}
+                        />
                       </View>
-                    </View>
-                  );
-                })
-              ) : (
-                <Text style={styles.emptyHistoryText}>
-                  Du har ingen aktive vervebonuser ennå. Del koden din for å låse opp ekstra tester!
-                </Text>
-              )}
+                    );
+                  })
+                ) : (
+                  <Text style={styles.emptyHistoryText}>
+                    Du har ingen aktive vervebonuser ennå. Del koden din for å låse opp ekstra tester!
+                  </Text>
+                )}
+              </Card>
             </View>
-          </View>
-        )}
+          )}
+        </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0B0F19',
-  },
   scrollContent: {
-    padding: 24,
-    paddingBottom: 40,
+    padding: space.lg,
+    paddingBottom: space.xxxl,
   },
-  backButton: {
-    paddingVertical: 8,
-    marginBottom: 16,
+  container: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
   },
-  backButtonText: {
-    color: '#38BDF8',
-    fontSize: 16,
-    fontWeight: '600',
+  hero: {
+    marginBottom: space.xl,
   },
-  header: {
-    marginBottom: 24,
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginBottom: space.xs,
+  },
+  giftCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.redSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.md,
+  },
+  giftCircleSmall: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.redSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#F8FAFC',
-    marginBottom: 8,
+    ...type.display,
   },
   subtitle: {
-    fontSize: 15,
-    color: '#94A3B8',
-    lineHeight: 22,
+    ...type.body,
   },
   emptyContainer: {
-    padding: 24,
+    padding: space.xl,
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
+    maxWidth: 480,
+    alignSelf: 'center',
   },
-  loginButton: {
-    backgroundColor: '#2563EB',
-    paddingHorizontal: 24,
-    paddingVertical: 14,
-    borderRadius: 12,
-    marginTop: 20,
-  },
-  loginButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 16,
+  loadingBox: {
+    paddingVertical: space.xxxl,
+    alignItems: 'center',
   },
   content: {
-    gap: 20,
+    gap: space.lg,
   },
-  codeBox: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 24,
+  ticketCard: {
+    backgroundColor: colors.redSoft,
+    borderRadius: radius.lg,
+    padding: space.xl,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderWidth: 1.5,
+    borderStyle: 'dashed',
+    borderColor: colors.red,
   },
   codeLabel: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 8,
+    ...type.overline,
+    color: colors.red,
+    marginBottom: space.sm,
   },
   codeValue: {
-    color: '#38BDF8',
+    color: colors.navy,
     fontSize: 32,
-    fontWeight: '900',
+    fontWeight: '800',
     letterSpacing: 4,
-    marginBottom: 16,
-  },
-  shareButton: {
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 10,
-    width: '100%',
-    alignItems: 'center',
-  },
-  shareButtonText: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-    fontSize: 15,
+    marginBottom: space.lg,
   },
   statsCard: {
     flexDirection: 'row',
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
     alignItems: 'center',
+    paddingVertical: space.xl,
   },
   statCol: {
     flex: 1,
@@ -266,76 +274,39 @@ const styles = StyleSheet.create({
   dividerVertical: {
     width: 1,
     height: 40,
-    backgroundColor: '#334155',
+    backgroundColor: colors.border,
   },
   statNumber: {
+    ...type.title,
     fontSize: 26,
     fontWeight: '800',
-    color: '#F8FAFC',
     marginBottom: 4,
   },
   statLabel: {
-    fontSize: 13,
-    color: '#94A3B8',
-  },
-  historyCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: '#334155',
+    ...type.caption,
   },
   historyTitle: {
-    fontSize: 17,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    marginBottom: 16,
+    ...type.heading,
+    marginBottom: space.md,
   },
   rewardItem: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: space.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#334155',
+    borderBottomColor: colors.border,
   },
   rewardItemText: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '600',
+    ...type.bodyStrong,
   },
   rewardSubtext: {
-    color: '#94A3B8',
-    fontSize: 12,
+    ...type.caption,
     marginTop: 2,
   },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-  },
-  badgeActive: {
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-  },
-  badgeExpired: {
-    backgroundColor: 'rgba(100, 116, 139, 0.15)',
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  textActive: {
-    color: '#10B981',
-  },
-  textExpired: {
-    color: '#64748B',
-  },
   emptyHistoryText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    lineHeight: 20,
+    ...type.body,
     textAlign: 'center',
-    paddingVertical: 12,
+    paddingVertical: space.md,
   },
 });
-

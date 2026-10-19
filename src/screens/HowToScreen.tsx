@@ -1,169 +1,157 @@
 import React from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-} from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
+import { Screen, AppHeader, Card, Badge, Icon } from '../components/ui';
+import { colors, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HowTo'>;
 
+const STEPS = [
+  {
+    number: '1',
+    badge: 'DEL 1',
+    title: 'Individuell presentasjon (Monolog)',
+    description:
+      'Sensoren stiller et oppstartsspørsmål knyttet til et valgt tema. Du snakker i ca. 1,5–2 minutter om temaet uten avbrytelser.',
+  },
+  {
+    number: '2',
+    badge: 'DEL 2',
+    title: 'Samtale med medkandidat',
+    description:
+      'Du diskuterer et dilemma eller et tema sammen med en medkandidat. I appen kan du øve alene med en interaktiv AI-medkandidat, eller dele mikrofonen med en venn ved siden av deg.',
+  },
+  {
+    number: '3',
+    badge: 'DEL 3',
+    title: 'Oppfølgingsspørsmål fra sensor',
+    description:
+      'Sensoren stiller fordypende spørsmål for å teste evnen din til å reflektere, begrunne meninger og bruke et nyansert ordforråd på B1- eller B2-nivå.',
+  },
+];
+
 export const HowToScreen: React.FC<Props> = ({ navigation }) => {
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.header}>
-        <TouchableOpacity
-          onPress={() => navigation.goBack()}
-          style={styles.backButton}
-        >
-          <Text style={styles.backButtonText}>← Tilbake</Text>
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Slik fungerer prøven</Text>
-        <View style={{ width: 60 }} />
-      </View>
+    <Screen>
+      <AppHeader
+        title="Slik fungerer prøven"
+        onBack={() => navigation.goBack()}
+        bordered
+      />
 
-      <ScrollView contentContainerStyle={styles.content}>
-        <View style={styles.introCard}>
-          <Text style={styles.introTitle}>Offisiell HK-dir B1/B2 Eksamenssimulator</Text>
-          <Text style={styles.introText}>
-            Simulatoren er bygget etter retningslinjene til Direktoratet for høyere utdanning og kompetanse (HK-dir)
-            og trener deg på den muntlige delen av Norskprøven.
-          </Text>
-        </View>
-
-        <View style={styles.stepCard}>
-          <View style={styles.stepBadge}>
-            <Text style={styles.stepBadgeText}>DEL 1</Text>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        <View style={styles.container}>
+          <View style={styles.introBox}>
+            <View style={styles.introHeaderRow}>
+              <Icon name="information-circle" size={20} color={colors.navy} />
+              <Text style={styles.introTitle}>Offisiell HK-dir B1/B2 Eksamenssimulator</Text>
+            </View>
+            <Text style={styles.introText}>
+              Simulatoren er bygget etter retningslinjene til Direktoratet for høyere utdanning og kompetanse (HK-dir)
+              og trener deg på den muntlige delen av Norskprøven.
+            </Text>
           </View>
-          <Text style={styles.stepTitle}>Individuell presentasjon (Monolog)</Text>
-          <Text style={styles.stepDescription}>
-            Sensoren stiller et oppstartsspørsmål knyttet til et valgt tema. Du snakker i ca. 1,5–2 minutter
-            om temaet uten avbrytelser.
-          </Text>
-        </View>
 
-        <View style={styles.stepCard}>
-          <View style={[styles.stepBadge, { backgroundColor: '#3B82F6' }]}>
-            <Text style={styles.stepBadgeText}>DEL 2</Text>
-          </View>
-          <Text style={styles.stepTitle}>Samtale med medkandidat</Text>
-          <Text style={styles.stepDescription}>
-            Du diskuterer et dilemma eller et tema sammen med en medkandidat. I appen kan du øve alene med en
-            interaktiv AI-medkandidat, eller dele mikrofonen med en venn ved siden av deg.
-          </Text>
-        </View>
+          {STEPS.map((step) => (
+            <Card key={step.number} style={styles.stepCard}>
+              <View style={styles.stepTopRow}>
+                <View style={styles.stepCircle}>
+                  <Text style={styles.stepCircleText}>{step.number}</Text>
+                </View>
+                <Badge label={step.badge} tone="navy" />
+              </View>
+              <Text style={styles.stepTitle}>{step.title}</Text>
+              <Text style={styles.stepDescription}>{step.description}</Text>
+            </Card>
+          ))}
 
-        <View style={styles.stepCard}>
-          <View style={[styles.stepBadge, { backgroundColor: '#8B5CF6' }]}>
-            <Text style={styles.stepBadgeText}>DEL 3</Text>
-          </View>
-          <Text style={styles.stepTitle}>Oppfølgingsspørsmål fra sensor</Text>
-          <Text style={styles.stepDescription}>
-            Sensoren stiller fordypende spørsmål for å teste evnen din til å reflektere, begrunne meninger og
-            bruke et nyansert ordforråd på B1- eller B2-nivå.
-          </Text>
-        </View>
-
-        <View style={styles.stepCard}>
-          <View style={[styles.stepBadge, { backgroundColor: '#10B981' }]}>
-            <Text style={styles.stepBadgeText}>VURDERING</Text>
-          </View>
-          <Text style={styles.stepTitle}>Umiddelbar tilbakemelding & poeng</Text>
-          <Text style={styles.stepDescription}>
-            Etter fullført prøve vurderes din taleautomatisk etter 5 offisielle kriterier: flyt, uttale,
-            vokabular, grammatikk og oppgaveforståelse.
-          </Text>
+          <Card style={styles.evalCard}>
+            <View style={styles.stepTopRow}>
+              <View style={styles.evalCircle}>
+                <Icon name="checkmark" size={16} color={colors.white} />
+              </View>
+              <Badge label="VURDERING" tone="success" />
+            </View>
+            <Text style={styles.stepTitle}>Umiddelbar tilbakemelding & poeng</Text>
+            <Text style={styles.stepDescription}>
+              Etter fullført prøve vurderes din tale automatisk etter 5 offisielle kriterier: flyt, uttale,
+              vokabular, grammatikk og oppgaveforståelse.
+            </Text>
+          </Card>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0B0F19',
+  scrollContent: {
+    padding: space.lg,
+    paddingBottom: space.xxxl,
   },
-  header: {
+  container: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    gap: space.md,
+  },
+  introBox: {
+    backgroundColor: colors.navySoft,
+    padding: space.lg,
+    borderRadius: 16,
+    gap: space.xs,
+  },
+  introHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-  },
-  backButton: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-  },
-  backButtonText: {
-    color: '#38BDF8',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-  headerTitle: {
-    color: '#F8FAFC',
-    fontSize: 17,
-    fontWeight: '700',
-  },
-  content: {
-    padding: 20,
-    paddingBottom: 40,
-    gap: 16,
-  },
-  introCard: {
-    backgroundColor: '#1E293B',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
+    gap: space.sm,
   },
   introTitle: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
+    ...type.heading,
+    flex: 1,
   },
   introText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    lineHeight: 20,
+    ...type.body,
   },
   stepCard: {
-    backgroundColor: '#1E293B',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
+    gap: space.sm,
   },
-  stepBadge: {
-    alignSelf: 'flex-start',
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    marginBottom: 8,
+  evalCard: {
+    gap: space.sm,
+    borderColor: colors.success,
   },
-  stepBadgeText: {
-    color: '#FFFFFF',
-    fontSize: 11,
+  stepTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginBottom: 2,
+  },
+  stepCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  evalCircle: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepCircleText: {
+    color: colors.white,
+    fontSize: 13,
     fontWeight: '800',
   },
   stepTitle: {
-    color: '#F8FAFC',
-    fontSize: 16,
-    fontWeight: '700',
-    marginBottom: 6,
+    ...type.heading,
   },
   stepDescription: {
-    color: '#94A3B8',
-    fontSize: 13,
-    lineHeight: 19,
+    ...type.body,
   },
 });
-

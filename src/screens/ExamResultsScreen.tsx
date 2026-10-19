@@ -3,31 +3,37 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   ActivityIndicator,
   RefreshControl,
-  StatusBar,
   Animated,
   Platform,
   UIManager,
   Share,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchExamResults } from '../api';
 import type {
   RootStackParamList,
   ExamResultsResponse,
   CandidateEvaluation,
-  ExamEvaluation,
   CriterionScore,
   ConcreteCorrection,
   TranscriptTurn,
   UsageLedgerEntry,
   AssessedLevel,
-  CefrLevel,
 } from '../types/exam';
+import {
+  Screen,
+  AppHeader,
+  Logo,
+  Card,
+  Badge,
+  Button,
+  Icon,
+} from '../components/ui';
+import { colors, radius, space, type } from '../theme';
 
 // Enable LayoutAnimation for Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -81,13 +87,13 @@ const CriterionProgressBar: React.FC<{
   const percentage = (clampedScore / 10) * 100;
 
   // Determine color based on HK-dir B1/B2 scale
-  let barColor = '#EF4444'; // Red (1 - 3)
+  let barColor: string = colors.red; // Red (1 - 3)
   if (clampedScore >= 7) {
-    barColor = '#10B981'; // Green (7 - 10) -> Solid B2
+    barColor = colors.success; // Green (7 - 10) -> Solid B2
   } else if (clampedScore >= 5) {
-    barColor = '#38BDF8'; // Sky Blue (5 - 6) -> Solid B1
+    barColor = colors.navy; // Navy (5 - 6) -> Solid B1
   } else if (clampedScore >= 4) {
-    barColor = '#F59E0B'; // Amber (4) -> Under B1 borderline
+    barColor = colors.warning; // Amber (4) -> Under B1 borderline
   }
 
   return (
@@ -128,7 +134,7 @@ const CriterionCard: React.FC<{
   };
 
   return (
-    <View style={styles.criterionCard}>
+    <Card style={styles.criterionCard}>
       <View style={styles.criterionHeader}>
         <View style={styles.criterionTitleContainer}>
           <Text style={styles.criterionTitleNo}>{titleNo}</Text>
@@ -143,7 +149,10 @@ const CriterionCard: React.FC<{
       <View style={styles.criterionProgressSection}>
         <CriterionProgressBar score={score} />
         <View style={styles.criterionLevelRow}>
-          <Text style={styles.criterionLevelTag}>{getScoreBadgeText(score)}</Text>
+          <Badge
+            label={getScoreBadgeText(score)}
+            tone={score >= 7 ? 'success' : score >= 5 ? 'navy' : score >= 4 ? 'warning' : 'red'}
+          />
           <Text style={styles.criterionLevelPercent}>HK-dir standard</Text>
         </View>
       </View>
@@ -151,7 +160,7 @@ const CriterionCard: React.FC<{
       <View style={styles.criterionFeedbackBox}>
         <Text style={styles.criterionFeedbackText}>{feedbackText}</Text>
       </View>
-    </View>
+    </Card>
   );
 };
 
@@ -176,7 +185,6 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
 
   // Loading Animation Values
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const rotateAnim = useRef(new Animated.Value(0)).current;
   const [loadingStepIndex, setLoadingStepIndex] = useState<number>(0);
 
   // Polling ref to safely clear timer across unmounts
@@ -184,52 +192,39 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const loadingStepTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /**
-   * Start engaging loading pulse/rotation
+   * Start engaging loading pulse
    */
   useEffect(() => {
     if (!isLoading) return;
 
-    // Pulsing circle
     const pulseLoop = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
-          toValue: 1.15,
-          duration: 1200,
+          toValue: 1.12,
+          duration: 1100,
           useNativeDriver: true,
         }),
         Animated.timing(pulseAnim, {
           toValue: 1.0,
-          duration: 1200,
+          duration: 1100,
           useNativeDriver: true,
         }),
       ])
     );
     pulseLoop.start();
 
-    // Subtle spinner rotation
-    const rotateLoop = Animated.loop(
-      Animated.timing(rotateAnim, {
-        toValue: 1,
-        duration: 2500,
-        useNativeDriver: true,
-      })
-    );
-    rotateLoop.start();
-
-    // Cycle through Norwegian HK-dir evaluation messages
     loadingStepTimerRef.current = setInterval(() => {
       setLoadingStepIndex((prev) => (prev + 1) % EVALUATION_LOADING_STEPS.length);
     }, 3200);
 
     return () => {
       pulseLoop.stop();
-      rotateLoop.stop();
       if (loadingStepTimerRef.current) {
         clearInterval(loadingStepTimerRef.current);
         loadingStepTimerRef.current = null;
       }
     };
-  }, [isLoading, pulseAnim, rotateAnim]);
+  }, [isLoading, pulseAnim]);
 
   const resultsDataRef = useRef<ExamResultsResponse | null>(null);
   resultsDataRef.current = resultsData;
@@ -383,7 +378,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleShareResults = async () => {
     if (!currentCandidate) return;
     try {
-      const summary = `Norskprøven Muntlig Resultat (${currentCandidate.targetLevel})\n` +
+      const summary = `Snakkly · Norskprøven Muntlig Resultat (${currentCandidate.targetLevel})\n` +
         `Kandidat: ${currentCandidate.speakerRole === 'CANDIDATE_1' ? 'Kandidat 1' : 'Kandidat 2'}\n` +
         `Vurdert nivå: ${currentCandidate.assessedLevel}\n` +
         `Målnivå: ${currentCandidate.passedTargetLevel ? 'BESTÅTT' : 'IKKE BESTÅTT'}\n` +
@@ -405,14 +400,12 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const getLevelBadgeColors = (level: AssessedLevel) => {
     switch (level) {
       case 'Over B2':
-        return { bg: '#581C87', text: '#E9D5FF', border: '#9333EA' };
       case 'B2':
-        return { bg: '#064E3B', text: '#A7F3D0', border: '#10B981' };
       case 'B1':
-        return { bg: '#0C4A6E', text: '#BAE6FD', border: '#0284C7' };
+        return { bg: colors.redSoft, text: colors.red, border: colors.red };
       case 'Under B1':
       default:
-        return { bg: '#7F1D1D', text: '#FECACA', border: '#EF4444' };
+        return { bg: colors.warningSoft, text: colors.warning, border: colors.warning };
     }
   };
 
@@ -422,25 +415,16 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     return list.length > 0 ? list[0].timestamp : 0;
   }, [resultsData]);
 
-  // Spin interpolation
-  const spinInterpolation = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
   // ==========================================
   // RENDER: Loading / Sensor Evaluating State
   // ==========================================
   if (isLoading || (!evaluation && resultsData?.status === 'ACTIVE')) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" />
+      <Screen>
         <View style={styles.loadingContainer}>
-          <View style={styles.sensorBadgeHeader}>
-            <Text style={styles.sensorBadgeHeaderText}>HK-DIR SENSOR VURDERING</Text>
-          </View>
+          <Badge label="HK-DIR SENSOR VURDERING" tone="red" icon="analytics-outline" />
 
-          {/* Animated Sensor Radar Pulse */}
+          {/* Animated Logo Pulse */}
           <Animated.View
             style={[
               styles.pulseCircleOuter,
@@ -449,42 +433,43 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
               },
             ]}
           >
-            <Animated.View
-              style={[
-                styles.pulseCircleInner,
-                {
-                  transform: [{ rotate: spinInterpolation }],
-                },
-              ]}
-            >
-              <ActivityIndicator size="large" color="#38BDF8" />
-            </Animated.View>
+            <View style={styles.pulseCircleInner}>
+              <Logo size={64} />
+            </View>
           </Animated.View>
+
+          <ActivityIndicator size="small" color={colors.red} style={{ marginBottom: space.md }} />
 
           <Text style={styles.loadingMainTitle}>
             Sensoren vurderer prestasjonen din etter HK-dir sine kriterier for B1/B2...
           </Text>
 
-          <View style={styles.loadingStepCard}>
+          <Card style={styles.loadingStepCard}>
             <View style={styles.loadingStepDot} />
             <Text style={styles.loadingStepText}>
               {EVALUATION_LOADING_STEPS[loadingStepIndex]}
             </Text>
-          </View>
+          </Card>
 
           <View style={styles.loadingProgressSteps}>
             <View style={styles.stepItem}>
-              <Text style={styles.stepNumber}>1</Text>
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>1</Text>
+              </View>
               <Text style={styles.stepLabel}>Transkripsjon</Text>
             </View>
             <View style={styles.stepConnector} />
             <View style={styles.stepItem}>
-              <Text style={styles.stepNumber}>2</Text>
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>2</Text>
+              </View>
               <Text style={styles.stepLabel}>HK-dir Rubrikk</Text>
             </View>
             <View style={styles.stepConnector} />
             <View style={styles.stepItem}>
-              <Text style={styles.stepNumber}>3</Text>
+              <View style={styles.stepCircle}>
+                <Text style={styles.stepNumber}>3</Text>
+              </View>
               <Text style={styles.stepLabel}>Rettelser</Text>
             </View>
           </View>
@@ -496,16 +481,16 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           {pollError && (
             <View style={styles.pollErrorBanner}>
               <Text style={styles.pollErrorText}>{pollError}</Text>
-              <TouchableOpacity
-                style={styles.pollRetryButton}
+              <Button
+                title="Prøv igjen"
+                variant="primary"
+                size="sm"
                 onPress={() => fetchResults(true)}
-              >
-                <Text style={styles.pollRetryButtonText}>Prøv igjen</Text>
-              </TouchableOpacity>
+              />
             </View>
           )}
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
@@ -514,51 +499,55 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   // ==========================================
   if (pollError && !resultsData) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" />
+      <Screen>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>⚠️</Text>
+          <View style={styles.errorIconCircle}>
+            <Icon name="alert-circle" size={32} color={colors.danger} />
+          </View>
           <Text style={styles.errorTitle}>Kunne ikke laste resultater</Text>
           <Text style={styles.errorMessage}>{pollError}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
+          <Button
+            title="Prøv på nytt"
+            variant="primary"
+            size="lg"
+            icon="refresh"
             onPress={() => {
               setIsLoading(true);
               fetchResults(true);
             }}
-          >
-            <Text style={styles.retryButtonText}>Prøv på nytt</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.backButton}
+            style={{ marginBottom: space.sm }}
+          />
+          <Button
+            title="Tilbake til start"
+            variant="ghost"
+            size="md"
             onPress={() => navigation.replace('ExamSetup')}
-          >
-            <Text style={styles.backButtonText}>Tilbake til start</Text>
-          </TouchableOpacity>
+          />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
   // Safety fallback if evaluation object is null
   if (!currentCandidate) {
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar barStyle="light-content" />
+      <Screen>
         <View style={styles.errorContainer}>
-          <Text style={styles.errorIcon}>📋</Text>
+          <View style={styles.errorIconCircle}>
+            <Icon name="document-text-outline" size={32} color={colors.navy} />
+          </View>
           <Text style={styles.errorTitle}>Ingen vurdering tilgjengelig</Text>
           <Text style={styles.errorMessage}>
             Det ble ikke funnet noen godkjente ytringer eller evaluering for denne prøven.
           </Text>
-          <TouchableOpacity
-            style={styles.retryButton}
+          <Button
+            title="Start ny prøve"
+            variant="primary"
+            size="lg"
             onPress={() => navigation.replace('ExamSetup')}
-          >
-            <Text style={styles.retryButtonText}>Start ny prøve</Text>
-          </TouchableOpacity>
+          />
         </View>
-      </SafeAreaView>
+      </Screen>
     );
   }
 
@@ -566,35 +555,23 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const isPassed = currentCandidate.passedTargetLevel;
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
-
+    <Screen>
       {/* TOP APP BAR */}
-      <View style={styles.topBar}>
-        <TouchableOpacity
-          style={styles.topBarBackButton}
-          onPress={() => navigation.replace('ExamSetup')}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.topBarBackArrow}>←</Text>
-          <Text style={styles.topBarBackText}>Ny prøve</Text>
-        </TouchableOpacity>
-
-        <View style={styles.topBarCenter}>
-          <Text style={styles.topBarTitle} numberOfLines={1}>
-            {resultsData?.topic?.titleNo || 'Eksamensresultat'}
-          </Text>
-          <Text style={styles.topBarSubtitle}>HK-dir B1/B2 Vurdering</Text>
-        </View>
-
-        <TouchableOpacity
-          style={styles.shareButton}
-          onPress={handleShareResults}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.shareButtonText}>Del</Text>
-        </TouchableOpacity>
-      </View>
+      <AppHeader
+        title={resultsData?.topic?.titleNo || 'Eksamensresultat'}
+        subtitle="HK-dir B1/B2 Vurdering"
+        onBack={() => navigation.replace('ExamSetup')}
+        bordered
+        right={
+          <Button
+            title="Del"
+            variant="outline"
+            size="sm"
+            icon="share-outline"
+            onPress={handleShareResults}
+          />
+        }
+      />
 
       <ScrollView
         style={styles.scrollView}
@@ -604,706 +581,579 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           <RefreshControl
             refreshing={isRefreshing}
             onRefresh={() => fetchResults(true)}
-            tintColor="#38BDF8"
-            colors={['#38BDF8']}
+            tintColor={colors.red}
+            colors={[colors.red]}
           />
         }
       >
-        {/* SEGMENTED TAB SWITCHER: DUAL CANDIDATE MODE (HUMAN_LOCAL) */}
-        {hasDualCandidates && (
-          <View style={styles.dualTabsContainer}>
-            <View style={styles.dualTabsNotice}>
-              <Text style={styles.dualTabsNoticeText}>
-                👥 Lokal to-kandidaters prøve – Velg kandidat for å se individuell vurdering:
+        <View style={styles.contentWrapper}>
+          {/* SEGMENTED TAB SWITCHER: DUAL CANDIDATE MODE (HUMAN_LOCAL) */}
+          {hasDualCandidates && (
+            <Card style={styles.dualTabsContainer}>
+              <View style={styles.dualTabsNotice}>
+                <Icon name="people-outline" size={16} color={colors.navy} />
+                <Text style={styles.dualTabsNoticeText}>
+                  Lokal to-kandidaters prøve – Velg kandidat for å se individuell vurdering:
+                </Text>
+              </View>
+              <View style={styles.dualTabsRow}>
+                {[0, 1].map((idx) => {
+                  const active = activeCandidateIndex === idx;
+                  const cand = candidates[idx];
+                  return (
+                    <Pressable
+                      key={idx}
+                      style={[
+                        styles.dualTabButton,
+                        active && styles.dualTabButtonActive,
+                      ]}
+                      onPress={() => setActiveCandidateIndex(idx)}
+                    >
+                      <Text
+                        style={[
+                          styles.dualTabTitle,
+                          active && styles.dualTabTitleActive,
+                        ]}
+                      >
+                        {idx === 0 ? 'Kandidat 1' : 'Kandidat 2'}
+                      </Text>
+                      <Badge
+                        label={cand?.assessedLevel || '--'}
+                        tone={cand?.passedTargetLevel ? 'success' : 'warning'}
+                      />
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </Card>
+          )}
+
+          {/* 1. SCORECARD HERO CARD */}
+          <Card style={styles.scorecardHeaderCard}>
+            <View style={styles.headerCandidateRow}>
+              <Text style={styles.headerCandidateLabel}>
+                {currentCandidate.speakerRole === 'CANDIDATE_1'
+                  ? 'Kandidat 1'
+                  : 'Kandidat 2'}
+                {hasDualCandidates ? '' : ' (Deg)'}
               </Text>
+              <Badge
+                label={`Målnivå: ${currentCandidate.targetLevel}`}
+                tone="navy"
+              />
             </View>
-            <View style={styles.dualTabsRow}>
-              <TouchableOpacity
+
+            {/* Big Assessed Level Highlight */}
+            <View style={styles.levelAssessmentRow}>
+              <View
                 style={[
-                  styles.dualTabButton,
-                  activeCandidateIndex === 0 && styles.dualTabButtonActive,
+                  styles.assessedLevelBigBadge,
+                  {
+                    backgroundColor: badgeColors.bg,
+                    borderColor: badgeColors.border,
+                  },
                 ]}
-                onPress={() => setActiveCandidateIndex(0)}
-                activeOpacity={0.7}
               >
+                <Text style={styles.assessedLevelLabel}>Vurdert nivå</Text>
                 <Text
                   style={[
-                    styles.dualTabTitle,
-                    activeCandidateIndex === 0 && styles.dualTabTitleActive,
+                    styles.assessedLevelValue,
+                    { color: badgeColors.text },
                   ]}
                 >
-                  Kandidat 1 (Speaker 0)
+                  {currentCandidate.assessedLevel}
                 </Text>
-                <View
-                  style={[
-                    styles.dualTabLevelTag,
-                    {
-                      backgroundColor:
-                        candidates[0]?.passedTargetLevel ? '#064E3B' : '#7F1D1D',
-                    },
-                  ]}
-                >
-                  <Text style={styles.dualTabLevelTagText}>
-                    {candidates[0]?.assessedLevel}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity
-                style={[
-                  styles.dualTabButton,
-                  activeCandidateIndex === 1 && styles.dualTabButtonActive,
-                ]}
-                onPress={() => setActiveCandidateIndex(1)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles.dualTabTitle,
-                    activeCandidateIndex === 1 && styles.dualTabTitleActive,
-                  ]}
-                >
-                  Kandidat 2 (Speaker 1)
-                </Text>
-                <View
-                  style={[
-                    styles.dualTabLevelTag,
-                    {
-                      backgroundColor:
-                        candidates[1]?.passedTargetLevel ? '#064E3B' : '#7F1D1D',
-                    },
-                  ]}
-                >
-                  <Text style={styles.dualTabLevelTagText}>
-                    {candidates[1]?.assessedLevel}
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              <View style={styles.scoreMetricCard}>
+                <Text style={styles.scoreMetricLabel}>HK-dir Snitt</Text>
+                <Text style={styles.scoreMetricValue}>{averageScore}</Text>
+                <Text style={styles.scoreMetricSub}>av 10 poeng</Text>
+              </View>
             </View>
-          </View>
-        )}
 
-        {/* 1. SCORECARD HEADER BADGE */}
-        <View style={styles.scorecardHeaderCard}>
-          <View style={styles.headerCandidateRow}>
-            <Text style={styles.headerCandidateLabel}>
-              {currentCandidate.speakerRole === 'CANDIDATE_1'
-                ? 'Kandidat 1'
-                : 'Kandidat 2'}
-              {hasDualCandidates ? '' : ' (Deg)'}
-            </Text>
-            <View style={styles.targetLevelBadge}>
-              <Text style={styles.targetLevelBadgeText}>
-                Målnivå: {currentCandidate.targetLevel}
-              </Text>
-            </View>
-          </View>
-
-          {/* Big Assessed Level Highlight */}
-          <View style={styles.levelAssessmentRow}>
+            {/* Pass / Needs Work Banner */}
             <View
               style={[
-                styles.assessedLevelBigBadge,
-                {
-                  backgroundColor: badgeColors.bg,
-                  borderColor: badgeColors.border,
-                },
+                styles.passStatusBanner,
+                isPassed ? styles.passStatusSuccess : styles.passStatusNeedsWork,
               ]}
             >
-              <Text style={styles.assessedLevelLabel}>Vurdert nivå</Text>
-              <Text
-                style={[
-                  styles.assessedLevelValue,
-                  { color: badgeColors.text },
-                ]}
+              <Icon
+                name={isPassed ? 'checkmark-circle' : 'alert-circle'}
+                size={22}
+                color={isPassed ? colors.success : colors.warning}
+              />
+              <View style={styles.passStatusTextContainer}>
+                <Text
+                  style={[
+                    styles.passStatusTitle,
+                    { color: isPassed ? colors.success : colors.warning },
+                  ]}
+                >
+                  {isPassed ? 'BESTÅTT MÅLNIVÅ' : 'TRENGER MER ØVING'}
+                </Text>
+                <Text style={styles.passStatusSubtitle}>
+                  {isPassed
+                    ? `Gratulerer! Du oppfyller HK-dir sine kompetansemål for nivå ${currentCandidate.targetLevel}.`
+                    : `Du er vurdert til ${currentCandidate.assessedLevel}. Øv mer for å nå målnivå ${currentCandidate.targetLevel}.`}
+                </Text>
+              </View>
+            </View>
+          </Card>
+
+          {/* 2. OVERALL SUMMARY SECTION WITH BILINGUAL TOGGLE */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>Sensorens helhetsvurdering</Text>
+              <Pressable
+                style={styles.langTogglePill}
+                onPress={() => setShowEnglishFeedback(!showEnglishFeedback)}
               >
-                {currentCandidate.assessedLevel}
-              </Text>
+                <Icon name="language-outline" size={14} color={colors.navy} />
+                <Text style={styles.langToggleLabel}>
+                  {showEnglishFeedback ? 'Vis på norsk' : 'Show English'}
+                </Text>
+              </Pressable>
             </View>
 
-            <View style={styles.scoreMetricCard}>
-              <Text style={styles.scoreMetricLabel}>HK-dir Snitt</Text>
-              <Text style={styles.scoreMetricValue}>{averageScore}</Text>
-              <Text style={styles.scoreMetricSub}>av 10 poeng</Text>
+            <Card style={styles.summaryCard}>
+              <View style={styles.summaryQuoteBar} />
+              <Text style={styles.summaryText}>
+                {showEnglishFeedback
+                  ? currentCandidate.overallSummaryEn || currentCandidate.overallSummaryNo
+                  : currentCandidate.overallSummaryNo}
+              </Text>
+            </Card>
+          </View>
+
+          {/* 3. 4 OFFICIAL HK-DIR CRITERIA CARDS */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>HK-dir Vurderingskriterier</Text>
+              <Text style={styles.sectionSubtitle}>Skala 1–10</Text>
             </View>
+
+            <CriterionCard
+              titleNo="1. Formidling og flyt"
+              titleEn="Fluency, Cohesion & Turn-taking"
+              criterion={currentCandidate.criteriaScores.formidlingOgFlyt}
+              showEnglish={showEnglishFeedback}
+            />
+
+            <CriterionCard
+              titleNo="2. Uttale og forståelighet"
+              titleEn="Pronunciation & Intonation"
+              criterion={currentCandidate.criteriaScores.uttaleOgForstaelighet}
+              showEnglish={showEnglishFeedback}
+            />
+
+            <CriterionCard
+              titleNo="3. Ordforråd"
+              titleEn="Vocabulary Breadth & Idiomatic Usage"
+              criterion={currentCandidate.criteriaScores.ordforrad}
+              showEnglish={showEnglishFeedback}
+            />
+
+            <CriterionCard
+              titleNo="4. Grammatikk og setningsstruktur"
+              titleEn="V2 Inversion & Clause Structure"
+              criterion={currentCandidate.criteriaScores.grammatikkOgSetningsstruktur}
+              showEnglish={showEnglishFeedback}
+            />
           </View>
 
-          {/* Pass / Needs Work Banner */}
-          <View
-            style={[
-              styles.passStatusBanner,
-              isPassed ? styles.passStatusSuccess : styles.passStatusNeedsWork,
-            ]}
-          >
-            <Text style={styles.passStatusIcon}>{isPassed ? '✓' : '!'}</Text>
-            <View style={styles.passStatusTextContainer}>
-              <Text
-                style={[
-                  styles.passStatusTitle,
-                  { color: isPassed ? '#10B981' : '#F59E0B' },
-                ]}
-              >
-                {isPassed ? 'BESTÅTT MÅLNIVÅ' : 'TRENGER MER ØVING'}
+          {/* 4. CONCRETE CORRECTIONS LIST */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeaderRow}>
+              <Text style={styles.sectionTitle}>
+                Konkrete forbedringer fra samtalen
               </Text>
-              <Text style={styles.passStatusSubtitle}>
-                {isPassed
-                  ? `Gratulerer! Du oppfyller HK-dir sine kompetansemål for nivå ${currentCandidate.targetLevel}.`
-                  : `Du er vurdert til ${currentCandidate.assessedLevel}. Øv mer for å nå målnivå ${currentCandidate.targetLevel}.`}
-              </Text>
+              <Badge
+                label={`${currentCandidate.concreteCorrections.length} eksempler`}
+                tone="navy"
+              />
             </View>
-          </View>
-        </View>
-
-        {/* 2. OVERALL SUMMARY SECTION WITH BILINGUAL TOGGLE */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>Sensorens helhetsvurdering</Text>
-            <TouchableOpacity
-              style={styles.langTogglePill}
-              onPress={() => setShowEnglishFeedback(!showEnglishFeedback)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.langToggleLabel}>
-                {showEnglishFeedback ? '🇳🇴 Vis på norsk' : '🇬🇧 Show English'}
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.summaryCard}>
-            <View style={styles.summaryQuoteBar} />
-            <Text style={styles.summaryText}>
-              {showEnglishFeedback
-                ? currentCandidate.overallSummaryEn || currentCandidate.overallSummaryNo
-                : currentCandidate.overallSummaryNo}
+            <Text style={styles.sectionExplainer}>
+              Sensor har plukket ut konkrete ytringer fra transkripsjonen med forslag til forbedringer:
             </Text>
-          </View>
-        </View>
 
-        {/* 3. 4 OFFICIAL HK-DIR CRITERIA CARDS */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>HK-dir Vurderingskriterier</Text>
-            <Text style={styles.sectionSubtitle}>Skala 1–10</Text>
-          </View>
-
-          {/* 1. Formidling og flyt */}
-          <CriterionCard
-            titleNo="1. Formidling og flyt"
-            titleEn="Fluency, Cohesion & Turn-taking"
-            criterion={currentCandidate.criteriaScores.formidlingOgFlyt}
-            showEnglish={showEnglishFeedback}
-          />
-
-          {/* 2. Uttale og forståelighet */}
-          <CriterionCard
-            titleNo="2. Uttale og forståelighet"
-            titleEn="Pronunciation & Intonation"
-            criterion={currentCandidate.criteriaScores.uttaleOgForstaelighet}
-            showEnglish={showEnglishFeedback}
-          />
-
-          {/* 3. Ordforråd */}
-          <CriterionCard
-            titleNo="3. Ordforråd"
-            titleEn="Vocabulary Breadth & Idiomatic Usage"
-            criterion={currentCandidate.criteriaScores.ordforrad}
-            showEnglish={showEnglishFeedback}
-          />
-
-          {/* 4. Grammatikk og setningsstruktur */}
-          <CriterionCard
-            titleNo="4. Grammatikk og setningsstruktur"
-            titleEn="V2 Inversion & Clause Structure"
-            criterion={currentCandidate.criteriaScores.grammatikkOgSetningsstruktur}
-            showEnglish={showEnglishFeedback}
-          />
-        </View>
-
-        {/* 4. CONCRETE CORRECTIONS LIST */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeaderRow}>
-            <Text style={styles.sectionTitle}>
-              Konkrete forbedringer fra samtalen
-            </Text>
-            <View style={styles.correctionCountBadge}>
-              <Text style={styles.correctionCountText}>
-                {currentCandidate.concreteCorrections.length} eksempler
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.sectionExplainer}>
-            Sensor har plukket ut konkrete ytringer fra transkripsjonen med forslag til forbedringer:
-          </Text>
-
-          {currentCandidate.concreteCorrections.length === 0 ? (
-            <View style={styles.emptyCorrectionsCard}>
-              <Text style={styles.emptyCorrectionsText}>
-                Ingen spesifikke grammatikkfeil registrert i ytringene. God presisjon!
-              </Text>
-            </View>
-          ) : (
-            currentCandidate.concreteCorrections.map((item: ConcreteCorrection, idx: number) => (
-              <View key={idx} style={styles.correctionCard}>
-                <View style={styles.correctionHeaderRow}>
-                  <Text style={styles.correctionIndexTag}>Punkt #{idx + 1}</Text>
-                </View>
-
-                {/* Red Strikethrough Box: Hva du sa */}
-                <View style={styles.correctionBoxRed}>
-                  <View style={styles.correctionBoxLabelRow}>
-                    <Text style={styles.correctionLabelRed}>✕ HVA DU SA</Text>
+            {currentCandidate.concreteCorrections.length === 0 ? (
+              <Card style={styles.emptyCorrectionsCard}>
+                <Icon name="checkmark-circle" size={24} color={colors.success} />
+                <Text style={styles.emptyCorrectionsText}>
+                  Ingen spesifikke grammatikkfeil registrert i ytringene. God presisjon!
+                </Text>
+              </Card>
+            ) : (
+              currentCandidate.concreteCorrections.map((item: ConcreteCorrection, idx: number) => (
+                <Card key={idx} style={styles.correctionCard}>
+                  <View style={styles.correctionHeaderRow}>
+                    <Badge label={`Punkt #${idx + 1}`} tone="neutral" />
                   </View>
-                  <Text style={styles.quoteTextRed}>
-                    "{item.originalQuote}"
-                  </Text>
-                </View>
 
-                {/* Green Box: Slik bør det sies */}
-                <View style={styles.correctionBoxGreen}>
-                  <View style={styles.correctionBoxLabelRow}>
-                    <Text style={styles.correctionLabelGreen}>✓ SLIK BØR DET SIES</Text>
-                  </View>
-                  <Text style={styles.quoteTextGreen}>
-                    "{item.correctedNorwegian}"
-                  </Text>
-                </View>
-
-                {/* Rule Explanation Box */}
-                <View style={styles.ruleExplanationBox}>
-                  <Text style={styles.ruleLabel}>💡 REGEL & FORKLARING</Text>
-                  <Text style={styles.ruleText}>{item.grammarOrVocabRule}</Text>
-                </View>
-              </View>
-            ))
-          )}
-        </View>
-
-        {/* 5. COLLAPSIBLE FULL TRANSCRIPT */}
-        <View style={styles.sectionContainer}>
-          <TouchableOpacity
-            style={styles.accordionHeader}
-            onPress={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.accordionTitleRow}>
-              <Text style={styles.accordionIcon}>💬</Text>
-              <View>
-                <Text style={styles.accordionTitle}>Full samtalelogg (Transkripsjon)</Text>
-                <Text style={styles.accordionSubtitle}>
-                  {(resultsData?.transcriptJson || []).length} ytringer registrert under prøven
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.accordionChevron}>
-              {isTranscriptExpanded ? '▲ Skjul' : '▼ Vis'}
-            </Text>
-          </TouchableOpacity>
-
-          {isTranscriptExpanded && (
-            <View style={styles.transcriptListContainer}>
-              {(resultsData?.transcriptJson || []).length === 0 ? (
-                <Text style={styles.emptyTranscriptText}>
-                  Ingen transkripsjon lagret for denne sesjonen.
-                </Text>
-              ) : (
-                resultsData?.transcriptJson.map((turn: TranscriptTurn, index: number) => {
-                  let roleColor = '#38BDF8';
-                  let roleName = 'Sensor';
-                  let bubbleBg = '#1E293B';
-
-                  if (turn.role === 'AI_COCANDIDATE') {
-                    roleColor = '#C084FC';
-                    roleName = 'AI-medkandidat';
-                    bubbleBg = '#1E1B4B';
-                  } else if (turn.role === 'CANDIDATE_1') {
-                    roleColor = '#34D399';
-                    roleName = 'Kandidat 1';
-                    bubbleBg = '#064E3B44';
-                  } else if (turn.role === 'CANDIDATE_2') {
-                    roleColor = '#FBBF24';
-                    roleName = 'Kandidat 2';
-                    bubbleBg = '#78350F44';
-                  }
-
-                  const timeStr = formatTimestamp(turn.timestamp, baseTimestamp);
-
-                  return (
-                    <View
-                      key={turn.id || index}
-                      style={[styles.transcriptTurnCard, { backgroundColor: bubbleBg }]}
-                    >
-                      <View style={styles.turnHeader}>
-                        <View style={styles.turnRoleTag}>
-                          <View
-                            style={[
-                              styles.turnRoleDot,
-                              { backgroundColor: roleColor },
-                            ]}
-                          />
-                          <Text
-                            style={[styles.turnRoleText, { color: roleColor }]}
-                          >
-                            {roleName}
-                          </Text>
-                        </View>
-                        <Text style={styles.turnTimeText}>{timeStr}</Text>
-                      </View>
-                      <Text style={styles.turnMessageText}>{turn.text}</Text>
+                  {/* Red Box: Hva du sa */}
+                  <View style={styles.correctionBoxRed}>
+                    <View style={styles.correctionBoxLabelRow}>
+                      <Icon name="close-circle" size={15} color={colors.danger} />
+                      <Text style={styles.correctionLabelRed}>HVA DU SA</Text>
                     </View>
-                  );
-                })
-              )}
-            </View>
-          )}
-        </View>
-
-        {/* 6. COLLAPSIBLE SESSION USAGE & COST FOOTER */}
-        <View style={styles.sectionContainer}>
-          <TouchableOpacity
-            style={styles.accordionHeader}
-            onPress={() => setIsUsageExpanded(!isUsageExpanded)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.accordionTitleRow}>
-              <Text style={styles.accordionIcon}>⚡</Text>
-              <View>
-                <Text style={styles.accordionTitle}>Sesjonsforbruk & Token Ledger</Text>
-                <Text style={styles.accordionSubtitle}>
-                  Audio, GPT-4o & ElevenLabs ressursbruk
-                </Text>
-              </View>
-            </View>
-            <Text style={styles.accordionChevron}>
-              {isUsageExpanded ? '▲ Skjul' : '▼ Vis'}
-            </Text>
-          </TouchableOpacity>
-
-          {isUsageExpanded && (
-            <View style={styles.usageDetailsCard}>
-              <View style={styles.usageMetricGrid}>
-                <View style={styles.usageMetricBox}>
-                  <Text style={styles.usageMetricVal}>
-                    {sessionUsageSummary.totalSttSeconds} sek
-                  </Text>
-                  <Text style={styles.usageMetricSub}>Talt lydtid (STT)</Text>
-                </View>
-
-                <View style={styles.usageMetricBox}>
-                  <Text style={styles.usageMetricVal}>
-                    {sessionUsageSummary.totalTokens.toLocaleString('no-NO')}
-                  </Text>
-                  <Text style={styles.usageMetricSub}>Totale LLM Tokens</Text>
-                </View>
-
-                <View style={styles.usageMetricBox}>
-                  <Text style={styles.usageMetricVal}>
-                    {sessionUsageSummary.totalTtsChars.toLocaleString('no-NO')}
-                  </Text>
-                  <Text style={styles.usageMetricSub}>TTS Tegn</Text>
-                </View>
-
-                <View style={styles.usageMetricBox}>
-                  <Text style={styles.usageMetricVal}>
-                    ${sessionUsageSummary.totalCostUsdFormatted}
-                  </Text>
-                  <Text style={styles.usageMetricSub}>Estimert sesjonskost</Text>
-                </View>
-              </View>
-
-              <View style={styles.usageLedgerEntriesList}>
-                <Text style={styles.usageLedgerEntriesTitle}>
-                  Ledger transaksjoner ({sessionUsageSummary.entriesCount}):
-                </Text>
-                {(resultsData?.usage || []).map((entry: UsageLedgerEntry, idx: number) => (
-                  <View key={entry.id || idx} style={styles.ledgerRow}>
-                    <View style={styles.ledgerRowLeft}>
-                      <Text style={styles.ledgerSourceText}>
-                        {entry.source === 'POST_EXAM_RUBRIC_EVAL'
-                          ? 'Rubrikkvurdering (gpt-4o)'
-                          : 'Sanntidssamtale (Voice Agent)'}
-                      </Text>
-                      <Text style={styles.ledgerModelText}>
-                        {entry.llmModel} • In: {entry.llmPromptTokens} • Out:{' '}
-                        {entry.llmCompletionTokens}
-                      </Text>
-                    </View>
-                    <Text style={styles.ledgerCostText}>
-                      ${parseFloat(String(entry.estimatedCostUsd || 0)).toFixed(4)}
+                    <Text style={styles.quoteTextRed}>
+                      "{item.originalQuote}"
                     </Text>
                   </View>
-                ))}
+
+                  {/* Green Box: Slik bør det sies */}
+                  <View style={styles.correctionBoxGreen}>
+                    <View style={styles.correctionBoxLabelRow}>
+                      <Icon name="checkmark-circle" size={15} color={colors.success} />
+                      <Text style={styles.correctionLabelGreen}>SLIK BØR DET SIES</Text>
+                    </View>
+                    <Text style={styles.quoteTextGreen}>
+                      "{item.correctedNorwegian}"
+                    </Text>
+                  </View>
+
+                  {/* Rule Explanation Box */}
+                  <View style={styles.ruleExplanationBox}>
+                    <View style={styles.correctionBoxLabelRow}>
+                      <Icon name="bulb-outline" size={15} color={colors.navy} />
+                      <Text style={styles.ruleLabel}>REGEL & FORKLARING</Text>
+                    </View>
+                    <Text style={styles.ruleText}>{item.grammarOrVocabRule}</Text>
+                  </View>
+                </Card>
+              ))
+            )}
+          </View>
+
+          {/* 5. COLLAPSIBLE FULL TRANSCRIPT */}
+          <View style={styles.sectionContainer}>
+            <Card
+              onPress={() => setIsTranscriptExpanded(!isTranscriptExpanded)}
+              style={styles.accordionHeader}
+            >
+              <View style={styles.accordionTitleRow}>
+                <View style={styles.accordionIconCircle}>
+                  <Icon name="chatbubbles-outline" size={18} color={colors.navy} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.accordionTitle}>Full samtalelogg (Transkripsjon)</Text>
+                  <Text style={styles.accordionSubtitle}>
+                    {(resultsData?.transcriptJson || []).length} ytringer registrert under prøven
+                  </Text>
+                </View>
               </View>
-            </View>
-          )}
-        </View>
+              <View style={styles.accordionRightRow}>
+                <Text style={styles.accordionChevron}>
+                  {isTranscriptExpanded ? 'Skjul' : 'Vis'}
+                </Text>
+                <Icon
+                  name={isTranscriptExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.red}
+                />
+              </View>
+            </Card>
 
-        {/* 7. BOTTOM ACTION BUTTONS */}
-        <View style={styles.bottomActionsContainer}>
-          <TouchableOpacity
-            style={styles.primaryActionButton}
-            onPress={() => navigation.replace('ExamSetup')}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.primaryActionButtonText}>
-              Ta en ny prøve
-            </Text>
-          </TouchableOpacity>
+            {isTranscriptExpanded && (
+              <Card style={styles.transcriptListContainer}>
+                {(resultsData?.transcriptJson || []).length === 0 ? (
+                  <Text style={styles.emptyTranscriptText}>
+                    Ingen transkripsjon lagret for denne sesjonen.
+                  </Text>
+                ) : (
+                  resultsData?.transcriptJson.map((turn: TranscriptTurn, index: number) => {
+                    const isExaminer = turn.role === 'EXAMINER';
+                    const isPeer = turn.role === 'AI_COCANDIDATE';
+                    const isCandidate2 = turn.role === 'CANDIDATE_2';
 
-          <TouchableOpacity
-            style={styles.secondaryActionButton}
-            onPress={handleShareResults}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.secondaryActionButtonText}>
-              Del eller lagre resultat
-            </Text>
-          </TouchableOpacity>
+                    const roleName = isExaminer
+                      ? 'Sensor'
+                      : isPeer
+                        ? 'AI-medkandidat'
+                        : isCandidate2
+                          ? 'Kandidat 2'
+                          : 'Kandidat 1';
+
+                    const timeStr = formatTimestamp(turn.timestamp, baseTimestamp);
+
+                    return (
+                      <View
+                        key={turn.id || index}
+                        style={[
+                          styles.transcriptTurnCard,
+                          isExaminer
+                            ? styles.turnBubbleExaminer
+                            : isPeer
+                              ? styles.turnBubblePeer
+                              : styles.turnBubbleCandidate,
+                        ]}
+                      >
+                        <View style={styles.turnHeader}>
+                          <Badge
+                            label={roleName}
+                            tone={isExaminer ? 'solidNavy' : isPeer ? 'neutral' : 'solidRed'}
+                          />
+                          <Text style={styles.turnTimeText}>{timeStr}</Text>
+                        </View>
+                        <Text style={styles.turnMessageText}>{turn.text}</Text>
+                      </View>
+                    );
+                  })
+                )}
+              </Card>
+            )}
+          </View>
+
+          {/* 6. COLLAPSIBLE SESSION USAGE & COST FOOTER */}
+          <View style={styles.sectionContainer}>
+            <Card
+              onPress={() => setIsUsageExpanded(!isUsageExpanded)}
+              style={styles.accordionHeader}
+            >
+              <View style={styles.accordionTitleRow}>
+                <View style={styles.accordionIconCircle}>
+                  <Icon name="flash-outline" size={18} color={colors.navy} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.accordionTitle}>Sesjonsforbruk & Token Ledger</Text>
+                  <Text style={styles.accordionSubtitle}>
+                    Audio, GPT-4o & ElevenLabs ressursbruk
+                  </Text>
+                </View>
+              </View>
+              <View style={styles.accordionRightRow}>
+                <Text style={styles.accordionChevron}>
+                  {isUsageExpanded ? 'Skjul' : 'Vis'}
+                </Text>
+                <Icon
+                  name={isUsageExpanded ? 'chevron-up' : 'chevron-down'}
+                  size={16}
+                  color={colors.red}
+                />
+              </View>
+            </Card>
+
+            {isUsageExpanded && (
+              <Card style={styles.usageDetailsCard}>
+                <View style={styles.usageMetricGrid}>
+                  <View style={styles.usageMetricBox}>
+                    <Text style={styles.usageMetricVal}>
+                      {sessionUsageSummary.totalSttSeconds} sek
+                    </Text>
+                    <Text style={styles.usageMetricSub}>Talt lydtid (STT)</Text>
+                  </View>
+
+                  <View style={styles.usageMetricBox}>
+                    <Text style={styles.usageMetricVal}>
+                      {sessionUsageSummary.totalTokens.toLocaleString('no-NO')}
+                    </Text>
+                    <Text style={styles.usageMetricSub}>Totale LLM Tokens</Text>
+                  </View>
+
+                  <View style={styles.usageMetricBox}>
+                    <Text style={styles.usageMetricVal}>
+                      {sessionUsageSummary.totalTtsChars.toLocaleString('no-NO')}
+                    </Text>
+                    <Text style={styles.usageMetricSub}>TTS Tegn</Text>
+                  </View>
+
+                  <View style={styles.usageMetricBox}>
+                    <Text style={styles.usageMetricVal}>
+                      ${sessionUsageSummary.totalCostUsdFormatted}
+                    </Text>
+                    <Text style={styles.usageMetricSub}>Estimert sesjonskost</Text>
+                  </View>
+                </View>
+
+                <View style={styles.usageLedgerEntriesList}>
+                  <Text style={styles.usageLedgerEntriesTitle}>
+                    Ledger transaksjoner ({sessionUsageSummary.entriesCount}):
+                  </Text>
+                  {(resultsData?.usage || []).map((entry: UsageLedgerEntry, idx: number) => (
+                    <View key={entry.id || idx} style={styles.ledgerRow}>
+                      <View style={styles.ledgerRowLeft}>
+                        <Text style={styles.ledgerSourceText}>
+                          {entry.source === 'POST_EXAM_RUBRIC_EVAL'
+                            ? 'Rubrikkvurdering (gpt-4o)'
+                            : 'Sanntidssamtale (Voice Agent)'}
+                        </Text>
+                        <Text style={styles.ledgerModelText}>
+                          {entry.llmModel} • In: {entry.llmPromptTokens} • Out:{' '}
+                          {entry.llmCompletionTokens}
+                        </Text>
+                      </View>
+                      <Text style={styles.ledgerCostText}>
+                        ${parseFloat(String(entry.estimatedCostUsd || 0)).toFixed(4)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </Card>
+            )}
+          </View>
+
+          {/* 7. BOTTOM ACTION BUTTONS */}
+          <View style={styles.bottomActionsContainer}>
+            <Button
+              title="Ta en ny prøve"
+              variant="primary"
+              size="lg"
+              icon="mic"
+              fullWidth
+              onPress={() => navigation.replace('ExamSetup')}
+            />
+
+            <Button
+              title="Del eller lagre resultat"
+              variant="outline"
+              size="lg"
+              icon="share-outline"
+              fullWidth
+              onPress={handleShareResults}
+            />
+          </View>
         </View>
       </ScrollView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
 export default ExamResultsScreen;
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0B0F19',
-  },
   scrollView: {
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 40,
+    padding: space.lg,
+    paddingBottom: space.xxxl,
   },
-
-  // TOP APP BAR
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-    backgroundColor: '#0B0F19',
-  },
-  topBarBackButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 4,
-    paddingRight: 8,
-  },
-  topBarBackArrow: {
-    color: '#38BDF8',
-    fontSize: 18,
-    marginRight: 4,
-    fontWeight: '700',
-  },
-  topBarBackText: {
-    color: '#38BDF8',
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  topBarCenter: {
-    flex: 1,
-    alignItems: 'center',
-    marginHorizontal: 8,
-  },
-  topBarTitle: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  topBarSubtitle: {
-    color: '#94A3B8',
-    fontSize: 11,
-    marginTop: 2,
-  },
-  shareButton: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  shareButtonText: {
-    color: '#E2E8F0',
-    fontSize: 13,
-    fontWeight: '600',
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
   },
 
   // DUAL TABS SWITCHER (HUMAN_LOCAL)
   dualTabsContainer: {
-    marginBottom: 16,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginBottom: space.lg,
+    gap: space.sm,
   },
   dualTabsNotice: {
-    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   dualTabsNoticeText: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '500',
+    ...type.caption,
+    color: colors.textSecondary,
+    flex: 1,
   },
   dualTabsRow: {
     flexDirection: 'row',
-    gap: 8,
+    gap: space.sm,
   },
   dualTabButton: {
     flex: 1,
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    backgroundColor: '#0F172A',
+    paddingHorizontal: space.md,
+    borderRadius: radius.md,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
     alignItems: 'center',
+    gap: 4,
   },
   dualTabButtonActive: {
-    backgroundColor: '#0284C7',
-    borderColor: '#38BDF8',
+    backgroundColor: colors.redSoft,
+    borderColor: colors.red,
   },
   dualTabTitle: {
-    color: '#94A3B8',
-    fontSize: 13,
+    ...type.caption,
+    color: colors.textSecondary,
     fontWeight: '700',
   },
   dualTabTitleActive: {
-    color: '#FFFFFF',
-  },
-  dualTabLevelTag: {
-    marginTop: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  dualTabLevelTagText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+    color: colors.red,
   },
 
-  // SCORECARD HEADER CARD
+  // SCORECARD HERO CARD
   scorecardHeaderCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
+    marginBottom: space.xl,
   },
   headerCandidateRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 14,
+    marginBottom: space.md,
   },
   headerCandidateLabel: {
-    color: '#38BDF8',
-    fontSize: 14,
-    fontWeight: '700',
-    letterSpacing: 0.5,
-  },
-  targetLevelBadge: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  targetLevelBadgeText: {
-    color: '#E2E8F0',
-    fontSize: 12,
-    fontWeight: '600',
+    ...type.overline,
+    color: colors.navy,
   },
   levelAssessmentRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 16,
+    gap: space.md,
+    marginBottom: space.md,
   },
   assessedLevelBigBadge: {
     flex: 2,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 2,
+    padding: space.lg,
+    borderRadius: radius.lg,
+    borderWidth: 1.5,
     alignItems: 'center',
     justifyContent: 'center',
   },
   assessedLevelLabel: {
-    color: '#CBD5E1',
-    fontSize: 11,
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
+    ...type.overline,
     marginBottom: 4,
-    fontWeight: '600',
   },
   assessedLevelValue: {
-    fontSize: 28,
-    fontWeight: '900',
-    letterSpacing: 0.5,
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: -0.6,
   },
   scoreMetricCard: {
     flex: 1,
-    backgroundColor: '#0F172A',
-    borderRadius: 12,
-    padding: 12,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.lg,
+    padding: space.md,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
   },
   scoreMetricLabel: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '600',
+    ...type.overline,
   },
   scoreMetricValue: {
-    color: '#F8FAFC',
-    fontSize: 24,
-    fontWeight: '800',
+    ...type.display,
+    fontSize: 26,
     marginVertical: 2,
   },
   scoreMetricSub: {
-    color: '#64748B',
-    fontSize: 10,
+    ...type.caption,
+    fontSize: 11,
   },
 
   // PASS / NEEDS WORK BANNER
   passStatusBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 12,
-    borderRadius: 10,
+    gap: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
     borderWidth: 1,
   },
   passStatusSuccess: {
-    backgroundColor: '#064E3B33',
-    borderColor: '#059669',
+    backgroundColor: colors.successSoft,
+    borderColor: colors.success,
   },
   passStatusNeedsWork: {
-    backgroundColor: '#78350F33',
-    borderColor: '#D97706',
-  },
-  passStatusIcon: {
-    fontSize: 20,
-    fontWeight: '900',
-    marginRight: 10,
-    color: '#F8FAFC',
+    backgroundColor: colors.warningSoft,
+    borderColor: colors.warning,
   },
   passStatusTextContainer: {
     flex: 1,
@@ -1311,278 +1161,210 @@ const styles = StyleSheet.create({
   passStatusTitle: {
     fontSize: 13,
     fontWeight: '800',
-    letterSpacing: 0.5,
+    letterSpacing: 0.4,
   },
   passStatusSubtitle: {
-    color: '#CBD5E1',
-    fontSize: 12,
+    ...type.caption,
+    color: colors.text,
     marginTop: 2,
-    lineHeight: 16,
   },
 
   // SECTIONS
   sectionContainer: {
-    marginBottom: 24,
+    marginBottom: space.xl,
   },
   sectionHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 10,
+    marginBottom: space.sm,
   },
   sectionTitle: {
-    color: '#F8FAFC',
-    fontSize: 17,
-    fontWeight: '700',
+    ...type.heading,
   },
   sectionSubtitle: {
-    color: '#94A3B8',
-    fontSize: 12,
-    fontWeight: '500',
+    ...type.caption,
   },
   sectionExplainer: {
-    color: '#94A3B8',
-    fontSize: 13,
-    marginBottom: 12,
-    lineHeight: 18,
+    ...type.caption,
+    color: colors.textSecondary,
+    marginBottom: space.md,
   },
 
   // SUMMARY CARD & TOGGLE
   langTogglePill: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: '#38BDF8',
+    borderColor: colors.border,
   },
   langToggleLabel: {
-    color: '#38BDF8',
+    color: colors.navy,
     fontSize: 12,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   summaryCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
     flexDirection: 'row',
   },
   summaryQuoteBar: {
     width: 4,
-    backgroundColor: '#38BDF8',
+    backgroundColor: colors.red,
     borderRadius: 2,
-    marginRight: 12,
+    marginRight: space.md,
   },
   summaryText: {
+    ...type.body,
+    color: colors.text,
     flex: 1,
-    color: '#E2E8F0',
-    fontSize: 14,
-    lineHeight: 22,
   },
 
-  // CRITERION CARD
+  // CRITERION CARDS
   criterionCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 12,
+    marginBottom: space.md,
   },
   criterionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    marginBottom: 10,
+    marginBottom: space.sm,
   },
   criterionTitleContainer: {
     flex: 1,
-    marginRight: 8,
+    marginRight: space.sm,
   },
   criterionTitleNo: {
-    color: '#F8FAFC',
-    fontSize: 15,
-    fontWeight: '700',
+    ...type.bodyStrong,
   },
   criterionTitleEn: {
-    color: '#94A3B8',
-    fontSize: 12,
-    marginTop: 2,
+    ...type.caption,
+    marginTop: 1,
   },
   criterionScoreBadge: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.navySoft,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
+    paddingVertical: 5,
+    borderRadius: radius.sm,
   },
   criterionScoreNumber: {
-    color: '#38BDF8',
+    color: colors.navy,
     fontSize: 18,
     fontWeight: '800',
   },
   criterionScoreDenominator: {
-    color: '#64748B',
+    color: colors.textSecondary,
     fontSize: 12,
-    marginLeft: 2,
     fontWeight: '600',
+    marginLeft: 2,
   },
   criterionProgressSection: {
-    marginVertical: 6,
+    marginBottom: space.md,
   },
   progressBarTrack: {
     height: 8,
-    backgroundColor: '#0F172A',
-    borderRadius: 4,
+    backgroundColor: colors.navySoft,
+    borderRadius: radius.pill,
     overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#334155',
+    marginBottom: 8,
   },
   progressBarFill: {
     height: '100%',
-    borderRadius: 4,
+    borderRadius: radius.pill,
   },
   criterionLevelRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 6,
-    marginBottom: 8,
-  },
-  criterionLevelTag: {
-    color: '#38BDF8',
-    fontSize: 11,
-    fontWeight: '700',
+    alignItems: 'center',
   },
   criterionLevelPercent: {
-    color: '#64748B',
+    ...type.caption,
     fontSize: 11,
   },
   criterionFeedbackBox: {
-    backgroundColor: '#0F172A',
-    padding: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#2D3748',
-    marginTop: 4,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    padding: space.md,
   },
   criterionFeedbackText: {
-    color: '#CBD5E1',
-    fontSize: 13,
-    lineHeight: 19,
+    ...type.body,
+    fontSize: 14,
   },
 
   // CONCRETE CORRECTIONS
-  correctionCountBadge: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  correctionCountText: {
-    color: '#38BDF8',
-    fontSize: 11,
-    fontWeight: '600',
-  },
   emptyCorrectionsCard: {
-    backgroundColor: '#1E293B',
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: space.sm,
   },
   emptyCorrectionsText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    textAlign: 'center',
+    ...type.body,
+    color: colors.success,
+    fontWeight: '600',
+    flex: 1,
   },
   correctionCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 12,
+    marginBottom: space.md,
+    gap: space.sm,
   },
   correctionHeaderRow: {
-    marginBottom: 8,
-  },
-  correctionIndexTag: {
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   correctionBoxRed: {
-    backgroundColor: '#450A0A33',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#7F1D1D',
-    marginBottom: 8,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.md,
+    padding: space.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.danger,
+  },
+  correctionBoxGreen: {
+    backgroundColor: colors.successSoft,
+    borderRadius: radius.md,
+    padding: space.md,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.success,
   },
   correctionBoxLabelRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
     marginBottom: 4,
   },
   correctionLabelRed: {
-    color: '#F87171',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    ...type.overline,
+    color: colors.danger,
   },
   quoteTextRed: {
-    color: '#FCA5A5',
-    fontSize: 14,
+    ...type.body,
+    color: colors.text,
     fontStyle: 'italic',
-    lineHeight: 20,
-    textDecorationLine: 'line-through',
-  },
-  correctionBoxGreen: {
-    backgroundColor: '#064E3B33',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#065F46',
-    marginBottom: 8,
   },
   correctionLabelGreen: {
-    color: '#34D399',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
+    ...type.overline,
+    color: colors.success,
   },
   quoteTextGreen: {
-    color: '#A7F3D0',
-    fontSize: 14,
-    fontWeight: '600',
-    lineHeight: 20,
+    ...type.bodyStrong,
   },
   ruleExplanationBox: {
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#1E3A8A',
+    backgroundColor: colors.navySoft,
+    borderRadius: radius.md,
+    padding: space.md,
   },
   ruleLabel: {
-    color: '#60A5FA',
-    fontSize: 10,
-    fontWeight: '800',
-    letterSpacing: 0.5,
-    marginBottom: 2,
+    ...type.overline,
+    color: colors.navy,
   },
   ruleText: {
-    color: '#CBD5E1',
-    fontSize: 12,
-    lineHeight: 18,
+    ...type.body,
+    fontSize: 14,
   },
 
   // ACCORDIONS (TRANSCRIPT & USAGE)
@@ -1590,55 +1372,59 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
   },
   accordionTitleRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: space.md,
     flex: 1,
   },
-  accordionIcon: {
-    fontSize: 18,
-    marginRight: 10,
+  accordionIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.navySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   accordionTitle: {
-    color: '#F8FAFC',
-    fontSize: 14,
-    fontWeight: '700',
+    ...type.bodyStrong,
   },
   accordionSubtitle: {
-    color: '#94A3B8',
-    fontSize: 11,
-    marginTop: 2,
+    ...type.caption,
+    marginTop: 1,
+  },
+  accordionRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   accordionChevron: {
-    color: '#38BDF8',
+    color: colors.red,
     fontSize: 12,
     fontWeight: '700',
-    marginLeft: 8,
   },
-
-  // TRANSCRIPT LIST
   transcriptListContainer: {
-    marginTop: 8,
-    paddingTop: 4,
+    marginTop: space.sm,
+    gap: space.sm,
   },
   emptyTranscriptText: {
-    color: '#94A3B8',
-    fontSize: 13,
-    padding: 12,
+    ...type.caption,
     textAlign: 'center',
+    paddingVertical: space.md,
   },
   transcriptTurnCard: {
-    borderRadius: 10,
-    padding: 12,
-    marginBottom: 8,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderRadius: radius.md,
+    padding: space.md,
+  },
+  turnBubbleExaminer: {
+    backgroundColor: colors.navySoft,
+  },
+  turnBubbleCandidate: {
+    backgroundColor: colors.redSoft,
+  },
+  turnBubblePeer: {
+    backgroundColor: colors.surfaceMuted,
   },
   turnHeader: {
     flexDirection: 'row',
@@ -1646,325 +1432,210 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: 6,
   },
-  turnRoleTag: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  turnRoleDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginRight: 6,
-  },
-  turnRoleText: {
-    fontSize: 12,
-    fontWeight: '700',
-  },
   turnTimeText: {
-    color: '#64748B',
+    ...type.caption,
     fontSize: 11,
   },
   turnMessageText: {
-    color: '#F1F5F9',
-    fontSize: 13,
-    lineHeight: 19,
+    ...type.body,
+    color: colors.text,
+    fontSize: 14,
   },
 
-  // USAGE DETAILS
+  // USAGE LEDGER
   usageDetailsCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginTop: 8,
+    marginTop: space.sm,
   },
   usageMetricGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 14,
+    gap: space.sm,
+    marginBottom: space.md,
   },
   usageMetricBox: {
     flex: 1,
     minWidth: '45%',
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
+    padding: space.md,
   },
   usageMetricVal: {
-    color: '#38BDF8',
-    fontSize: 16,
-    fontWeight: '800',
+    ...type.heading,
   },
   usageMetricSub: {
-    color: '#94A3B8',
+    ...type.caption,
     fontSize: 11,
     marginTop: 2,
   },
   usageLedgerEntriesList: {
     borderTopWidth: 1,
-    borderTopColor: '#334155',
-    paddingTop: 10,
+    borderTopColor: colors.border,
+    paddingTop: space.md,
   },
   usageLedgerEntriesTitle: {
-    color: '#CBD5E1',
-    fontSize: 12,
-    fontWeight: '700',
-    marginBottom: 8,
+    ...type.overline,
+    marginBottom: space.sm,
   },
   ledgerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: space.xs,
     borderBottomWidth: 1,
-    borderBottomColor: '#2D3748',
+    borderBottomColor: colors.border,
   },
   ledgerRowLeft: {
     flex: 1,
-    marginRight: 8,
   },
   ledgerSourceText: {
-    color: '#E2E8F0',
-    fontSize: 12,
+    ...type.caption,
+    color: colors.text,
     fontWeight: '600',
   },
   ledgerModelText: {
-    color: '#64748B',
+    ...type.caption,
     fontSize: 11,
-    marginTop: 1,
   },
   ledgerCostText: {
-    color: '#10B981',
-    fontSize: 12,
+    ...type.caption,
+    color: colors.navy,
     fontWeight: '700',
   },
 
-  // BOTTOM ACTION BUTTONS
+  // BOTTOM ACTIONS
   bottomActionsContainer: {
-    marginTop: 12,
-    gap: 10,
-  },
-  primaryActionButton: {
-    backgroundColor: '#0284C7',
-    borderRadius: 12,
-    paddingVertical: 15,
-    alignItems: 'center',
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  primaryActionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  secondaryActionButton: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  secondaryActionButtonText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '600',
+    gap: space.md,
+    marginTop: space.sm,
   },
 
-  // LOADING STATE STYLES
+  // LOADING & ERROR STATES
   loadingContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  sensorBadgeHeader: {
-    backgroundColor: '#0C4A6E',
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#0284C7',
-    marginBottom: 28,
-  },
-  sensorBadgeHeaderText: {
-    color: '#38BDF8',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
+    justifyContent: 'center',
+    padding: space.xl,
+    maxWidth: 520,
+    alignSelf: 'center',
   },
   pulseCircleOuter: {
-    width: 110,
-    height: 110,
-    borderRadius: 55,
-    backgroundColor: '#0369A122',
-    borderWidth: 2,
-    borderColor: '#38BDF866',
-    justifyContent: 'center',
+    width: 116,
+    height: 116,
+    borderRadius: 58,
+    backgroundColor: colors.redSoft,
     alignItems: 'center',
-    marginBottom: 28,
+    justifyContent: 'center',
+    marginVertical: space.xl,
   },
   pulseCircleInner: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: '#0F172A',
-    justifyContent: 'center',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   loadingMainTitle: {
-    color: '#F8FAFC',
-    fontSize: 17,
-    fontWeight: '700',
+    ...type.heading,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 24,
+    marginBottom: space.md,
   },
   loadingStepCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
-    borderRadius: 10,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderWidth: 1,
-    borderColor: '#334155',
-    marginBottom: 24,
+    gap: space.sm,
     width: '100%',
+    marginBottom: space.xl,
   },
   loadingStepDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#38BDF8',
-    marginRight: 12,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.red,
   },
   loadingStepText: {
+    ...type.body,
+    color: colors.text,
     flex: 1,
-    color: '#E2E8F0',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
   },
   loadingProgressSteps: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 20,
-    width: '80%',
+    marginBottom: space.lg,
   },
   stepItem: {
     alignItems: 'center',
+    gap: 4,
   },
-  stepNumber: {
+  stepCircle: {
     width: 26,
     height: 26,
     borderRadius: 13,
-    backgroundColor: '#0284C7',
-    color: '#FFFFFF',
+    backgroundColor: colors.navy,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  stepNumber: {
+    color: colors.white,
     fontSize: 12,
-    fontWeight: '700',
-    textAlign: 'center',
-    lineHeight: 26,
+    fontWeight: '800',
   },
   stepLabel: {
-    color: '#94A3B8',
-    fontSize: 10,
-    marginTop: 4,
-    fontWeight: '600',
+    ...type.caption,
+    fontSize: 11,
   },
   stepConnector: {
-    flex: 1,
+    width: 32,
     height: 2,
-    backgroundColor: '#334155',
-    marginHorizontal: 8,
-    marginBottom: 14,
+    backgroundColor: colors.borderStrong,
+    marginHorizontal: space.sm,
   },
   loadingHelpNote: {
-    color: '#64748B',
-    fontSize: 12,
+    ...type.caption,
     textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 16,
   },
   pollErrorBanner: {
-    marginTop: 20,
-    backgroundColor: '#7F1D1D33',
-    borderColor: '#EF4444',
+    marginTop: space.lg,
+    backgroundColor: colors.dangerSoft,
+    padding: space.md,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderRadius: 8,
-    padding: 12,
+    borderColor: colors.danger,
     alignItems: 'center',
+    gap: space.sm,
     width: '100%',
   },
   pollErrorText: {
-    color: '#FECACA',
-    fontSize: 12,
+    ...type.caption,
+    color: colors.danger,
     textAlign: 'center',
-    marginBottom: 8,
   },
-  pollRetryButton: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  pollRetryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 12,
-    fontWeight: '700',
-  },
-
-  // ERROR STATE STYLES
   errorContainer: {
     flex: 1,
-    justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    justifyContent: 'center',
+    padding: space.xxl,
+    maxWidth: 480,
+    alignSelf: 'center',
   },
-  errorIcon: {
-    fontSize: 48,
-    marginBottom: 16,
+  errorIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.dangerSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.md,
   },
   errorTitle: {
-    color: '#F8FAFC',
-    fontSize: 20,
-    fontWeight: '800',
-    marginBottom: 8,
+    ...type.title,
+    marginBottom: space.xs,
     textAlign: 'center',
   },
   errorMessage: {
-    color: '#94A3B8',
-    fontSize: 14,
+    ...type.body,
     textAlign: 'center',
-    lineHeight: 20,
-    marginBottom: 24,
-  },
-  retryButton: {
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginBottom: 12,
-  },
-  retryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
-  },
-  backButton: {
-    paddingVertical: 8,
-  },
-  backButtonText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    fontWeight: '600',
+    marginBottom: space.xl,
   },
 });

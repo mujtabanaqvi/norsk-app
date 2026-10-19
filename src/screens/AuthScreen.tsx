@@ -3,23 +3,23 @@ import {
   View,
   Text,
   TextInput,
-  TouchableOpacity,
+  Pressable,
   StyleSheet,
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { useAuth } from '../hooks/useAuth';
+import { Screen, Logo, Card, Badge, Button, Icon } from '../components/ui';
+import { colors, radius, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 
 export const AuthScreen: React.FC<Props> = ({ navigation }) => {
-  const { user, login, register, loginWithGoogle } = useAuth();
+  const { login, register, loginWithGoogle } = useAuth();
 
   const [isLoginMode, setIsLoginMode] = useState<boolean>(true);
   const [email, setEmail] = useState<string>('');
@@ -28,6 +28,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
   const [referralCode, setReferralCode] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [focusedField, setFocusedField] = useState<string | null>(null);
 
   const handleSubmit = async () => {
     setErrorMessage(null);
@@ -82,450 +83,448 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <Screen>
       <KeyboardAvoidingView
-        style={styles.container}
+        style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
         >
-          {navigation.canGoBack() && (
-            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-              <Text style={styles.backButtonText}>← Tilbake</Text>
-            </TouchableOpacity>
-          )}
+          <View style={styles.container}>
+            {navigation.canGoBack() && (
+              <Pressable
+                style={styles.backButton}
+                onPress={() => navigation.goBack()}
+                accessibilityRole="button"
+                accessibilityLabel="Tilbake"
+              >
+                <Icon name="chevron-back" size={20} color={colors.navy} />
+                <Text style={styles.backButtonText}>Tilbake</Text>
+              </Pressable>
+            )}
 
-          {/* App Branding & Highlights Banner */}
-          <View style={styles.brandContainer}>
-            <View style={styles.brandBadge}>
-              <Text style={styles.brandBadgeText}>NORSKPRØVEN B1 / B2</Text>
-            </View>
-            <Text style={styles.brandTitle}>Muntlig Eksamenssimulator</Text>
-            <Text style={styles.brandSubtitle}>
-              Øv på den offisielle muntlige prøven med AI-sensor og få umiddelbar HK-dir karaktervurdering.
-            </Text>
-          </View>
-
-          {/* Smart Feature Showcase Cards */}
-          <View style={styles.featuresGrid}>
-            <View style={styles.featureItem}>
-              <Text style={styles.featureIcon}>🎙️</Text>
-              <View style={styles.featureTextWrapper}>
-                <Text style={styles.featureTitle}>Full muntlig eksamen</Text>
-                <Text style={styles.featureDesc}>
-                  Del 1 (egenpresentasjon), Del 2 (samtale) og Del 3 (oppfølging).
-                </Text>
-              </View>
+            {/* App Branding & Highlights Hero */}
+            <View style={styles.brandContainer}>
+              <Logo size={76} withWordmark />
+              <Badge
+                label="NORSKPRØVEN MUNTLIG · B1 / B2"
+                tone="red"
+                style={styles.brandBadge}
+              />
+              <Text style={styles.brandTitle}>Muntlig Eksamenssimulator</Text>
+              <Text style={styles.brandSubtitle}>
+                Øv på den offisielle muntlige prøven med AI-sensor og få umiddelbar HK-dir karaktervurdering.
+              </Text>
             </View>
 
-            <View style={styles.featureItem}>
-              <Text style={styles.featureIcon}>🤖</Text>
-              <View style={styles.featureTextWrapper}>
-                <Text style={styles.featureTitle}>Interaktiv AI-medkandidat</Text>
-                <Text style={styles.featureDesc}>
-                  Øv alene når det passer deg, eller ta prøven sammen med en venn.
-                </Text>
-              </View>
+            {/* Smart Feature Showcase Cards */}
+            <View style={styles.featuresGrid}>
+              <Card style={styles.featureCard}>
+                <View style={styles.featureIconCircle}>
+                  <Icon name="mic-outline" size={20} color={colors.red} />
+                </View>
+                <View style={styles.featureTextWrapper}>
+                  <Text style={styles.featureTitle}>Full muntlig eksamen</Text>
+                  <Text style={styles.featureDesc}>
+                    Del 1 (egenpresentasjon), Del 2 (samtale) og Del 3 (oppfølging).
+                  </Text>
+                </View>
+              </Card>
+
+              <Card style={styles.featureCard}>
+                <View style={[styles.featureIconCircle, { backgroundColor: colors.navySoft }]}>
+                  <Icon name="people-outline" size={20} color={colors.navy} />
+                </View>
+                <View style={styles.featureTextWrapper}>
+                  <Text style={styles.featureTitle}>Interaktiv AI-medkandidat</Text>
+                  <Text style={styles.featureDesc}>
+                    Øv alene når det passer deg, eller ta prøven sammen med en venn.
+                  </Text>
+                </View>
+              </Card>
+
+              <Card style={styles.featureCard}>
+                <View style={styles.featureIconCircle}>
+                  <Icon name="analytics-outline" size={20} color={colors.red} />
+                </View>
+                <View style={styles.featureTextWrapper}>
+                  <Text style={styles.featureTitle}>HK-dir Sensorvurdering</Text>
+                  <Text style={styles.featureDesc}>
+                    Detaljert poengsum på flyt, uttale, grammatikk og ordforråd.
+                  </Text>
+                </View>
+              </Card>
             </View>
 
-            <View style={styles.featureItem}>
-              <Text style={styles.featureIcon}>📊</Text>
-              <View style={styles.featureTextWrapper}>
-                <Text style={styles.featureTitle}>HK-dir Sensorvurdering</Text>
-                <Text style={styles.featureDesc}>
-                  Detaljert poengsum på flyt, uttale, grammatikk og ordforråd.
-                </Text>
-              </View>
+            <View style={styles.headerContainer}>
+              <Text style={styles.title}>
+                {isLoginMode ? 'Logg inn for å starte' : 'Opprett konto for å starte'}
+              </Text>
+              <Text style={styles.subtitle}>
+                {isLoginMode
+                  ? 'Logg inn med din konto for å få tilgang til prøver og resultater.'
+                  : 'Registrer deg gratis for å øve til Norskprøven i dag.'}
+              </Text>
             </View>
-          </View>
 
-          <View style={styles.headerContainer}>
-            <Text style={styles.title}>
-              {isLoginMode ? 'Logg inn for å starte' : 'Opprett konto for å starte'}
-            </Text>
-            <Text style={styles.subtitle}>
-              {isLoginMode
-                ? 'Logg inn med din konto for å få tilgang til prøver og resultater.'
-                : 'Registrer deg gratis for å øve til Norskprøven i dag.'}
-            </Text>
-          </View>
-
-          {errorMessage && (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{errorMessage}</Text>
-            </View>
-          )}
-
-          <View style={styles.formCard}>
-            {!isLoginMode && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Fullt navn</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="Ola Nordmann"
-                  placeholderTextColor="#64748B"
-                  value={name}
-                  onChangeText={setName}
-                  autoCapitalize="words"
-                />
+            {errorMessage && (
+              <View style={styles.errorBox}>
+                <Icon name="alert-circle" size={18} color={colors.danger} />
+                <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
 
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>E-postadresse</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="ola@eksempel.no"
-                placeholderTextColor="#64748B"
-                value={email}
-                onChangeText={setEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-              />
-            </View>
-
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>Passord</Text>
-              <TextInput
-                style={styles.input}
-                placeholder="Minst 6 tegn"
-                placeholderTextColor="#64748B"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry
-              />
-            </View>
-
-            {!isLoginMode && (
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Vervekode (valgfritt)</Text>
-                <TextInput
-                  style={styles.input}
-                  placeholder="F.eks. A1B2C3D4"
-                  placeholderTextColor="#64748B"
-                  value={referralCode}
-                  onChangeText={setReferralCode}
-                  autoCapitalize="characters"
-                />
-              </View>
-            )}
-
-            <TouchableOpacity
-              style={[styles.submitButton, isLoading && styles.disabledButton]}
-              onPress={handleSubmit}
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#FFFFFF" />
-              ) : (
-                <Text style={styles.submitButtonText}>
-                  {isLoginMode ? 'Logg inn' : 'Registrer konto'}
-                </Text>
+            <Card style={styles.formCard}>
+              {!isLoginMode && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Fullt navn</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      focusedField === 'name' && styles.inputFocused,
+                    ]}
+                    placeholder="Ola Nordmann"
+                    placeholderTextColor={colors.textMuted}
+                    value={name}
+                    onChangeText={setName}
+                    onFocus={() => setFocusedField('name')}
+                    onBlur={() => setFocusedField(null)}
+                    autoCapitalize="words"
+                  />
+                </View>
               )}
-            </TouchableOpacity>
 
-            <View style={styles.dividerContainer}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>ELLER</Text>
-              <View style={styles.dividerLine} />
-            </View>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>E-postadresse</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    focusedField === 'email' && styles.inputFocused,
+                  ]}
+                  placeholder="ola@eksempel.no"
+                  placeholderTextColor={colors.textMuted}
+                  value={email}
+                  onChangeText={setEmail}
+                  onFocus={() => setFocusedField('email')}
+                  onBlur={() => setFocusedField(null)}
+                  keyboardType="email-address"
+                  autoCapitalize="none"
+                />
+              </View>
 
-            {/* Google Authentication */}
-            <TouchableOpacity
-              style={styles.googleButton}
-              onPress={handleGoogleSignIn}
-              disabled={isLoading}
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>Passord</Text>
+                <TextInput
+                  style={[
+                    styles.input,
+                    focusedField === 'password' && styles.inputFocused,
+                  ]}
+                  placeholder="Minst 6 tegn"
+                  placeholderTextColor={colors.textMuted}
+                  value={password}
+                  onChangeText={setPassword}
+                  onFocus={() => setFocusedField('password')}
+                  onBlur={() => setFocusedField(null)}
+                  secureTextEntry
+                />
+              </View>
+
+              {!isLoginMode && (
+                <View style={styles.inputGroup}>
+                  <Text style={styles.inputLabel}>Vervekode (valgfritt)</Text>
+                  <TextInput
+                    style={[
+                      styles.input,
+                      focusedField === 'referral' && styles.inputFocused,
+                    ]}
+                    placeholder="F.eks. A1B2C3D4"
+                    placeholderTextColor={colors.textMuted}
+                    value={referralCode}
+                    onChangeText={setReferralCode}
+                    onFocus={() => setFocusedField('referral')}
+                    onBlur={() => setFocusedField(null)}
+                    autoCapitalize="characters"
+                  />
+                </View>
+              )}
+
+              <Button
+                title={isLoginMode ? 'Logg inn' : 'Registrer konto'}
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={isLoading}
+                onPress={handleSubmit}
+                style={styles.submitButton}
+              />
+
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>ELLER</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Google Authentication */}
+              <Button
+                title="Fortsett med Google"
+                variant="outline"
+                size="lg"
+                icon="logo-google"
+                fullWidth
+                disabled={isLoading}
+                onPress={handleGoogleSignIn}
+                style={styles.socialButton}
+              />
+
+              {/* Apple ID Placeholder */}
+              <Button
+                title="Logg inn med Apple (Kommer snart)"
+                variant="outline"
+                size="lg"
+                icon="logo-apple"
+                fullWidth
+                disabled={true}
+                onPress={() =>
+                  Alert.alert('Kommer snart', 'Apple ID-innlogging blir tilgjengelig snart.')
+                }
+              />
+            </Card>
+
+            <Pressable
+              style={styles.switchModeButton}
+              onPress={() => {
+                setIsLoginMode(!isLoginMode);
+                setErrorMessage(null);
+              }}
             >
-              <Text style={styles.googleButtonText}>Fortsett med Google</Text>
-            </TouchableOpacity>
+              <Text style={styles.switchModeText}>
+                {isLoginMode
+                  ? 'Har du ikke en konto? Registrer deg her'
+                  : 'Har du allerede en konto? Logg inn'}
+              </Text>
+            </Pressable>
 
-            {/* Apple ID Placeholder */}
-            <TouchableOpacity
-              style={[styles.appleButton, styles.disabledButton]}
-              disabled={true}
-              onPress={() => Alert.alert('Kommer snart', 'Apple ID-innlogging blir tilgjengelig snart.')}
-            >
-              <Text style={styles.appleButtonText}> Logg inn med Apple (Kommer snart)</Text>
-            </TouchableOpacity>
-          </View>
+            {/* Public Legal & How-to Links */}
+            <View style={styles.publicLinksContainer}>
+              <Pressable
+                onPress={() => navigation.navigate('HowTo')}
+                style={({ pressed }) => [styles.publicLinkBtn, pressed && styles.pressed]}
+              >
+                <Icon name="book-outline" size={16} color={colors.navy} />
+                <Text style={styles.publicLinkText}>Slik fungerer prøven</Text>
+              </Pressable>
 
-          <TouchableOpacity
-            style={styles.switchModeButton}
-            onPress={() => {
-              setIsLoginMode(!isLoginMode);
-              setErrorMessage(null);
-            }}
-          >
-            <Text style={styles.switchModeText}>
-              {isLoginMode
-                ? 'Har du ikke en konto? Registrer deg her'
-                : 'Har du allerede en konto? Logg inn'}
-            </Text>
-          </TouchableOpacity>
-
-          {/* Public Legal & How-to Links */}
-          <View style={styles.publicLinksContainer}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('HowTo')}
-              style={styles.publicLinkBtn}
-            >
-              <Text style={styles.publicLinkText}>📖 Slik fungerer prøven</Text>
-            </TouchableOpacity>
-
-            <View style={styles.footerLinkRow}>
-              <TouchableOpacity onPress={() => navigation.navigate('Terms')}>
-                <Text style={styles.footerSubLink}>Vilkår for bruk</Text>
-              </TouchableOpacity>
-              <Text style={styles.footerDot}>•</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
-                <Text style={styles.footerSubLink}>Personvernerklæring</Text>
-              </TouchableOpacity>
+              <View style={styles.footerLinkRow}>
+                <Pressable onPress={() => navigation.navigate('Terms')}>
+                  <Text style={styles.footerSubLink}>Vilkår for bruk</Text>
+                </Pressable>
+                <Text style={styles.footerDot}>•</Text>
+                <Pressable onPress={() => navigation.navigate('PrivacyPolicy')}>
+                  <Text style={styles.footerSubLink}>Personvernerklæring</Text>
+                </Pressable>
+              </View>
             </View>
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0B0F19',
+  flex: { flex: 1 },
+  scrollContent: {
+    padding: space.lg,
+    paddingBottom: space.xxxl,
   },
   container: {
-    flex: 1,
-  },
-  scrollContent: {
-    padding: 20,
-    paddingBottom: 40,
+    width: '100%',
+    maxWidth: 480,
+    alignSelf: 'center',
   },
   backButton: {
-    paddingVertical: 8,
-    marginBottom: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: space.sm,
+    marginBottom: space.sm,
+    alignSelf: 'flex-start',
   },
   backButtonText: {
-    color: '#38BDF8',
-    fontSize: 16,
+    color: colors.navy,
+    fontSize: 15,
     fontWeight: '600',
   },
   brandContainer: {
     alignItems: 'center',
-    marginBottom: 20,
-    marginTop: 8,
+    marginTop: space.sm,
+    marginBottom: space.xl,
   },
   brandBadge: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#38BDF8',
-    marginBottom: 8,
-  },
-  brandBadgeText: {
-    color: '#38BDF8',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1,
+    marginTop: space.md,
+    marginBottom: space.sm,
+    alignSelf: 'center',
   },
   brandTitle: {
-    fontSize: 24,
-    fontWeight: '900',
-    color: '#F8FAFC',
+    ...type.title,
     textAlign: 'center',
-    marginBottom: 6,
+    marginBottom: space.xs,
   },
   brandSubtitle: {
-    fontSize: 13,
-    color: '#94A3B8',
+    ...type.body,
     textAlign: 'center',
-    lineHeight: 18,
-    paddingHorizontal: 10,
   },
   featuresGrid: {
-    backgroundColor: '#131B2E',
-    borderRadius: 14,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: '#1E293B',
-    marginBottom: 20,
-    gap: 12,
+    gap: space.sm,
+    marginBottom: space.xl,
   },
-  featureItem: {
+  featureCard: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 12,
+    alignItems: 'center',
+    gap: space.md,
+    padding: space.md,
   },
-  featureIcon: {
-    fontSize: 20,
+  featureIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.redSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   featureTextWrapper: {
     flex: 1,
   },
   featureTitle: {
-    color: '#F8FAFC',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 2,
+    ...type.bodyStrong,
   },
   featureDesc: {
-    color: '#94A3B8',
-    fontSize: 12,
-    lineHeight: 16,
+    ...type.caption,
+    color: colors.textSecondary,
+    marginTop: 1,
   },
   headerContainer: {
-    marginBottom: 16,
+    marginBottom: space.md,
   },
   title: {
-    fontSize: 20,
-    fontWeight: '800',
-    color: '#F8FAFC',
+    ...type.title,
     marginBottom: 4,
   },
   subtitle: {
-    fontSize: 13,
-    color: '#94A3B8',
+    ...type.body,
   },
   errorBox: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: colors.dangerSoft,
     borderWidth: 1,
-    borderColor: '#EF4444',
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 16,
+    borderColor: colors.danger,
+    borderRadius: radius.md,
+    padding: space.md,
+    marginBottom: space.md,
   },
   errorText: {
-    color: '#FCA5A5',
-    fontSize: 13,
-    lineHeight: 18,
+    ...type.body,
+    color: colors.danger,
+    fontWeight: '600',
+    flex: 1,
   },
   formCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#334155',
+    padding: space.xl,
   },
   inputGroup: {
-    marginBottom: 14,
+    marginBottom: space.md,
   },
   inputLabel: {
-    color: '#CBD5E1',
-    fontSize: 13,
+    ...type.caption,
+    color: colors.text,
     fontWeight: '600',
     marginBottom: 6,
   },
   input: {
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: '#334155',
-    borderRadius: 10,
-    paddingHorizontal: 14,
+    borderColor: colors.border,
+    paddingHorizontal: space.lg,
     paddingVertical: 12,
-    color: '#F8FAFC',
     fontSize: 15,
+    color: colors.text,
+  },
+  inputFocused: {
+    borderColor: colors.red,
+    backgroundColor: colors.surface,
   },
   submitButton: {
-    backgroundColor: '#0284C7',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    marginTop: 6,
-  },
-  submitButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-  disabledButton: {
-    opacity: 0.6,
+    marginTop: space.xs,
   },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 18,
+    marginVertical: space.lg,
   },
   dividerLine: {
     flex: 1,
     height: 1,
-    backgroundColor: '#334155',
+    backgroundColor: colors.border,
   },
   dividerText: {
-    color: '#64748B',
-    fontSize: 11,
-    fontWeight: '700',
-    marginHorizontal: 12,
+    ...type.overline,
+    marginHorizontal: space.md,
   },
-  googleButton: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  googleButtonText: {
-    color: '#0F172A',
-    fontSize: 14,
-    fontWeight: '700',
-  },
-  appleButton: {
-    backgroundColor: '#000000',
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#334155',
-  },
-  appleButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '600',
+  socialButton: {
+    marginBottom: space.sm,
   },
   switchModeButton: {
-    marginTop: 18,
+    marginTop: space.lg,
     alignItems: 'center',
-    paddingVertical: 10,
+    paddingVertical: space.sm,
   },
   switchModeText: {
-    color: '#38BDF8',
+    color: colors.red,
     fontSize: 14,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   publicLinksContainer: {
-    marginTop: 20,
-    alignItems: 'center',
-    gap: 12,
+    marginTop: space.xl,
+    paddingTop: space.lg,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
-    paddingTop: 16,
+    borderTopColor: colors.border,
+    alignItems: 'center',
+    gap: space.md,
   },
   publicLinkBtn: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: colors.surface,
+    paddingHorizontal: space.lg,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: '#334155',
+    borderColor: colors.border,
+  },
+  pressed: {
+    backgroundColor: colors.surfaceMuted,
   },
   publicLinkText: {
-    color: '#38BDF8',
+    color: colors.navy,
     fontSize: 13,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   footerLinkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: space.sm,
   },
   footerSubLink: {
-    color: '#64748B',
-    fontSize: 12,
+    ...type.caption,
   },
   footerDot: {
-    color: '#475569',
-    fontSize: 12,
+    ...type.caption,
   },
 });

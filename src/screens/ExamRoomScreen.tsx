@@ -3,7 +3,7 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   Alert,
   StatusBar,
@@ -20,6 +20,8 @@ import type {
   RootStackParamList,
   ExamStage,
 } from '../types/exam';
+import { Card, Badge, Button, Icon, Waveform } from '../components/ui';
+import { colors, radius, shadow, space, type } from '../theme';
 
 // Enable LayoutAnimation on Android
 if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -27,82 +29,6 @@ if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental
 }
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamRoom'>;
-
-/**
- * Animated Audio Waveform Bars Component
- * Renders pulsing bars that indicate live microphone/speech activity
- */
-const AudioWaveIndicator: React.FC<{
-  isSpeaking: boolean;
-  color?: string;
-  size?: 'small' | 'normal';
-}> = ({ isSpeaking, color = '#38BDF8', size = 'normal' }) => {
-  const anim1 = useRef(new Animated.Value(0.3)).current;
-  const anim2 = useRef(new Animated.Value(0.6)).current;
-  const anim3 = useRef(new Animated.Value(0.4)).current;
-  const anim4 = useRef(new Animated.Value(0.8)).current;
-
-  useEffect(() => {
-    let loop: Animated.CompositeAnimation | null = null;
-
-    if (isSpeaking) {
-      loop = Animated.loop(
-        Animated.stagger(120, [
-          Animated.sequence([
-            Animated.timing(anim1, { toValue: 1.0, duration: 250, useNativeDriver: false }),
-            Animated.timing(anim1, { toValue: 0.2, duration: 250, useNativeDriver: false }),
-          ]),
-          Animated.sequence([
-            Animated.timing(anim2, { toValue: 1.0, duration: 220, useNativeDriver: false }),
-            Animated.timing(anim2, { toValue: 0.3, duration: 220, useNativeDriver: false }),
-          ]),
-          Animated.sequence([
-            Animated.timing(anim3, { toValue: 1.0, duration: 280, useNativeDriver: false }),
-            Animated.timing(anim3, { toValue: 0.2, duration: 280, useNativeDriver: false }),
-          ]),
-          Animated.sequence([
-            Animated.timing(anim4, { toValue: 1.0, duration: 240, useNativeDriver: false }),
-            Animated.timing(anim4, { toValue: 0.3, duration: 240, useNativeDriver: false }),
-          ]),
-        ])
-      );
-      loop.start();
-    } else {
-      anim1.setValue(0.2);
-      anim2.setValue(0.2);
-      anim3.setValue(0.2);
-      anim4.setValue(0.2);
-    }
-
-    return () => {
-      if (loop) loop.stop();
-    };
-  }, [isSpeaking, anim1, anim2, anim3, anim4]);
-
-  const barHeight = size === 'small' ? 16 : 24;
-  const barWidth = size === 'small' ? 3 : 4;
-
-  return (
-    <View style={styles.waveContainer}>
-      {[anim1, anim2, anim3, anim4].map((anim, index) => (
-        <Animated.View
-          key={index}
-          style={[
-            styles.waveBar,
-            {
-              width: barWidth,
-              backgroundColor: isSpeaking ? color : '#475569',
-              height: anim.interpolate({
-                inputRange: [0, 1],
-                outputRange: [4, barHeight],
-              }),
-            },
-          ]}
-        />
-      ))}
-    </View>
-  );
-};
 
 export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   const {
@@ -153,6 +79,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
   const [isDrawerExpanded, setIsDrawerExpanded] = useState<boolean>(false);
   const transcriptScrollRef = useRef<React.ComponentRef<typeof ScrollView> | null>(null);
+  const pulseAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -160,6 +87,30 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Pulse animation while recording
+  useEffect(() => {
+    if (phase !== 'recording') {
+      pulseAnim.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, {
+          toValue: 1.16,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim, {
+          toValue: 1,
+          duration: 650,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [phase, pulseAnim]);
 
   // Auto-scroll transcript when new turns arrive
   useEffect(() => {
@@ -236,624 +187,704 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
         : 'Svar på oppfølgingsspørsmålene fra sensoren.';
 
   return (
-    <SafeAreaView style={styles.roomSafeArea}>
-      <StatusBar barStyle="light-content" />
+    <SafeAreaView edges={['top']} style={styles.topSafeArea}>
+      <StatusBar barStyle="light-content" backgroundColor={colors.navy} />
 
-      {/* Top App Bar & Stage Indicator */}
-      <View style={styles.topBar}>
-        <View style={styles.topBarLeft}>
-          <View style={styles.liveIndicator}>
-            <View
-              style={[
-                styles.liveDot,
-                phase === 'recording'
-                  ? styles.liveDotRecording
-                  : phase === 'thinking'
-                    ? styles.liveDotThinking
-                    : styles.liveDotConnected,
-              ]}
-            />
-            <Text style={styles.liveText}>{statusBadgeLabel}</Text>
-          </View>
-          <Text style={styles.timerText}>{formattedTimer}</Text>
-        </View>
-
-        <View style={styles.topBarCenter}>
-          <Text style={styles.examTitleText} numberOfLines={1}>
-            {topicTitle}
-          </Text>
-        </View>
-
-        <View style={styles.levelBadge}>
-          <Text style={styles.levelBadgeText}>{level}</Text>
-        </View>
-      </View>
-
-      {/* Phase Segmented Pills */}
-      <View style={styles.phaseContainer}>
-        {(['DEL_1', 'DEL_2', 'DEL_3'] as ExamStage[]).map((pillStage) => {
-          const isActive = stage === pillStage;
-          const label =
-            pillStage === 'DEL_1'
-              ? 'Del 1: Monolog'
-              : pillStage === 'DEL_2'
-                ? 'Del 2: Samtale'
-                : 'Del 3: Oppfølging';
-          return (
-            <View
-              key={pillStage}
-              style={[styles.phasePill, isActive && styles.phasePillActive]}
-            >
-              <Text
-                style={[styles.phasePillText, isActive && styles.phasePillTextActive]}
-              >
-                {label}
-              </Text>
+      {/* Solid Navy Top Bar & Stage Stepper */}
+      <View style={styles.navyHeader}>
+        <View style={styles.topBar}>
+          <View style={styles.topBarLeft}>
+            <View style={styles.liveIndicator}>
+              <View
+                style={[
+                  styles.liveDot,
+                  phase === 'recording'
+                    ? styles.liveDotRecording
+                    : phase === 'thinking'
+                      ? styles.liveDotThinking
+                      : styles.liveDotConnected,
+                ]}
+              />
+              <Text style={styles.liveText}>{statusBadgeLabel}</Text>
             </View>
-          );
-        })}
-      </View>
+            <Text style={styles.timerText}>{formattedTimer}</Text>
+          </View>
 
-      <ScrollView
-        style={styles.mainScroll}
-        contentContainerStyle={styles.mainScrollContent}
-        showsVerticalScrollIndicator={false}
-      >
-        {/* Current Task / Active Speech Card */}
-        <View style={styles.promptBannerCard}>
-          <Text style={styles.promptBannerLabel}>
-            {phase === 'speaking'
-              ? activeAiSpeaker === 'co_candidate'
-                ? 'AI Medkandidat sier:'
-                : 'Sensor sier:'
-              : `Oppgave (${stage === 'DEL_1' ? 'Del 1' : stage === 'DEL_2' ? 'Del 2' : 'Del 3'}):`}
-          </Text>
-          <Text style={styles.promptBannerText}>
-            {phase === 'speaking' && currentReplyText
-              ? currentReplyText
-              : currentTaskDescription}
-          </Text>
+          <View style={styles.topBarCenter}>
+            <Text style={styles.examTitleText} numberOfLines={1}>
+              {topicTitle}
+            </Text>
+          </View>
+
+          <View style={styles.levelBadge}>
+            <Text style={styles.levelBadgeText}>{level}</Text>
+          </View>
         </View>
 
-        {/* Participant Card 1: Sensor (AI Examiner) */}
+        {/* Phase Segmented Pills */}
+        <View style={styles.phaseContainer}>
+          {(['DEL_1', 'DEL_2', 'DEL_3'] as ExamStage[]).map((pillStage) => {
+            const isActive = stage === pillStage;
+            const label =
+              pillStage === 'DEL_1'
+                ? 'Del 1: Monolog'
+                : pillStage === 'DEL_2'
+                  ? 'Del 2: Samtale'
+                  : 'Del 3: Oppfølging';
+            return (
+              <View
+                key={pillStage}
+                style={[styles.phasePill, isActive && styles.phasePillActive]}
+              >
+                {isActive && <View style={styles.phaseDot} />}
+                <Text
+                  style={[styles.phasePillText, isActive && styles.phasePillTextActive]}
+                >
+                  {label}
+                </Text>
+              </View>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* Main Light Room Body */}
+      <View style={styles.roomBody}>
+        <ScrollView
+          style={styles.mainScroll}
+          contentContainerStyle={styles.mainScrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={styles.contentWrapper}>
+            {/* Current Task / Active Speech Card */}
+            <Card style={styles.promptBannerCard}>
+              <View style={styles.promptBannerHeader}>
+                <Icon
+                  name={phase === 'speaking' ? 'volume-high-outline' : 'document-text-outline'}
+                  size={16}
+                  color={colors.red}
+                />
+                <Text style={styles.promptBannerLabel}>
+                  {phase === 'speaking'
+                    ? activeAiSpeaker === 'co_candidate'
+                      ? 'AI Medkandidat sier:'
+                      : 'Sensor sier:'
+                    : `Oppgave (${stage === 'DEL_1' ? 'Del 1' : stage === 'DEL_2' ? 'Del 2' : 'Del 3'}):`}
+                </Text>
+              </View>
+              <Text style={styles.promptBannerText}>
+                {phase === 'speaking' && currentReplyText
+                  ? currentReplyText
+                  : currentTaskDescription}
+              </Text>
+            </Card>
+
+            {/* Participant Card 1: Sensor (AI Examiner) */}
+            <Card
+              style={[
+                styles.participantCard,
+                isExaminerSpeaking && styles.participantCardActiveNavy,
+              ]}
+            >
+              <View style={styles.participantHeader}>
+                <View style={styles.participantAvatarExaminer}>
+                  <Text style={styles.avatarLetter}>S</Text>
+                </View>
+                <View style={styles.participantMeta}>
+                  <Text style={styles.participantName}>Sensor (AI Sensor)</Text>
+                  <Text style={styles.participantRole}>Offisiell eksaminator (HK-dir)</Text>
+                </View>
+                <Badge
+                  label={isExaminerSpeaking ? 'Taler nå' : 'Lytter'}
+                  tone={isExaminerSpeaking ? 'solidNavy' : 'neutral'}
+                />
+              </View>
+
+              <View style={styles.participantWaveRow}>
+                <Waveform
+                  active={isExaminerSpeaking}
+                  color={isExaminerSpeaking ? colors.navy : colors.borderStrong}
+                  accentColor={isExaminerSpeaking ? colors.red : colors.borderStrong}
+                  height={24}
+                  barWidth={4}
+                />
+              </View>
+            </Card>
+
+            {/* Participant Card 2: Co-Candidate or Candidate Card */}
+            {coCandidateMode === 'AI_PEER' ? (
+              <Card
+                style={[
+                  styles.participantCard,
+                  (isAiCoCandidateSpeaking || isLocalSpeaking) &&
+                    styles.participantCardActiveRed,
+                ]}
+              >
+                <View style={styles.participantHeader}>
+                  <View style={styles.participantAvatarPeer}>
+                    <Text style={styles.avatarLetter}>M</Text>
+                  </View>
+                  <View style={styles.participantMeta}>
+                    <Text style={styles.participantName}>
+                      {stage === 'DEL_2' ? 'AI Medkandidat & Deg' : 'Kandidat (Deg)'}
+                    </Text>
+                    <Text style={styles.participantRole}>
+                      {stage === 'DEL_2'
+                        ? `Samtalepartner på nivå ${level}`
+                        : `Målnivå ${level}`}
+                    </Text>
+                  </View>
+                  <Badge
+                    label={
+                      isAiCoCandidateSpeaking
+                        ? 'Medkandidat taler'
+                        : isLocalSpeaking
+                          ? 'Du snakker nå'
+                          : 'Klar'
+                    }
+                    tone={
+                      isAiCoCandidateSpeaking
+                        ? 'navy'
+                        : isLocalSpeaking
+                          ? 'solidRed'
+                          : 'neutral'
+                    }
+                  />
+                </View>
+
+                <View style={styles.participantWaveRow}>
+                  <Waveform
+                    active={isAiCoCandidateSpeaking || isLocalSpeaking}
+                    color={
+                      isAiCoCandidateSpeaking || isLocalSpeaking
+                        ? colors.red
+                        : colors.borderStrong
+                    }
+                    accentColor={
+                      isAiCoCandidateSpeaking || isLocalSpeaking
+                        ? colors.navy
+                        : colors.borderStrong
+                    }
+                    height={24}
+                    barWidth={4}
+                  />
+                </View>
+              </Card>
+            ) : (
+              /* HUMAN_LOCAL Card: Two Humans Sharing Microphone */
+              <Card
+                style={[
+                  styles.participantCard,
+                  isLocalSpeaking && styles.participantCardActiveRed,
+                ]}
+              >
+                <View style={styles.participantHeader}>
+                  <View style={styles.participantAvatarLocal}>
+                    <Text style={styles.avatarLetterLocal}>2x</Text>
+                  </View>
+                  <View style={styles.participantMeta}>
+                    <Text style={styles.participantName}>
+                      Kandidat 1 & Kandidat 2 (Delt mikrofon)
+                    </Text>
+                    <Text style={styles.participantRole}>
+                      Aktiv taler:{' '}
+                      {candidateSpeaker === 'CANDIDATE_2' ? 'Kandidat 2' : 'Kandidat 1'}
+                    </Text>
+                  </View>
+                  <Badge
+                    label={isLocalSpeaking ? 'Mikrofon aktiv' : 'Klar'}
+                    tone={isLocalSpeaking ? 'solidRed' : 'neutral'}
+                  />
+                </View>
+
+                {/* Candidate 1 / Candidate 2 Selector for HUMAN_LOCAL */}
+                <View style={styles.speakerSelectorRow}>
+                  {(['CANDIDATE_1', 'CANDIDATE_2'] as const).map((cand) => {
+                    const selected = candidateSpeaker === cand;
+                    return (
+                      <Pressable
+                        key={cand}
+                        style={[
+                          styles.speakerSelectButton,
+                          selected && styles.speakerSelectButtonActive,
+                        ]}
+                        onPress={() => setCandidateSpeaker(cand)}
+                        disabled={phase === 'recording' || phase === 'thinking'}
+                      >
+                        <Icon
+                          name="person-outline"
+                          size={15}
+                          color={selected ? colors.white : colors.navy}
+                        />
+                        <Text
+                          style={[
+                            styles.speakerSelectButtonText,
+                            selected && styles.speakerSelectButtonTextActive,
+                          ]}
+                        >
+                          {cand === 'CANDIDATE_1' ? 'Kandidat 1' : 'Kandidat 2'}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.participantWaveRow}>
+                  <Waveform
+                    active={isLocalSpeaking}
+                    color={isLocalSpeaking ? colors.red : colors.borderStrong}
+                    accentColor={isLocalSpeaking ? colors.navy : colors.borderStrong}
+                    height={24}
+                    barWidth={4}
+                  />
+                </View>
+              </Card>
+            )}
+
+            {/* Hint / Retry Notification */}
+            {hintMessage && (
+              <View style={styles.hintBanner}>
+                <Icon name="information-circle" size={18} color={colors.navy} />
+                <Text style={styles.hintBannerText}>{hintMessage}</Text>
+              </View>
+            )}
+
+            {/* Error Banner with Retry */}
+            {phase === 'error' && errorMessage && (
+              <View style={styles.errorBanner}>
+                <View style={styles.errorHeaderRow}>
+                  <Icon name="alert-circle" size={18} color={colors.danger} />
+                  <Text style={styles.errorBannerTitle}>Tilkoblings- eller opptaksfeil</Text>
+                </View>
+                <Text style={styles.errorBannerText}>{errorMessage}</Text>
+                <Button
+                  title="Prøv på nytt"
+                  variant="primary"
+                  size="sm"
+                  icon="refresh"
+                  onPress={dismissError}
+                />
+              </View>
+            )}
+
+            {/* Turn-Based Microphone Action Card (Hero) */}
+            <Card style={styles.micControlCard}>
+              {phase === 'speaking' && (
+                <View style={styles.micStateBox}>
+                  <View style={styles.speakingBadgeCircle}>
+                    <Waveform
+                      active={true}
+                      color={colors.white}
+                      accentColor={colors.navy}
+                      height={26}
+                      barWidth={4}
+                    />
+                  </View>
+                  <Text style={styles.micStatusTitle}>
+                    {activeAiSpeaker === 'co_candidate'
+                      ? 'AI Medkandidat snakker...'
+                      : 'Sensor snakker...'}
+                  </Text>
+                  <Text style={styles.micStatusSubtext}>
+                    Lytt til oppgaven. Det blir din tur straks talen er ferdig.
+                  </Text>
+                  <Button
+                    title="Hopp over tale — Svar nå"
+                    variant="outline"
+                    size="md"
+                    iconRight="arrow-forward"
+                    onPress={skipCurrentSpeech}
+                  />
+                </View>
+              )}
+
+              {phase === 'listening' && (
+                <View style={styles.micStateBox}>
+                  <Pressable
+                    onPress={startRecording}
+                    accessibilityRole="button"
+                    accessibilityLabel="Trykk for å snakke"
+                    style={({ pressed }) => [
+                      styles.heroMicButton,
+                      pressed && styles.heroMicButtonPressed,
+                    ]}
+                  >
+                    <Icon name="mic" size={34} color={colors.white} />
+                  </Pressable>
+                  <Text style={styles.micStatusTitle}>Din tur til å snakke</Text>
+                  <Text style={styles.micStatusSubtext}>
+                    Trykk på mikrofonen for å starte opptaket. Opptaket stopper automatisk ved pause, eller når du trykker «Ferdig».
+                  </Text>
+                  <Button
+                    title="Trykk for å snakke"
+                    variant="primary"
+                    size="lg"
+                    icon="mic"
+                    fullWidth
+                    onPress={startRecording}
+                  />
+                </View>
+              )}
+
+              {phase === 'recording' && (
+                <View style={styles.micStateBox}>
+                  <View style={styles.recordingOrbWrapper}>
+                    <Animated.View
+                      style={[
+                        styles.recordingPulseRing,
+                        { transform: [{ scale: pulseAnim }] },
+                      ]}
+                    />
+                    <Pressable
+                      onPress={stopRecordingAndSubmit}
+                      accessibilityRole="button"
+                      accessibilityLabel="Ferdig å snakke — Send svar"
+                      style={styles.heroMicButtonRecording}
+                    >
+                      <Waveform
+                        active={true}
+                        color={colors.white}
+                        accentColor={colors.navy}
+                        height={28}
+                        barWidth={4}
+                      />
+                    </Pressable>
+                  </View>
+                  <Text style={styles.micStatusTitleRecording}>
+                    Opptak pågår ({formattedRecordingTime})
+                  </Text>
+                  <Text style={styles.micStatusSubtext}>
+                    Snakk tydelig på norsk. Trykk «Ferdig å snakke» når du har svart.
+                  </Text>
+                  <Button
+                    title="Ferdig å snakke — Send svar"
+                    variant="secondary"
+                    size="lg"
+                    icon="stop"
+                    fullWidth
+                    onPress={stopRecordingAndSubmit}
+                  />
+                </View>
+              )}
+
+              {phase === 'thinking' && (
+                <View style={styles.micStateBox}>
+                  <ActivityIndicator size="large" color={colors.red} />
+                  <Text style={[styles.micStatusTitle, { marginTop: space.sm }]}>
+                    Behandler svaret ditt...
+                  </Text>
+                  <Text style={styles.micStatusSubtext}>
+                    Transkriberer norsk tale og genererer neste respons
+                  </Text>
+                </View>
+              )}
+
+              {phase === 'done' && (
+                <View style={styles.micStateBox}>
+                  <ActivityIndicator size="small" color={colors.success} />
+                  <Text style={[styles.micStatusTitle, { marginTop: space.xs }]}>
+                    Prøven er fullført! Henter vurdering...
+                  </Text>
+                </View>
+              )}
+            </Card>
+
+            {/* Local Duo Mode (HUMAN_LOCAL) Moderator Controls during Del 2 */}
+            {coCandidateMode === 'HUMAN_LOCAL' && stage === 'DEL_2' && (
+              <Card style={styles.moderatorBox}>
+                <View style={styles.moderatorIconRow}>
+                  <Icon name="people" size={20} color={colors.navy} />
+                  <Text style={styles.moderatorTitle}>
+                    Del 2: Samtale mellom Kandidat 1 og 2
+                  </Text>
+                </View>
+
+                <Text style={styles.moderatorDescription}>
+                  Ta opp flere replikker mellom Kandidat 1 og Kandidat 2. Sensoren lytter passivt uten å avbryte. Når dere er ferdige med diskusjonen, trykk på knappen under for å gå til Del 3.
+                </Text>
+
+                <Button
+                  title="Fullfør diskusjon — Gå til Del 3"
+                  variant="secondary"
+                  size="md"
+                  iconRight="arrow-forward"
+                  fullWidth
+                  disabled={phase === 'thinking'}
+                  onPress={endHumanDiscussion}
+                />
+              </Card>
+            )}
+          </View>
+        </ScrollView>
+
+        {/* Live Transcript Drawer */}
         <View
           style={[
-            styles.participantCard,
-            isExaminerSpeaking && styles.participantCardActive,
+            styles.transcriptDrawer,
+            isDrawerExpanded && styles.transcriptDrawerExpanded,
           ]}
         >
-          <View style={styles.participantHeader}>
-            <View style={styles.participantAvatarExaminer}>
-              <Text style={styles.avatarLetter}>S</Text>
+          <Pressable
+            style={styles.transcriptDrawerHandle}
+            onPress={toggleDrawer}
+          >
+            <View style={styles.drawerHandleBar} />
+            <View style={styles.transcriptHeaderRow}>
+              <View style={styles.transcriptTitleGroup}>
+                <Icon name="chatbubbles-outline" size={16} color={colors.navy} />
+                <Text style={styles.transcriptHeaderTitle}>
+                  Transkripsjon ({transcripts.length})
+                </Text>
+              </View>
+              <View style={styles.transcriptHintGroup}>
+                <Text style={styles.drawerExpandHint}>
+                  {isDrawerExpanded ? 'Skjul' : 'Vis transkripsjon'}
+                </Text>
+                <Icon
+                  name={isDrawerExpanded ? 'chevron-down' : 'chevron-up'}
+                  size={16}
+                  color={colors.red}
+                />
+              </View>
             </View>
-            <View style={styles.participantMeta}>
-              <Text style={styles.participantName}>Sensor (AI Sensor)</Text>
-              <Text style={styles.participantRole}>Offisiell eksaminator (HK-dir)</Text>
-            </View>
-            <View
-              style={[
-                styles.statusBadge,
-                isExaminerSpeaking ? styles.statusBadgeSpeaking : styles.statusBadgeIdle,
-              ]}
+          </Pressable>
+
+          {isDrawerExpanded && (
+            <ScrollView
+              ref={transcriptScrollRef}
+              style={styles.transcriptScroll}
+              contentContainerStyle={styles.transcriptScrollContent}
+              showsVerticalScrollIndicator={true}
             >
-              <Text
-                style={[
-                  styles.statusBadgeText,
-                  isExaminerSpeaking && styles.statusBadgeTextSpeaking,
-                ]}
-              >
-                {isExaminerSpeaking ? 'Taler nå' : 'Lytter'}
-              </Text>
-            </View>
-          </View>
+              {transcripts.length === 0 ? (
+                <Text style={styles.emptyTranscriptText}>
+                  Transkripsjon vises her etter hvert som deltakerne snakker...
+                </Text>
+              ) : (
+                transcripts.map((turn, index) => {
+                  const isExaminer = turn.role === 'EXAMINER';
+                  const isPeer = turn.role === 'AI_COCANDIDATE';
+                  const isCandidate2 = turn.role === 'CANDIDATE_2';
 
-          <View style={styles.participantWaveRow}>
-            <AudioWaveIndicator isSpeaking={isExaminerSpeaking} color="#38BDF8" />
-          </View>
-        </View>
-
-        {/* Participant Card 2: Co-Candidate or Candidate Card */}
-        {coCandidateMode === 'AI_PEER' ? (
-          <View
-            style={[
-              styles.participantCard,
-              isAiCoCandidateSpeaking && styles.participantCardActiveCo,
-              isLocalSpeaking && styles.participantCardActiveLocal,
-            ]}
-          >
-            <View style={styles.participantHeader}>
-              <View style={styles.participantAvatarPeer}>
-                <Text style={styles.avatarLetter}>M</Text>
-              </View>
-              <View style={styles.participantMeta}>
-                <Text style={styles.participantName}>
-                  {stage === 'DEL_2' ? 'AI Medkandidat & Deg' : 'Kandidat (Deg)'}
-                </Text>
-                <Text style={styles.participantRole}>
-                  {stage === 'DEL_2'
-                    ? `Samtalepartner på nivå ${level}`
-                    : `Målnivå ${level}`}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isAiCoCandidateSpeaking
-                    ? styles.statusBadgeSpeakingCo
-                    : isLocalSpeaking
-                      ? styles.statusBadgeSpeakingLocal
-                      : styles.statusBadgeIdle,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    (isAiCoCandidateSpeaking || isLocalSpeaking) &&
-                      styles.statusBadgeTextSpeaking,
-                  ]}
-                >
-                  {isAiCoCandidateSpeaking
-                    ? 'Medkandidat taler'
-                    : isLocalSpeaking
-                      ? 'Du snakker nå'
-                      : 'Klar'}
-                </Text>
-              </View>
-            </View>
-
-            <View style={styles.participantWaveRow}>
-              <AudioWaveIndicator
-                isSpeaking={isAiCoCandidateSpeaking || isLocalSpeaking}
-                color={isAiCoCandidateSpeaking ? '#A855F7' : '#10B981'}
-              />
-            </View>
-          </View>
-        ) : (
-          /* HUMAN_LOCAL Card: Two Humans Sharing Microphone */
-          <View
-            style={[
-              styles.participantCard,
-              isLocalSpeaking && styles.participantCardActiveLocal,
-            ]}
-          >
-            <View style={styles.participantHeader}>
-              <View style={styles.participantAvatarLocal}>
-                <Text style={styles.avatarLetter}>2x</Text>
-              </View>
-              <View style={styles.participantMeta}>
-                <Text style={styles.participantName}>
-                  Kandidat 1 & Kandidat 2 (Delt mikrofon)
-                </Text>
-                <Text style={styles.participantRole}>
-                  Aktiv taler:{' '}
-                  {candidateSpeaker === 'CANDIDATE_2' ? 'Kandidat 2' : 'Kandidat 1'}
-                </Text>
-              </View>
-              <View
-                style={[
-                  styles.statusBadge,
-                  isLocalSpeaking ? styles.statusBadgeSpeakingLocal : styles.statusBadgeIdle,
-                ]}
-              >
-                <Text
-                  style={[
-                    styles.statusBadgeText,
-                    isLocalSpeaking && styles.statusBadgeTextSpeakingLocal,
-                  ]}
-                >
-                  {isLocalSpeaking ? 'Mikrofon aktiv' : 'Klar'}
-                </Text>
-              </View>
-            </View>
-
-            {/* Candidate 1 / Candidate 2 Selector for HUMAN_LOCAL */}
-            <View style={styles.speakerSelectorRow}>
-              {(['CANDIDATE_1', 'CANDIDATE_2'] as const).map((cand) => {
-                const selected = candidateSpeaker === cand;
-                return (
-                  <TouchableOpacity
-                    key={cand}
-                    style={[
-                      styles.speakerSelectButton,
-                      selected && styles.speakerSelectButtonActive,
-                    ]}
-                    onPress={() => setCandidateSpeaker(cand)}
-                    disabled={phase === 'recording' || phase === 'thinking'}
-                    activeOpacity={0.8}
-                  >
-                    <Text
+                  return (
+                    <View
+                      key={turn.id || index}
                       style={[
-                        styles.speakerSelectButtonText,
-                        selected && styles.speakerSelectButtonTextActive,
+                        styles.turnCard,
+                        isExaminer
+                          ? styles.turnBubbleExaminer
+                          : isPeer
+                            ? styles.turnBubblePeer
+                            : styles.turnBubbleCandidate,
                       ]}
                     >
-                      {cand === 'CANDIDATE_1' ? '👤 Kandidat 1' : '👤 Kandidat 2'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            <View style={styles.participantWaveRow}>
-              <AudioWaveIndicator isSpeaking={isLocalSpeaking} color="#10B981" />
-            </View>
-          </View>
-        )}
-
-        {/* Hint / Retry Notification */}
-        {hintMessage && (
-          <View style={styles.hintBanner}>
-            <Text style={styles.hintBannerText}>{hintMessage}</Text>
-          </View>
-        )}
-
-        {/* Error Banner with Retry */}
-        {phase === 'error' && errorMessage && (
-          <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerTitle}>Tilkoblings- eller opptaksfeil</Text>
-            <Text style={styles.errorBannerText}>{errorMessage}</Text>
-            <TouchableOpacity
-              style={styles.errorRetryButton}
-              onPress={dismissError}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.errorRetryButtonText}>Prøv på nytt</Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Turn-Based Microphone Action Card */}
-        <View style={styles.micControlCard}>
-          {phase === 'speaking' && (
-            <View style={styles.micStateBox}>
-              <Text style={styles.micStatusTitle}>
-                {activeAiSpeaker === 'co_candidate'
-                  ? '🔊 AI Medkandidat snakker...'
-                  : '🔊 Sensor snakker...'}
-              </Text>
-              <Text style={styles.micStatusSubtext}>
-                Lytt til oppgaven. Det blir din tur straks talen er ferdig.
-              </Text>
-              <TouchableOpacity
-                style={styles.skipSpeechButton}
-                onPress={skipCurrentSpeech}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.skipSpeechButtonText}>
-                  Hopp over tale — Svar nå →
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {phase === 'listening' && (
-            <View style={styles.micStateBox}>
-              <Text style={styles.micStatusTitle}>Din tur til å snakke</Text>
-              <Text style={styles.micStatusSubtext}>
-                Trykk på knappen under for å starte opptaket. Opptaket stopper automatisk ved pause, eller når du trykker «Ferdig».
-              </Text>
-              <TouchableOpacity
-                style={styles.recordStartButton}
-                onPress={startRecording}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.recordStartButtonText}>
-                  🎙️ Trykk for å snakke
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {phase === 'recording' && (
-            <View style={styles.micStateBox}>
-              <Text style={styles.micStatusTitleRecording}>
-                🔴 Opptak pågår ({formattedRecordingTime})
-              </Text>
-              <Text style={styles.micStatusSubtext}>
-                Snakk tydelig på norsk. Trykk «Ferdig å snakke» når du har svart.
-              </Text>
-              <TouchableOpacity
-                style={styles.recordStopButton}
-                onPress={stopRecordingAndSubmit}
-                activeOpacity={0.85}
-              >
-                <Text style={styles.recordStopButtonText}>
-                  ⏹ Ferdig å snakke — Send svar
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {phase === 'thinking' && (
-            <View style={styles.micStateBox}>
-              <ActivityIndicator size="large" color="#38BDF8" />
-              <Text style={[styles.micStatusTitle, { marginTop: 10 }]}>
-                Behandler svaret ditt...
-              </Text>
-              <Text style={styles.micStatusSubtext}>
-                Transkriberer norsk tale og genererer neste respons
-              </Text>
-            </View>
-          )}
-
-          {phase === 'done' && (
-            <View style={styles.micStateBox}>
-              <ActivityIndicator size="small" color="#10B981" />
-              <Text style={[styles.micStatusTitle, { marginTop: 8 }]}>
-                Prøven er fullført! Henter vurdering...
-              </Text>
-            </View>
+                      <View style={styles.turnHeader}>
+                        <Badge
+                          label={
+                            isExaminer
+                              ? 'Sensor'
+                              : isPeer
+                                ? 'AI Medkandidat'
+                                : isCandidate2
+                                  ? 'Kandidat 2'
+                                  : 'Kandidat 1'
+                          }
+                          tone={isExaminer ? 'solidNavy' : isPeer ? 'neutral' : 'solidRed'}
+                        />
+                        <Text style={styles.turnTimestamp}>
+                          {new Date(turn.timestamp).toLocaleTimeString([], {
+                            minute: '2-digit',
+                            second: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                      <Text style={styles.turnText}>{turn.text}</Text>
+                    </View>
+                  );
+                })
+              )}
+            </ScrollView>
           )}
         </View>
 
-        {/* Local Duo Mode (HUMAN_LOCAL) Moderator Controls during Del 2 */}
-        {coCandidateMode === 'HUMAN_LOCAL' && stage === 'DEL_2' && (
-          <View style={styles.moderatorBox}>
-            <View style={styles.moderatorIconRow}>
-              <Text style={styles.moderatorIcon}>👥</Text>
-              <Text style={styles.moderatorTitle}>Del 2: Samtale mellom Kandidat 1 og 2</Text>
-            </View>
-
-            <Text style={styles.moderatorDescription}>
-              Ta opp flere replikker mellom Kandidat 1 og Kandidat 2. Sensoren lytter passivt uten å avbryte. Når dere er ferdige med diskusjonen, trykk på knappen under for å gå til Del 3.
-            </Text>
-
-            <TouchableOpacity
-              style={[
-                styles.endDiscussionButton,
-                phase === 'thinking' && styles.endDiscussionButtonDisabled,
-              ]}
-              onPress={endHumanDiscussion}
-              disabled={phase === 'thinking'}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.endDiscussionButtonText}>
-                Fullfør diskusjon — Gå til Del 3 (Oppfølgingsspørsmål)
-              </Text>
-            </TouchableOpacity>
+        {/* Bottom Action Footer */}
+        <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
+          <View style={styles.bottomBarInner}>
+            <Button
+              title="Avslutt prøve og få vurdering"
+              variant="outline"
+              size="md"
+              icon="flag-outline"
+              fullWidth
+              onPress={handleConfirmEndExam}
+            />
           </View>
-        )}
-      </ScrollView>
-
-      {/* Live Transcript Drawer */}
-      <View
-        style={[
-          styles.transcriptDrawer,
-          isDrawerExpanded && styles.transcriptDrawerExpanded,
-        ]}
-      >
-        <TouchableOpacity
-          style={styles.transcriptDrawerHandle}
-          onPress={toggleDrawer}
-          activeOpacity={0.7}
-        >
-          <View style={styles.drawerHandleBar} />
-          <View style={styles.transcriptHeaderRow}>
-            <Text style={styles.transcriptHeaderTitle}>
-              Transkripsjon ({transcripts.length})
-            </Text>
-            <Text style={styles.drawerExpandHint}>
-              {isDrawerExpanded ? 'Skjul ▾' : 'Vis transkripsjon ▴'}
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        {isDrawerExpanded && (
-          <ScrollView
-            ref={transcriptScrollRef}
-            style={styles.transcriptScroll}
-            contentContainerStyle={styles.transcriptScrollContent}
-            showsVerticalScrollIndicator={true}
-          >
-            {transcripts.length === 0 ? (
-              <Text style={styles.emptyTranscriptText}>
-                Transkripsjon vises her etter hvert som deltakerne snakker...
-              </Text>
-            ) : (
-              transcripts.map((turn, index) => {
-                const isExaminer = turn.role === 'EXAMINER';
-                const isPeer = turn.role === 'AI_COCANDIDATE';
-                const isCandidate2 = turn.role === 'CANDIDATE_2';
-
-                return (
-                  <View key={turn.id || index} style={styles.turnCard}>
-                    <View style={styles.turnHeader}>
-                      <View
-                        style={[
-                          styles.turnRoleBadge,
-                          isExaminer && styles.turnRoleExaminer,
-                          isPeer && styles.turnRolePeer,
-                          isCandidate2 && styles.turnRoleCand2,
-                        ]}
-                      >
-                        <Text style={styles.turnRoleBadgeText}>
-                          {isExaminer
-                            ? 'Sensor'
-                            : isPeer
-                              ? 'AI Medkandidat'
-                              : isCandidate2
-                                ? 'Kandidat 2'
-                                : 'Kandidat 1'}
-                        </Text>
-                      </View>
-                      <Text style={styles.turnTimestamp}>
-                        {new Date(turn.timestamp).toLocaleTimeString([], {
-                          minute: '2-digit',
-                          second: '2-digit',
-                        })}
-                      </Text>
-                    </View>
-                    <Text style={styles.turnText}>{turn.text}</Text>
-                  </View>
-                );
-              })
-            )}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* Bottom Action Footer */}
-      <View style={styles.bottomBar}>
-        <TouchableOpacity
-          style={styles.endExamButton}
-          onPress={handleConfirmEndExam}
-          activeOpacity={0.8}
-        >
-          <Text style={styles.endExamButtonText}>
-            Avslutt prøve og få vurdering
-          </Text>
-        </TouchableOpacity>
+        </SafeAreaView>
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  roomSafeArea: {
+  topSafeArea: {
     flex: 1,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.navy,
+  },
+  navyHeader: {
+    backgroundColor: colors.navy,
+    paddingBottom: space.md,
   },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-    backgroundColor: '#0F172A',
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+    gap: space.sm,
   },
   topBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: space.sm,
   },
   liveIndicator: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 8,
+    backgroundColor: colors.navyLight,
+    paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: radius.pill,
     gap: 6,
   },
   liveDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#94A3B8',
+    backgroundColor: colors.white,
   },
   liveDotConnected: {
-    backgroundColor: '#10B981',
+    backgroundColor: colors.success,
   },
   liveDotRecording: {
-    backgroundColor: '#EF4444',
+    backgroundColor: colors.red,
   },
   liveDotThinking: {
-    backgroundColor: '#F59E0B',
+    backgroundColor: colors.gold,
   },
   liveText: {
+    color: colors.white,
     fontSize: 11,
     fontWeight: '800',
-    color: '#F8FAFC',
+    letterSpacing: 0.5,
   },
   timerText: {
+    color: colors.white,
     fontSize: 14,
     fontWeight: '700',
-    color: '#38BDF8',
     fontVariant: ['tabular-nums'],
   },
   topBarCenter: {
     flex: 1,
-    marginHorizontal: 12,
+    marginHorizontal: space.xs,
   },
   examTitleText: {
+    color: colors.white,
     fontSize: 14,
     fontWeight: '600',
-    color: '#E2E8F0',
     textAlign: 'center',
   },
   levelBadge: {
-    backgroundColor: '#0284C7',
+    backgroundColor: colors.red,
     paddingHorizontal: 10,
     paddingVertical: 4,
-    borderRadius: 6,
+    borderRadius: radius.pill,
   },
   levelBadgeText: {
-    color: '#FFFFFF',
-    fontWeight: '800',
+    color: colors.white,
     fontSize: 12,
+    fontWeight: '800',
   },
   phaseContainer: {
     flexDirection: 'row',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: '#1E293B',
-    gap: 8,
+    paddingHorizontal: space.lg,
+    paddingTop: space.xs,
+    gap: space.xs,
   },
   phasePill: {
     flex: 1,
-    paddingVertical: 6,
-    borderRadius: 6,
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#0F172A',
+    justifyContent: 'center',
+    gap: 5,
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    borderRadius: radius.pill,
+    backgroundColor: colors.navyLight,
   },
   phasePillActive: {
-    backgroundColor: '#38BDF8',
+    backgroundColor: colors.red,
+  },
+  phaseDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.white,
   },
   phasePillText: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#94A3B8',
+    color: colors.navySoft,
   },
   phasePillTextActive: {
-    color: '#0F172A',
+    color: colors.white,
     fontWeight: '800',
+  },
+  roomBody: {
+    flex: 1,
+    backgroundColor: colors.bg,
   },
   mainScroll: {
     flex: 1,
   },
   mainScrollContent: {
-    padding: 16,
-    gap: 14,
+    padding: space.lg,
+    paddingBottom: space.xl,
+  },
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    gap: space.md,
   },
   promptBannerCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 14,
     borderLeftWidth: 4,
-    borderLeftColor: '#38BDF8',
+    borderLeftColor: colors.red,
+  },
+  promptBannerHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginBottom: 6,
   },
   promptBannerLabel: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#38BDF8',
-    textTransform: 'uppercase',
-    marginBottom: 4,
+    ...type.overline,
+    color: colors.red,
   },
   promptBannerText: {
-    fontSize: 14,
-    color: '#F8FAFC',
-    lineHeight: 20,
+    ...type.bodyStrong,
+    fontSize: 15,
+    lineHeight: 22,
   },
   participantCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#334155',
+    padding: space.lg,
   },
-  participantCardActive: {
-    borderColor: '#38BDF8',
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+  participantCardActiveNavy: {
+    borderColor: colors.navy,
+    borderWidth: 1.5,
   },
-  participantCardActiveCo: {
-    borderColor: '#A855F7',
-    backgroundColor: 'rgba(168, 85, 247, 0.08)',
-  },
-  participantCardActiveLocal: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.08)',
+  participantCardActiveRed: {
+    borderColor: colors.red,
+    borderWidth: 1.5,
   },
   participantHeader: {
     flexDirection: 'row',
@@ -863,387 +894,316 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#0369A1',
+    backgroundColor: colors.navy,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: space.md,
   },
   participantAvatarPeer: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#7E22CE',
+    backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: space.md,
   },
   participantAvatarLocal: {
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#047857',
+    backgroundColor: colors.surface,
+    borderWidth: 2,
+    borderColor: colors.navy,
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: space.md,
   },
   avatarLetter: {
-    color: '#FFFFFF',
-    fontSize: 18,
+    color: colors.white,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  avatarLetterLocal: {
+    color: colors.navy,
+    fontSize: 14,
     fontWeight: '800',
   },
   participantMeta: {
     flex: 1,
-    marginLeft: 12,
+    marginRight: space.sm,
   },
   participantName: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    ...type.bodyStrong,
   },
   participantRole: {
-    fontSize: 12,
-    color: '#94A3B8',
-    marginTop: 2,
+    ...type.caption,
+    marginTop: 1,
   },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  statusBadgeIdle: {
-    backgroundColor: '#334155',
-  },
-  statusBadgeSpeaking: {
-    backgroundColor: '#0284C7',
-  },
-  statusBadgeSpeakingCo: {
-    backgroundColor: '#9333EA',
-  },
-  statusBadgeSpeakingLocal: {
-    backgroundColor: '#059669',
-  },
-  statusBadgeText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  statusBadgeTextSpeaking: {
-    color: '#FFFFFF',
-  },
-  statusBadgeTextSpeakingLocal: {
-    color: '#FFFFFF',
+  participantWaveRow: {
+    marginTop: space.md,
+    paddingTop: space.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    alignItems: 'center',
   },
   speakerSelectorRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 12,
+    gap: space.sm,
+    marginTop: space.md,
   },
   speakerSelectButton: {
     flex: 1,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#475569',
-    backgroundColor: '#0F172A',
-    alignItems: 'center',
-  },
-  speakerSelectButtonActive: {
-    borderColor: '#10B981',
-    backgroundColor: 'rgba(16, 185, 129, 0.18)',
-  },
-  speakerSelectButtonText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#94A3B8',
-  },
-  speakerSelectButtonTextActive: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  participantWaveRow: {
-    marginTop: 12,
-    height: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  waveContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    height: 24,
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceMuted,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
-  waveBar: {
-    borderRadius: 2,
+  speakerSelectButtonActive: {
+    backgroundColor: colors.navy,
+    borderColor: colors.navy,
+  },
+  speakerSelectButtonText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.navy,
+  },
+  speakerSelectButtonTextActive: {
+    color: colors.white,
   },
   hintBanner: {
-    backgroundColor: 'rgba(245, 158, 11, 0.15)',
-    borderRadius: 10,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: '#F59E0B',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: colors.navySoft,
+    borderRadius: radius.md,
+    padding: space.md,
   },
   hintBannerText: {
-    color: '#FDE68A',
-    fontSize: 13,
-    lineHeight: 18,
-    textAlign: 'center',
+    ...type.caption,
+    color: colors.navy,
+    fontWeight: '600',
+    flex: 1,
   },
   errorBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
-    borderRadius: 12,
-    padding: 14,
+    backgroundColor: colors.dangerSoft,
+    borderRadius: radius.lg,
+    padding: space.lg,
     borderWidth: 1,
-    borderColor: '#EF4444',
+    borderColor: colors.danger,
+    gap: space.xs,
+  },
+  errorHeaderRow: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: space.xs,
   },
   errorBannerTitle: {
-    color: '#FCA5A5',
-    fontSize: 14,
-    fontWeight: '700',
-    marginBottom: 4,
+    ...type.bodyStrong,
+    color: colors.danger,
   },
   errorBannerText: {
-    color: '#FECACA',
-    fontSize: 13,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  errorRetryButton: {
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-  },
-  errorRetryButtonText: {
-    color: '#FFFFFF',
-    fontSize: 13,
-    fontWeight: '700',
+    ...type.caption,
+    color: colors.text,
+    marginBottom: space.xs,
   },
   micControlCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 16,
-    padding: 18,
-    borderWidth: 1.5,
-    borderColor: '#334155',
-    alignItems: 'center',
+    padding: space.xl,
   },
   micStateBox: {
-    width: '100%',
     alignItems: 'center',
+    gap: space.sm,
+  },
+  speakingBadgeCircle: {
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.xs,
+  },
+  heroMicButton: {
+    width: 76,
+    height: 76,
+    borderRadius: 38,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.xs,
+    ...shadow.raised,
+  },
+  heroMicButtonPressed: {
+    backgroundColor: colors.redPressed,
+  },
+  recordingOrbWrapper: {
+    width: 92,
+    height: 92,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.xs,
+  },
+  recordingPulseRing: {
+    position: 'absolute',
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: colors.redSoft,
+    borderWidth: 2,
+    borderColor: colors.red,
+  },
+  heroMicButtonRecording: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: colors.red,
+    alignItems: 'center',
+    justifyContent: 'center',
+    ...shadow.raised,
   },
   micStatusTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#F8FAFC',
+    ...type.heading,
     textAlign: 'center',
   },
   micStatusTitleRecording: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#34D399',
+    ...type.heading,
+    color: colors.red,
     textAlign: 'center',
   },
   micStatusSubtext: {
-    fontSize: 12,
-    color: '#94A3B8',
+    ...type.caption,
+    color: colors.textSecondary,
     textAlign: 'center',
-    marginTop: 4,
-    marginBottom: 14,
-    lineHeight: 18,
-  },
-  recordStartButton: {
-    width: '100%',
-    backgroundColor: '#0284C7',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recordStartButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  recordStopButton: {
-    width: '100%',
-    backgroundColor: '#059669',
-    paddingVertical: 16,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  recordStopButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  skipSpeechButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#475569',
-    backgroundColor: '#0F172A',
-  },
-  skipSpeechButtonText: {
-    color: '#38BDF8',
-    fontSize: 12,
-    fontWeight: '600',
+    marginBottom: space.xs,
   },
   moderatorBox: {
-    backgroundColor: '#1E1B4B',
-    borderRadius: 16,
-    padding: 16,
-    borderWidth: 1.5,
-    borderColor: '#6366F1',
+    backgroundColor: colors.navySoft,
+    borderColor: colors.navy,
+    gap: space.sm,
   },
   moderatorIconRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 8,
-  },
-  moderatorIcon: {
-    fontSize: 18,
+    gap: space.sm,
   },
   moderatorTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#E0E7FF',
+    ...type.bodyStrong,
+    flex: 1,
   },
   moderatorDescription: {
-    fontSize: 13,
-    color: '#C7D2FE',
-    lineHeight: 19,
-    marginBottom: 14,
-  },
-  endDiscussionButton: {
-    backgroundColor: '#4F46E5',
-    borderRadius: 10,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  endDiscussionButtonDisabled: {
-    backgroundColor: '#3730A3',
-  },
-  endDiscussionButtonText: {
-    color: '#FFFFFF',
-    fontSize: 14,
-    fontWeight: '700',
-    textAlign: 'center',
+    ...type.caption,
+    color: colors.textSecondary,
+    marginBottom: space.xs,
   },
   transcriptDrawer: {
-    backgroundColor: '#1E293B',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#334155',
-    maxHeight: 180,
+    borderTopColor: colors.border,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    maxHeight: 56,
   },
   transcriptDrawerExpanded: {
-    maxHeight: 320,
+    maxHeight: 280,
   },
   transcriptDrawerHandle: {
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    paddingBottom: space.md,
     alignItems: 'center',
-    paddingTop: 8,
-    paddingBottom: 10,
-    paddingHorizontal: 16,
   },
   drawerHandleBar: {
     width: 36,
     height: 4,
     borderRadius: 2,
-    backgroundColor: '#475569',
-    marginBottom: 8,
+    backgroundColor: colors.borderStrong,
+    marginBottom: space.xs,
   },
   transcriptHeaderRow: {
-    width: '100%',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    width: '100%',
+    maxWidth: 680,
+  },
+  transcriptTitleGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   transcriptHeaderTitle: {
-    fontSize: 13,
+    ...type.caption,
+    color: colors.text,
     fontWeight: '700',
-    color: '#E2E8F0',
+  },
+  transcriptHintGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
   drawerExpandHint: {
     fontSize: 12,
-    color: '#38BDF8',
-    fontWeight: '600',
+    color: colors.red,
+    fontWeight: '700',
   },
   transcriptScroll: {
-    flex: 1,
+    paddingHorizontal: space.lg,
   },
   transcriptScrollContent: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 10,
+    paddingBottom: space.md,
+    gap: space.sm,
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
   },
   emptyTranscriptText: {
-    color: '#64748B',
-    fontSize: 13,
-    fontStyle: 'italic',
+    ...type.caption,
     textAlign: 'center',
-    paddingVertical: 16,
+    paddingVertical: space.lg,
   },
   turnCard: {
-    backgroundColor: '#0F172A',
-    borderRadius: 8,
-    padding: 10,
-    borderWidth: 1,
-    borderColor: '#334155',
+    borderRadius: radius.md,
+    padding: space.md,
+  },
+  turnBubbleExaminer: {
+    backgroundColor: colors.navySoft,
+  },
+  turnBubbleCandidate: {
+    backgroundColor: colors.redSoft,
+  },
+  turnBubblePeer: {
+    backgroundColor: colors.surfaceMuted,
   },
   turnHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  turnRoleBadge: {
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  turnRoleExaminer: {
-    backgroundColor: '#0284C7',
-  },
-  turnRolePeer: {
-    backgroundColor: '#9333EA',
-  },
-  turnRoleCand2: {
-    backgroundColor: '#D97706',
-  },
-  turnRoleBadgeText: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: '#FFFFFF',
+    marginBottom: 6,
   },
   turnTimestamp: {
-    fontSize: 10,
-    color: '#64748B',
+    fontSize: 11,
+    color: colors.textMuted,
   },
   turnText: {
-    fontSize: 13,
-    color: '#F1F5F9',
-    lineHeight: 18,
+    ...type.body,
+    color: colors.text,
+    fontSize: 14,
   },
   bottomBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#0F172A',
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
+    borderTopColor: colors.border,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
   },
-  endExamButton: {
-    backgroundColor: '#DC2626',
-    borderRadius: 12,
-    paddingVertical: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  endExamButtonText: {
-    color: '#FFFFFF',
-    fontSize: 15,
-    fontWeight: '700',
+  bottomBarInner: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
   },
 });

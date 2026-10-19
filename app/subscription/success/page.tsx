@@ -1,79 +1,89 @@
-import React, { Suspense } from 'react';
-import Link from 'next/link';
+import React from 'react';
 
 export default function SubscriptionSuccessPage({
   searchParams,
 }: {
   searchParams: Promise<{ session_id?: string }>;
 }) {
+  void searchParams;
   return (
-    <main
-      style={{
-        fontFamily: 'system-ui, -apple-system, sans-serif',
-        minHeight: '100vh',
-        backgroundColor: '#0B0F19',
-        color: '#F8FAFC',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '2rem',
-      }}
-    >
+    <main className="snakkly-center-shell">
       <div
+        className="snakkly-card"
         style={{
-          maxWidth: '480px',
+          maxWidth: '460px',
           width: '100%',
-          backgroundColor: '#1E293B',
-          borderRadius: '16px',
-          padding: '2.5rem',
+          padding: '2.5rem 2rem',
           textAlign: 'center',
-          border: '1px solid #334155',
-          boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5)',
         }}
       >
+        <div
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: '0.5rem',
+            marginBottom: '1.5rem',
+          }}
+        >
+          <img src="/brand/snakkly-logo.svg" alt="Snakkly" width={36} height={38} />
+          <span
+            style={{
+              fontSize: '1.35rem',
+              fontWeight: 800,
+              letterSpacing: '-0.03em',
+            }}
+          >
+            <span style={{ color: 'var(--navy)' }}>Snakk</span>
+            <span style={{ color: 'var(--red)' }}>ly</span>
+          </span>
+        </div>
+
         <div
           style={{
             width: '64px',
             height: '64px',
             borderRadius: '50%',
-            backgroundColor: 'rgba(16, 185, 129, 0.15)',
-            color: '#10B981',
-            fontSize: '32px',
+            backgroundColor: 'var(--success-soft)',
+            color: 'var(--success)',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'center',
-            margin: '0 auto 1.5rem',
-            border: '1px solid #10B981',
+            margin: '0 auto 1.25rem',
           }}
+          aria-hidden="true"
         >
-          ✓
+          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <polyline points="20 6 9 17 4 12" />
+          </svg>
         </div>
 
-        <h1 style={{ fontSize: '1.75rem', fontWeight: 800, marginBottom: '0.75rem' }}>
+        <h1
+          style={{
+            fontSize: '1.65rem',
+            fontWeight: 800,
+            color: 'var(--navy)',
+            margin: '0 0 0.65rem',
+            letterSpacing: '-0.02em',
+          }}
+        >
           Takk for ditt kjøp!
         </h1>
-        <p style={{ color: '#94A3B8', fontSize: '1rem', lineHeight: '1.5', marginBottom: '2rem' }}>
+        <p
+          style={{
+            color: 'var(--text-secondary)',
+            fontSize: '0.98rem',
+            lineHeight: 1.55,
+            margin: '0 0 1.75rem',
+          }}
+        >
           Ditt abonnement er nå aktivert. Du har fått utvidet din daglige testkvote og kan nå øve
           videre til muntlig Norskprøve.
         </p>
 
-        <a
-          href="/"
-          style={{
-            display: 'inline-block',
-            backgroundColor: '#2563EB',
-            color: '#FFFFFF',
-            padding: '0.875rem 2rem',
-            borderRadius: '10px',
-            textDecoration: 'none',
-            fontWeight: 700,
-            fontSize: '1rem',
-          }}
-        >
+        <a href="/" className="snakkly-btn-primary">
           Tilbake til appen
         </a>
       </div>
     </main>
   );
 }
-

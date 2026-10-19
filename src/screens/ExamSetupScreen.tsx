@@ -3,14 +3,12 @@ import {
   View,
   Text,
   StyleSheet,
-  TouchableOpacity,
+  Pressable,
   ScrollView,
   ActivityIndicator,
   RefreshControl,
   Alert,
-  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchTopicsAndQuota, startExamSession } from '../api';
 import { useAuth } from '../hooks/useAuth';
@@ -20,6 +18,16 @@ import type {
   ExamTopic,
   RootStackParamList,
 } from '../types/exam';
+import {
+  Screen,
+  Logo,
+  Card,
+  Badge,
+  TierBadge,
+  Button,
+  Icon,
+} from '../components/ui';
+import { colors, radius, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamSetup'>;
 
@@ -37,6 +45,8 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+
+  const { user, dailyTestStatus, logout } = useAuth();
 
   /**
    * Fetch topics catalog and remaining user audio quota from backend
@@ -170,215 +180,114 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const { user, dailyTestStatus, logout } = useAuth();
+  const dailyProgressRatio = useMemo(() => {
+    if (!dailyTestStatus || !dailyTestStatus.totalAllowedToday) return 0;
+    const used = Math.min(dailyTestStatus.testsUsedToday, dailyTestStatus.totalAllowedToday);
+    return used / dailyTestStatus.totalAllowedToday;
+  }, [dailyTestStatus]);
 
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" />
-
-      {/* Top User & Tier Header */}
-      <View style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 8,
-        borderBottomWidth: 1,
-        borderBottomColor: '#1E293B',
-      }}>
-        {user ? (
-          <TouchableOpacity
-            style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-            onPress={() => navigation.navigate('Subscription')}
-          >
-            <View style={{
-              backgroundColor: user.subscriptionTier === 'PREMIUM' ? '#F59E0B' : user.subscriptionTier === 'STANDARD' ? '#2563EB' : '#475569',
-              paddingHorizontal: 8,
-              paddingVertical: 3,
-              borderRadius: 6,
-            }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 11, fontWeight: '800' }}>
-                {user.subscriptionTier}
-              </Text>
-            </View>
-            <Text style={{ color: '#F8FAFC', fontSize: 14, fontWeight: '600' }}>
-              {user.name || user.email.split('@')[0]}
-            </Text>
-          </TouchableOpacity>
-        ) : (
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Auth')}
-            style={{
-              backgroundColor: '#1E293B',
-              paddingHorizontal: 12,
-              paddingVertical: 6,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#334155',
-            }}
-          >
-            <Text style={{ color: '#38BDF8', fontSize: 13, fontWeight: '600' }}>
-              👤 Logg inn / Registrer
-            </Text>
-          </TouchableOpacity>
-        )}
-
-        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('HowTo')}
-            style={{
-              backgroundColor: 'rgba(56, 189, 248, 0.15)',
-              paddingHorizontal: 8,
-              paddingVertical: 5,
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: '700' }}>
-              ℹ️ Veileder
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Referral')}
-            style={{
-              backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              paddingHorizontal: 8,
-              paddingVertical: 5,
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700' }}>
-              🎁 Verv
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            onPress={() => navigation.navigate('Subscription')}
-            style={{
-              backgroundColor: 'rgba(245, 158, 11, 0.15)',
-              paddingHorizontal: 8,
-              paddingVertical: 5,
-              borderRadius: 8,
-            }}
-          >
-            <Text style={{ color: '#F59E0B', fontSize: 12, fontWeight: '700' }}>
-              ⭐ Oppgrader
-            </Text>
-          </TouchableOpacity>
-
-          {user && (
-            <TouchableOpacity
-              onPress={logout}
-              style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.15)',
-                paddingHorizontal: 8,
-                paddingVertical: 5,
-                borderRadius: 8,
-              }}
-            >
-              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>
-                Logg ut
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-
-      {/* Header Bar */}
+    <Screen>
+      {/* Clean Single Top Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.headerTitle}>Norskprøven Muntlig</Text>
-          <Text style={styles.headerSubtitle}>Offisiell HK-dir eksamenssimulator</Text>
-        </View>
-
-        {/* Quota Badge */}
-        <View
-          style={[
-            styles.quotaBadge,
-            hasInsufficientQuota && styles.quotaBadgeInsufficient,
-          ]}
-        >
-          <Text style={styles.quotaBadgeLabel}>Talekvote:</Text>
-          <Text
-            style={[
-              styles.quotaBadgeValue,
-              hasInsufficientQuota && styles.quotaBadgeValueInsufficient,
-            ]}
-          >
-            {formattedQuota}
+        <View style={styles.brandBlock}>
+          <Logo size={32} withWordmark />
+          <Text style={styles.headerSubtitle}>
+            Norskprøven Muntlig{user ? ` · ${user.name || user.email.split('@')[0]}` : ''}
           </Text>
         </View>
-      </View>
 
-      {/* Daily Tests Quota Status Bar */}
-      {dailyTestStatus && (
-        <View style={{
-          backgroundColor: dailyTestStatus.remainingToday > 0 ? '#1E293B' : 'rgba(239, 68, 68, 0.15)',
-          marginHorizontal: 20,
-          marginBottom: 12,
-          padding: 12,
-          borderRadius: 12,
-          borderWidth: 1,
-          borderColor: dailyTestStatus.remainingToday > 0 ? '#334155' : '#EF4444',
-          flexDirection: 'row',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-        }}>
-          <View>
-            <Text style={{ color: '#F8FAFC', fontSize: 13, fontWeight: '700' }}>
-              Øvingstester i dag: {dailyTestStatus.testsUsedToday} av {dailyTestStatus.totalAllowedToday} brukt
-            </Text>
-            <Text style={{ color: '#94A3B8', fontSize: 12, marginTop: 2 }}>
-              {dailyTestStatus.remainingToday > 0
-                ? `${dailyTestStatus.remainingToday} gjenstår (nullstilles ved midnatt)`
-                : 'Dagens grense er nådd. Nullstilles ved midnatt.'}
-              {dailyTestStatus.bonusTests > 0 && ` (+${dailyTestStatus.bonusTests} vervebonus)`}
-            </Text>
-          </View>
-          {dailyTestStatus.remainingToday === 0 && (
-            <TouchableOpacity
+        <View style={styles.headerActions}>
+          {user ? (
+            <Pressable
               onPress={() => navigation.navigate('Subscription')}
-              style={{
-                backgroundColor: '#F59E0B',
-                paddingHorizontal: 12,
-                paddingVertical: 6,
-                borderRadius: 8,
-              }}
+              accessibilityRole="button"
+              accessibilityLabel="Abonnement"
             >
-              <Text style={{ color: '#0F172A', fontSize: 12, fontWeight: '800' }}>
-                Lås opp flere
-              </Text>
-            </TouchableOpacity>
+              <TierBadge tier={user.subscriptionTier} />
+            </Pressable>
+          ) : (
+            <Button
+              title="Logg inn"
+              variant="outline"
+              size="sm"
+              icon="person-outline"
+              onPress={() => navigation.navigate('Auth')}
+            />
+          )}
+
+          <Pressable
+            onPress={() => navigation.navigate('HowTo')}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Veileder"
+          >
+            <Icon name="help-circle-outline" size={20} color={colors.navy} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => navigation.navigate('Referral')}
+            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+            accessibilityRole="button"
+            accessibilityLabel="Verv en venn"
+          >
+            <Icon name="gift-outline" size={19} color={colors.navy} />
+          </Pressable>
+
+          <Pressable
+            onPress={() => navigation.navigate('Subscription')}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              { backgroundColor: colors.goldSoft, borderColor: colors.goldSoft },
+              pressed && styles.iconBtnPressed,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel="Oppgrader"
+          >
+            <Icon name="star" size={18} color={colors.gold} />
+          </Pressable>
+
+          {user && (
+            <Pressable
+              onPress={logout}
+              style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+              accessibilityRole="button"
+              accessibilityLabel="Logg ut"
+            >
+              <Icon name="log-out-outline" size={19} color={colors.red} />
+            </Pressable>
           )}
         </View>
-      )}
+      </View>
 
       {/* Insufficient Quota Warning Banner */}
       {hasInsufficientQuota && (
         <View style={styles.warningBanner}>
+          <Icon name="warning-outline" size={18} color={colors.warning} />
           <Text style={styles.warningBannerText}>
-            ⚠️ Lav talekvote. Du trenger minst {MIN_REQUIRED_QUOTA_SECONDS / 60} minutter for å gjennomføre en full prøve.
+            Lav talekvote. Du trenger minst {MIN_REQUIRED_QUOTA_SECONDS / 60} minutter for å gjennomføre en full prøve.
           </Text>
         </View>
       )}
 
       {isLoading ? (
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color="#38BDF8" />
+          <ActivityIndicator size="large" color={colors.red} />
           <Text style={styles.loadingText}>Henter tilgjengelige temaer og talekvote...</Text>
         </View>
       ) : fetchError ? (
         <View style={styles.errorContainer}>
+          <View style={styles.errorIconCircle}>
+            <Icon name="alert-circle" size={28} color={colors.danger} />
+          </View>
           <Text style={styles.errorTitle}>Tilkoblingsfeil</Text>
           <Text style={styles.errorMessage}>{fetchError}</Text>
-          <TouchableOpacity
-            style={styles.retryButton}
+          <Button
+            title="Prøv på nytt"
+            variant="primary"
+            icon="refresh"
             onPress={() => loadExamCatalog(false)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.retryButtonText}>Prøv på nytt</Text>
-          </TouchableOpacity>
+          />
         </View>
       ) : (
         <ScrollView
@@ -389,549 +298,570 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             <RefreshControl
               refreshing={isRefreshing}
               onRefresh={() => loadExamCatalog(true)}
-              tintColor="#38BDF8"
-              colors={['#38BDF8']}
+              tintColor={colors.red}
+              colors={[colors.red]}
             />
           }
         >
-          {/* Section 1: Target Level Selector */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>1. Velg målnivå (CEFR)</Text>
-            <View style={styles.levelSelectorRow}>
-              {(['B1', 'B2'] as CefrLevel[]).map((level) => {
-                const isSelected = targetLevel === level;
-                return (
-                  <TouchableOpacity
-                    key={level}
+          <View style={styles.contentWrapper}>
+            {/* Unified Quota & Daily Tests Stat Card */}
+            <Card style={styles.statsCard}>
+              <View style={styles.statsRow}>
+                <View style={styles.statColumn}>
+                  <Text style={styles.statOverline}>TALEKVOTE</Text>
+                  <Text
                     style={[
-                      styles.levelOption,
-                      isSelected && styles.levelOptionSelected,
+                      styles.statValue,
+                      hasInsufficientQuota && { color: colors.danger },
                     ]}
-                    onPress={() => setTargetLevel(level)}
-                    activeOpacity={0.8}
                   >
-                    <Text
-                      style={[
-                        styles.levelOptionTitle,
-                        isSelected && styles.levelOptionTitleSelected,
-                      ]}
-                    >
-                      Nivå {level}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.levelOptionSubtitle,
-                        isSelected && styles.levelOptionSubtitleSelected,
-                      ]}
-                    >
-                      {level === 'B1'
-                        ? 'Selvstendig bruker (Middels)'
-                        : 'Flytende & Nyansert (Høyere)'}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Section 2: Practice Mode Selector */}
-          <View style={styles.section}>
-            <Text style={styles.sectionTitle}>2. Velg øvingsmodus</Text>
-
-            {/* AI_PEER Card */}
-            <TouchableOpacity
-              style={[
-                styles.modeCard,
-                practiceMode === 'AI_PEER' && styles.modeCardSelected,
-              ]}
-              onPress={() => setPracticeMode('AI_PEER')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.modeCardHeader}>
-                <View style={styles.modeRadioOuter}>
-                  {practiceMode === 'AI_PEER' && <View style={styles.modeRadioInner} />}
-                </View>
-                <View style={styles.modeTitleContainer}>
-                  <Text style={styles.modeCardTitle}>
-                    Øv alene (AI Sensor + AI Medkandidat)
+                    {formattedQuota}
                   </Text>
-                  <Text style={styles.modeCardTag}>Anbefalt for egentrening</Text>
+                  <Text style={styles.statCaption}>Tilgjengelig taletid</Text>
                 </View>
-              </View>
-              <Text style={styles.modeCardDescription}>
-                AI spiller både den autoriserte sensoren og en vennlig medkandidat i samtaledelen. Full samtalesimulering direkte på telefonen.
-              </Text>
-            </TouchableOpacity>
 
-            {/* HUMAN_LOCAL Card */}
-            <TouchableOpacity
-              style={[
-                styles.modeCard,
-                practiceMode === 'HUMAN_LOCAL' && styles.modeCardSelected,
-              ]}
-              onPress={() => setPracticeMode('HUMAN_LOCAL')}
-              activeOpacity={0.8}
-            >
-              <View style={styles.modeCardHeader}>
-                <View style={styles.modeRadioOuter}>
-                  {practiceMode === 'HUMAN_LOCAL' && <View style={styles.modeRadioInner} />}
-                </View>
-                <View style={styles.modeTitleContainer}>
-                  <Text style={styles.modeCardTitle}>
-                    Øv med en venn ved siden av deg (Delt mikrofon)
+                <View style={styles.statDivider} />
+
+                <View style={styles.statColumn}>
+                  <Text style={styles.statOverline}>ØVINGSTESTER I DAG</Text>
+                  <Text style={styles.statValue}>
+                    {dailyTestStatus
+                      ? `${dailyTestStatus.testsUsedToday} / ${dailyTestStatus.totalAllowedToday}`
+                      : '--'}
                   </Text>
-                  <Text style={styles.modeCardTagDuo}>Delt mikrofon (2 personer)</Text>
+                  <Text style={styles.statCaption}>
+                    {dailyTestStatus
+                      ? dailyTestStatus.remainingToday > 0
+                        ? `${dailyTestStatus.remainingToday} gjenstår i dag`
+                        : 'Dagens grense er nådd'
+                      : 'Nullstilles ved midnatt'}
+                    {dailyTestStatus && dailyTestStatus.bonusTests > 0
+                      ? ` (+${dailyTestStatus.bonusTests} bonus)`
+                      : ''}
+                  </Text>
                 </View>
               </View>
-              <Text style={styles.modeCardDescription}>
-                AI-sensor leder prøven mens to kandidater sitter fysisk sammen og deler telefonens mikrofon. Sensoren lytter passivt under Del 2 (Samtaleoppgave).
-              </Text>
-            </TouchableOpacity>
-          </View>
 
-          {/* Section 3: Topic Selection */}
-          <View style={styles.section}>
-            <View style={styles.topicSectionHeader}>
-              <Text style={styles.sectionTitle}>3. Velg eksamenstema</Text>
-              <Text style={styles.topicCounter}>
-                {filteredTopics.length} temaer for {targetLevel}
-              </Text>
-            </View>
-
-            {filteredTopics.length === 0 ? (
-              <View style={styles.emptyTopicsBox}>
-                <Text style={styles.emptyTopicsText}>
-                  Ingen temaer funnet for nivå {targetLevel}.
-                </Text>
-              </View>
-            ) : (
-              <>
-                {/* Random Exam Option (Default) */}
-                <TouchableOpacity
-                  style={[
-                    styles.topicCard,
-                    selectedTopicId === 'RANDOM' && styles.topicCardSelected,
-                  ]}
-                  onPress={() => setSelectedTopicId('RANDOM')}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.topicCardTop}>
-                    <View style={styles.topicLevelBadge}>
-                      <Text style={styles.topicLevelBadgeText}>TILFELDIG</Text>
-                    </View>
-                    <Text style={styles.topicCardTitle}>
-                      Tilfeldig prøve (Anbefalt)
-                    </Text>
+              {dailyTestStatus && (
+                <View style={styles.progressSection}>
+                  <View style={styles.progressTrack}>
+                    <View
+                      style={[
+                        styles.progressFill,
+                        { width: `${Math.round(dailyProgressRatio * 100)}%` },
+                      ]}
+                    />
                   </View>
 
-                  <Text style={styles.topicCardPreview}>
-                    Som på den ekte Norskprøven trekkes eksamenstema og oppfølgingsspørsmål for nivå {targetLevel} tilfeldig fra databasen når du starter prøven ({filteredTopics.length} tilgjengelige prøver).
-                  </Text>
-
-                  {selectedTopicId === 'RANDOM' && (
-                    <View style={styles.selectedCheckRow}>
-                      <Text style={styles.selectedCheckText}>
-                        ✓ Tilfeldig trekning valgt
+                  {dailyTestStatus.remainingToday === 0 && (
+                    <View style={styles.unlockRow}>
+                      <Text style={styles.unlockHint}>
+                        Dagens grense er nådd. Nullstilles ved midnatt.
                       </Text>
+                      <Button
+                        title="Lås opp flere"
+                        variant="gold"
+                        size="sm"
+                        icon="star"
+                        onPress={() => navigation.navigate('Subscription')}
+                      />
                     </View>
                   )}
-                </TouchableOpacity>
+                </View>
+              )}
+            </Card>
 
-                {filteredTopics.map((topic) => {
-                  const isSelected = selectedTopicId === topic.id;
+            {/* Section 1: Target Level Selector (Segmented Control) */}
+            <View style={styles.section}>
+              <Text style={styles.sectionOverline}>1. VELG MÅLNIVÅ (CEFR)</Text>
+              <View style={styles.segmentedControl}>
+                {(['B1', 'B2'] as CefrLevel[]).map((level) => {
+                  const isSelected = targetLevel === level;
                   return (
-                    <TouchableOpacity
-                      key={topic.id}
+                    <Pressable
+                      key={level}
                       style={[
-                        styles.topicCard,
-                        isSelected && styles.topicCardSelected,
+                        styles.segmentOption,
+                        isSelected && styles.segmentOptionSelected,
                       ]}
-                      onPress={() => setSelectedTopicId(topic.id)}
-                      activeOpacity={0.8}
+                      onPress={() => setTargetLevel(level)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
                     >
-                      <View style={styles.topicCardTop}>
-                        <View style={styles.topicLevelBadge}>
-                          <Text style={styles.topicLevelBadgeText}>{topic.level}</Text>
-                        </View>
-                        <Text style={styles.topicCardTitle}>{topic.titleNo}</Text>
-                      </View>
-
                       <Text
-                        style={styles.topicCardPreview}
-                        numberOfLines={3}
-                        ellipsizeMode="tail"
+                        style={[
+                          styles.segmentTitle,
+                          isSelected && styles.segmentTitleSelected,
+                        ]}
                       >
-                        {topic.monologuePromptNo || topic.discussionPromptNo}
+                        Nivå {level}
                       </Text>
-
-                      {isSelected && (
-                        <View style={styles.selectedCheckRow}>
-                          <Text style={styles.selectedCheckText}>✓ Valgt tema</Text>
-                        </View>
-                      )}
-                    </TouchableOpacity>
+                      <Text
+                        style={[
+                          styles.segmentSubtitle,
+                          isSelected && styles.segmentSubtitleSelected,
+                        ]}
+                      >
+                        {level === 'B1'
+                          ? 'Selvstendig bruker (Middels)'
+                          : 'Flytende & Nyansert (Høyere)'}
+                      </Text>
+                    </Pressable>
                   );
                 })}
-              </>
-            )}
+              </View>
+            </View>
+
+            {/* Section 2: Practice Mode Selector */}
+            <View style={styles.section}>
+              <Text style={styles.sectionOverline}>2. VELG ØVINGSMODUS</Text>
+
+              {/* AI_PEER Card */}
+              <Card
+                selected={practiceMode === 'AI_PEER'}
+                onPress={() => setPracticeMode('AI_PEER')}
+                style={styles.modeCard}
+              >
+                <View style={styles.modeCardHeader}>
+                  <View
+                    style={[
+                      styles.radioOuter,
+                      practiceMode === 'AI_PEER' && styles.radioOuterSelected,
+                    ]}
+                  >
+                    {practiceMode === 'AI_PEER' && <View style={styles.radioInner} />}
+                  </View>
+                  <View style={styles.modeTitleContainer}>
+                    <Text style={styles.modeCardTitle}>
+                      Øv alene (AI Sensor + AI Medkandidat)
+                    </Text>
+                    <Badge
+                      label="Anbefalt for egentrening"
+                      tone="red"
+                      style={styles.modeBadge}
+                    />
+                  </View>
+                </View>
+                <Text style={styles.modeCardDescription}>
+                  AI spiller både den autoriserte sensoren og en vennlig medkandidat i samtaledelen. Full samtalesimulering direkte på telefonen.
+                </Text>
+              </Card>
+
+              {/* HUMAN_LOCAL Card */}
+              <Card
+                selected={practiceMode === 'HUMAN_LOCAL'}
+                onPress={() => setPracticeMode('HUMAN_LOCAL')}
+                style={styles.modeCard}
+              >
+                <View style={styles.modeCardHeader}>
+                  <View
+                    style={[
+                      styles.radioOuter,
+                      practiceMode === 'HUMAN_LOCAL' && styles.radioOuterSelected,
+                    ]}
+                  >
+                    {practiceMode === 'HUMAN_LOCAL' && <View style={styles.radioInner} />}
+                  </View>
+                  <View style={styles.modeTitleContainer}>
+                    <Text style={styles.modeCardTitle}>
+                      Øv med en venn ved siden av deg (Delt mikrofon)
+                    </Text>
+                    <Badge
+                      label="Delt mikrofon (2 personer)"
+                      tone="navy"
+                      style={styles.modeBadge}
+                    />
+                  </View>
+                </View>
+                <Text style={styles.modeCardDescription}>
+                  AI-sensor leder prøven mens to kandidater sitter fysisk sammen og deler telefonens mikrofon. Sensoren lytter passivt under Del 2 (Samtaleoppgave).
+                </Text>
+              </Card>
+            </View>
+
+            {/* Section 3: Topic Selection */}
+            <View style={styles.section}>
+              <View style={styles.topicSectionHeader}>
+                <Text style={styles.sectionOverline}>3. VELG EKSAMENSTEMA</Text>
+                <Text style={styles.topicCounter}>
+                  {filteredTopics.length} temaer for {targetLevel}
+                </Text>
+              </View>
+
+              {filteredTopics.length === 0 ? (
+                <Card style={styles.emptyTopicsBox}>
+                  <Text style={styles.emptyTopicsText}>
+                    Ingen temaer funnet for nivå {targetLevel}.
+                  </Text>
+                </Card>
+              ) : (
+                <>
+                  {/* Random Exam Option (Default) */}
+                  <Card
+                    selected={selectedTopicId === 'RANDOM'}
+                    onPress={() => setSelectedTopicId('RANDOM')}
+                    style={styles.topicCard}
+                  >
+                    <View style={styles.topicCardTop}>
+                      <Badge label="TILFELDIG" tone="solidRed" icon="shuffle" />
+                      <Text style={styles.topicCardTitle}>
+                        Tilfeldig prøve (Anbefalt)
+                      </Text>
+                      {selectedTopicId === 'RANDOM' && (
+                        <Icon name="checkmark-circle" size={22} color={colors.red} />
+                      )}
+                    </View>
+
+                    <Text style={styles.topicCardPreview}>
+                      Som på den ekte Norskprøven trekkes eksamenstema og oppfølgingsspørsmål for nivå {targetLevel} tilfeldig fra databasen når du starter prøven ({filteredTopics.length} tilgjengelige prøver).
+                    </Text>
+                  </Card>
+
+                  {filteredTopics.map((topic) => {
+                    const isSelected = selectedTopicId === topic.id;
+                    return (
+                      <Card
+                        key={topic.id}
+                        selected={isSelected}
+                        onPress={() => setSelectedTopicId(topic.id)}
+                        style={styles.topicCard}
+                      >
+                        <View style={styles.topicCardTop}>
+                          <Badge label={topic.level} tone="navy" />
+                          <Text style={styles.topicCardTitle}>{topic.titleNo}</Text>
+                          {isSelected && (
+                            <Icon name="checkmark-circle" size={22} color={colors.red} />
+                          )}
+                        </View>
+
+                        <Text
+                          style={styles.topicCardPreview}
+                          numberOfLines={3}
+                          ellipsizeMode="tail"
+                        >
+                          {topic.monologuePromptNo || topic.discussionPromptNo}
+                        </Text>
+                      </Card>
+                    );
+                  })}
+                </>
+              )}
+            </View>
           </View>
         </ScrollView>
       )}
 
-      {/* Footer Start Button */}
+      {/* Sticky Footer Start Button */}
       <View style={styles.footer}>
-        <TouchableOpacity
-          style={[
-            styles.startButton,
-            (isStarting || !selectedTopicId || hasInsufficientQuota) &&
-              styles.startButtonDisabled,
-          ]}
-          onPress={handleStartExam}
-          disabled={isStarting || !selectedTopicId || hasInsufficientQuota}
-          activeOpacity={0.8}
-        >
-          {isStarting ? (
-            <View style={styles.startingRow}>
-              <ActivityIndicator size="small" color="#FFFFFF" />
-              <Text style={styles.startButtonText}>Forbereder eksamensrom...</Text>
-            </View>
-          ) : (
-            <Text style={styles.startButtonText}>Start muntlig prøve</Text>
-          )}
-        </TouchableOpacity>
+        <View style={styles.footerInner}>
+          <Button
+            title={isStarting ? 'Forbereder eksamensrom...' : 'Start muntlig prøve'}
+            variant="primary"
+            size="lg"
+            icon="mic"
+            fullWidth
+            loading={isStarting}
+            disabled={isStarting || !selectedTopicId || hasInsufficientQuota}
+            onPress={handleStartExam}
+          />
+        </View>
       </View>
-    </SafeAreaView>
+    </Screen>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: '#0F172A', // Slate 900
-  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#1E293B',
-    backgroundColor: '#0F172A',
+    borderBottomColor: colors.border,
+    gap: space.sm,
   },
-  headerTitle: {
-    fontSize: 22,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    letterSpacing: -0.5,
+  brandBlock: {
+    flexShrink: 1,
   },
   headerSubtitle: {
-    fontSize: 13,
-    color: '#94A3B8',
+    ...type.caption,
     marginTop: 2,
   },
-  quotaBadge: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
-    borderColor: '#334155',
-    alignItems: 'flex-end',
+    borderColor: colors.border,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  quotaBadgeInsufficient: {
-    borderColor: '#EF4444',
-    backgroundColor: 'rgba(239, 68, 68, 0.1)',
-  },
-  quotaBadgeLabel: {
-    fontSize: 10,
-    color: '#94A3B8',
-    textTransform: 'uppercase',
-    fontWeight: '600',
-  },
-  quotaBadgeValue: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#38BDF8',
-    marginTop: 1,
-  },
-  quotaBadgeValueInsufficient: {
-    color: '#EF4444',
+  iconBtnPressed: {
+    backgroundColor: colors.navySoft,
   },
   warningBanner: {
-    backgroundColor: 'rgba(239, 68, 68, 0.15)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    backgroundColor: colors.warningSoft,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(239, 68, 68, 0.3)',
-    paddingHorizontal: 20,
+    borderBottomColor: colors.warning,
+    paddingHorizontal: space.lg,
     paddingVertical: 10,
   },
   warningBannerText: {
-    color: '#FCA5A5',
-    fontSize: 13,
-    lineHeight: 18,
-    fontWeight: '500',
+    ...type.caption,
+    color: colors.warning,
+    fontWeight: '600',
+    flex: 1,
   },
   scrollContainer: {
     flex: 1,
   },
   scrollContent: {
-    padding: 20,
-    paddingBottom: 32,
+    padding: space.lg,
+    paddingBottom: space.xxl,
+  },
+  contentWrapper: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+  },
+  statsCard: {
+    marginBottom: space.xl,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  statColumn: {
+    flex: 1,
+  },
+  statDivider: {
+    width: 1,
+    height: 44,
+    backgroundColor: colors.border,
+    marginHorizontal: space.lg,
+  },
+  statOverline: {
+    ...type.overline,
+    marginBottom: 2,
+  },
+  statValue: {
+    ...type.title,
+    fontWeight: '800',
+  },
+  statCaption: {
+    ...type.caption,
+    marginTop: 2,
+  },
+  progressSection: {
+    marginTop: space.md,
+    paddingTop: space.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    gap: space.sm,
+  },
+  progressTrack: {
+    height: 6,
+    backgroundColor: colors.navySoft,
+    borderRadius: radius.pill,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: colors.red,
+    borderRadius: radius.pill,
+  },
+  unlockRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.sm,
+    marginTop: 4,
+  },
+  unlockHint: {
+    ...type.caption,
+    color: colors.warning,
+    flex: 1,
   },
   section: {
-    marginBottom: 24,
+    marginBottom: space.xl,
   },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#E2E8F0',
-    marginBottom: 12,
+  sectionOverline: {
+    ...type.overline,
+    color: colors.navy,
+    marginBottom: space.sm,
   },
-  levelSelectorRow: {
+  segmentedControl: {
     flexDirection: 'row',
-    gap: 12,
+    backgroundColor: colors.surfaceMuted,
+    borderRadius: radius.lg,
+    padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+    gap: 4,
   },
-  levelOption: {
+  segmentOption: {
     flex: 1,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#334155',
+    borderRadius: radius.md,
+    paddingVertical: 14,
+    paddingHorizontal: space.md,
+    alignItems: 'center',
   },
-  levelOptionSelected: {
-    borderColor: '#38BDF8',
-    backgroundColor: '#0C4A6E',
+  segmentOptionSelected: {
+    backgroundColor: colors.red,
   },
-  levelOptionTitle: {
-    fontSize: 18,
+  segmentTitle: {
+    fontSize: 17,
     fontWeight: '800',
-    color: '#94A3B8',
-    marginBottom: 4,
+    color: colors.text,
+    marginBottom: 2,
   },
-  levelOptionTitleSelected: {
-    color: '#FFFFFF',
+  segmentTitleSelected: {
+    color: colors.white,
   },
-  levelOptionSubtitle: {
+  segmentSubtitle: {
     fontSize: 12,
-    color: '#64748B',
-    lineHeight: 16,
+    fontWeight: '500',
+    color: colors.textSecondary,
+    textAlign: 'center',
   },
-  levelOptionSubtitleSelected: {
-    color: '#BAE6FD',
+  segmentSubtitleSelected: {
+    color: colors.white,
   },
   modeCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#334155',
-    marginBottom: 12,
-  },
-  modeCardSelected: {
-    borderColor: '#38BDF8',
-    backgroundColor: '#172554',
+    marginBottom: space.md,
   },
   modeCardHeader: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: 8,
+    marginBottom: space.xs,
   },
-  modeRadioOuter: {
+  radioOuter: {
     width: 20,
     height: 20,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#64748B',
+    borderColor: colors.borderStrong,
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
     marginRight: 10,
+    backgroundColor: colors.surface,
   },
-  modeRadioInner: {
+  radioOuterSelected: {
+    borderColor: colors.red,
+  },
+  radioInner: {
     width: 10,
     height: 10,
     borderRadius: 5,
-    backgroundColor: '#38BDF8',
+    backgroundColor: colors.red,
   },
   modeTitleContainer: {
     flex: 1,
   },
   modeCardTitle: {
-    fontSize: 15,
-    fontWeight: '700',
-    color: '#F8FAFC',
-    lineHeight: 20,
+    ...type.bodyStrong,
   },
-  modeCardTag: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#38BDF8',
-    marginTop: 2,
-  },
-  modeCardTagDuo: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: '#A855F7',
-    marginTop: 2,
+  modeBadge: {
+    marginTop: 6,
   },
   modeCardDescription: {
-    fontSize: 13,
-    color: '#94A3B8',
-    lineHeight: 18,
+    ...type.caption,
+    color: colors.textSecondary,
     paddingLeft: 30,
+    marginTop: 4,
   },
   topicSectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: space.sm,
   },
   topicCounter: {
-    fontSize: 12,
-    color: '#64748B',
-    fontWeight: '500',
+    ...type.caption,
   },
   emptyTopicsBox: {
-    padding: 24,
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
+    padding: space.xl,
     alignItems: 'center',
   },
   emptyTopicsText: {
-    color: '#94A3B8',
-    fontSize: 14,
+    ...type.body,
   },
   topicCard: {
-    backgroundColor: '#1E293B',
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 2,
-    borderColor: '#334155',
-    marginBottom: 12,
-  },
-  topicCardSelected: {
-    borderColor: '#38BDF8',
-    backgroundColor: 'rgba(56, 189, 248, 0.08)',
+    marginBottom: space.md,
   },
   topicCardTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
-  },
-  topicLevelBadge: {
-    backgroundColor: '#0F172A',
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: '#475569',
-    marginRight: 8,
-  },
-  topicLevelBadgeText: {
-    fontSize: 12,
-    fontWeight: '800',
-    color: '#38BDF8',
+    gap: space.sm,
+    marginBottom: space.xs,
   },
   topicCardTitle: {
+    ...type.heading,
     fontSize: 16,
-    fontWeight: '700',
-    color: '#F8FAFC',
     flex: 1,
   },
   topicCardPreview: {
-    fontSize: 13,
-    color: '#94A3B8',
-    lineHeight: 19,
-  },
-  selectedCheckRow: {
-    marginTop: 10,
-    alignSelf: 'flex-start',
-    backgroundColor: '#0284C7',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-  },
-  selectedCheckText: {
-    color: '#FFFFFF',
-    fontSize: 11,
-    fontWeight: '700',
+    ...type.body,
+    fontSize: 14,
   },
   footer: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
     borderTopWidth: 1,
-    borderTopColor: '#1E293B',
-    backgroundColor: '#0F172A',
+    borderTopColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  startButton: {
-    backgroundColor: '#0284C7',
-    borderRadius: 12,
-    paddingVertical: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#0284C7',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  startButtonDisabled: {
-    backgroundColor: '#334155',
-    shadowOpacity: 0,
-    elevation: 0,
-  },
-  startingRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  startButtonText: {
-    color: '#FFFFFF',
-    fontSize: 16,
-    fontWeight: '700',
+  footerInner: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
   },
   loadingContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: space.xxl,
   },
   loadingText: {
-    color: '#94A3B8',
-    fontSize: 14,
-    marginTop: 12,
+    ...type.body,
+    marginTop: space.md,
     textAlign: 'center',
   },
   errorContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 32,
+    padding: space.xxl,
+  },
+  errorIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.dangerSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: space.md,
   },
   errorTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#EF4444',
-    marginBottom: 8,
+    ...type.title,
+    color: colors.danger,
+    marginBottom: space.xs,
   },
   errorMessage: {
-    color: '#94A3B8',
-    fontSize: 14,
+    ...type.body,
     textAlign: 'center',
-    marginBottom: 20,
-    lineHeight: 20,
-  },
-  retryButton: {
-    backgroundColor: '#1E293B',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#38BDF8',
-  },
-  retryButtonText: {
-    color: '#38BDF8',
-    fontSize: 14,
-    fontWeight: '600',
+    marginBottom: space.lg,
   },
 });
