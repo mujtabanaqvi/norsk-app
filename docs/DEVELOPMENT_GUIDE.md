@@ -87,7 +87,10 @@ Or run them in two terminals:
 - **Physical Phone (Expo Go)**: Make sure your phone is on the same Wi-Fi network as your computer, open **Expo Go**, and scan the QR code. `src/config.ts` automatically detects your computer's LAN IP from Expo's `hostUri` and connects to port `3000`. (If prompted by Windows Firewall on first run, allow Node.js on Private networks.)
 - **Android Emulator**: Press `a` in the Expo terminal. `src/config.ts` automatically falls back to `http://10.0.2.2:3000`.
 - **Web Browser (Candidate App)**: Run `npm run mobile:web` (or press `w` in the Expo terminal).
-- **Web Admin Portal (Exam & Question Management)**: Navigate to `http://localhost:3000/admin` in your browser. Log in with the `ADMIN_SECRET` configured in `.env.local` (defaults to `admin123` in dev mode). Here you can create, edit, activate/deactivate, and delete oral exams and their Del 3 question pools.
+- **Web Admin Portal (Exam & Configuration Management)**: Navigate to `http://localhost:3000/admin` in your browser. Log in with the `ADMIN_SECRET` configured in `.env.local` (defaults to `admin123` in dev mode). Here you can:
+  - Create, edit, activate/deactivate, and delete oral exams and their Del 3 question pools.
+  - Configure daily test limits per tier (`FREE`, `STANDARD`, `PREMIUM`), monthly pricing, and planned features.
+  - Configure referral bonus parameters (bonus tests per day and bonus duration days).
 
 ### Step 5: Run Automated Tests
 ```bash
@@ -111,5 +114,8 @@ $env:RUN_INTEGRATION='1'; npm run test:integration
 | `npm run mobile:web` | Expo Web | Launches the mobile client in a web browser. |
 | `npm test` | Run Unit Tests | Runs all unit tests in `tests/*.test.ts`. |
 | `npm run test:integration` | Run Integration Tests | Runs live DB and rubric evaluation tests when `RUN_INTEGRATION=1`. |
-| `npm run db:seed` | Database Seeder | Applies schema updates and seeds HK-dir B1/B2 topics & test quota. |
-| `npm run db:push` | Drizzle Push | Pushes `src/db/schema.ts` to PostgreSQL. |
+| `npm run db:seed` | Database Seeder | Applies schema updates, seeds HK-dir topics, test quota, default tier policies, and referral settings. |
+| `npm run db:generate` | Drizzle Generate | Generates versioned SQL migration files in `drizzle/`. |
+| `npm run db:migrate` | Drizzle Migrate | Applies pending SQL migrations to PostgreSQL. |
+| `npm run db:push` | Drizzle Push | Pushes `src/db/schema.ts` directly to PostgreSQL without generating migration files. |
+

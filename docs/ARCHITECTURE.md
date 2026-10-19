@@ -10,16 +10,19 @@ This document describes the architectural topology, service interactions, and li
 ┌──────────────────────────────────────────────────────────────┐
 │            React Native Client (Expo Go & Web)               │
 │                                                              │
+│  ├── AuthScreen.tsx        (Login, Register, Google OAuth)   │
 │  ├── ExamSetupScreen.tsx   (Level, topic, mode, quota)       │
 │  ├── ExamRoomScreen.tsx    (expo-audio, turn state, stages)  │
-│  └── ExamResultsScreen.tsx (Rubric scores, corrections)      │
+│  ├── ExamResultsScreen.tsx (Rubric scores, corrections)      │
+│  └── HowTo / Terms / Privacy Policy Screens                  │
 └──────────────────────┬───────────────────────▲───────────────┘
                        │ REST + Audio Streams  │
                        ▼                       │
 ┌──────────────────────────────────────────────┴───────────────┐
 │                 Next.js 16 Control Plane                     │
 │  ├── app/admin/page.tsx                     (Web Admin Portal)│
-│  ├── api/admin/exams                        (Admin Exam CRUD) │
+│  ├── api/admin/exams & api/admin/config     (Exams & Tiers)  │
+│  ├── api/auth/*                             (Better Auth/JWT)│
 │  ├── proxy.ts                               (CORS headers)   │
 │  ├── GET  /api/exam/topics                  (Catalog/quota)  │
 │  ├── POST /api/exam/start                   (Random/Init)    │
@@ -35,9 +38,12 @@ This document describes the architectural topology, service interactions, and li
 │  ├── OpenAI Direct OR Azure Foundry │   │  ├── exam_topics            │
 │  │   ├── STT: Whisper               │   │  ├── user_quotas            │
 │  │   ├── LLM: gpt-4o-mini / gpt-4.1 │   │  ├── exam_sessions          │
-│  │   └── Eval: gpt-4o (structured)  │   │  └── usage_ledger           │
-│  └── ElevenLabs / OpenAI TTS Stream │   └─────────────────────────────┘
-└─────────────────────────────────────┘
+│  │   └── Eval: gpt-4o (structured)  │   │  ├── usage_ledger           │
+│  └── ElevenLabs / OpenAI TTS Stream │   │  ├── user, session, account │
+│                                     │   │  ├── tier_configs           │
+│                                     │   │  ├── referral_rewards       │
+│                                     │   │  └── system_configs         │
+└─────────────────────────────────────┘   └─────────────────────────────┘
 ```
 
 ---

@@ -130,6 +130,56 @@ Granular audit records of resource consumption per session and source.
 | `estimated_cost_usd` | `NUMERIC(10, 6)` | `NOT NULL` | Calculated cost in USD for this record. |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Audit timestamp. |
 
+### 2.5 `user` (alias `users`)
+Core user profile, Better Auth account records, referral identities, and subscription tiers.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `TEXT` | `PRIMARY KEY` | User UUID / ID string. |
+| `name` | `TEXT` | `NOT NULL` | User full name. |
+| `email` | `TEXT` | `NOT NULL`, `UNIQUE` | Email address. |
+| `email_verified` | `BOOLEAN` | `NOT NULL`, `DEFAULT false` | Verified status flag. |
+| `image` | `TEXT` | `NULLABLE` | Profile avatar URL. |
+| `role` | `user_role` | `NOT NULL`, `DEFAULT 'USER'` | `'USER'` or `'ADMIN'`. |
+| `subscription_tier` | `subscription_tier` | `NOT NULL`, `DEFAULT 'FREE'` | `'FREE'`, `'STANDARD'`, or `'PREMIUM'`. |
+| `stripe_customer_id` | `VARCHAR(255)` | `NULLABLE` | Stripe Customer ID. |
+| `referral_code` | `VARCHAR(32)` | `NOT NULL`, `UNIQUE` | Unique 8-char referral code. |
+| `referred_by_user_id`| `VARCHAR(128)` | `NULLABLE` | Referrer user ID if referred during signup. |
+
+### 2.6 `tier_configs`
+Configurable subscription limits, monthly pricing, and feature bullets.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `tier` | `subscription_tier` | `PRIMARY KEY` | Plan tier (`'FREE'`, `'STANDARD'`, `'PREMIUM'`). |
+| `daily_test_limit` | `INTEGER` | `NOT NULL` | Tests allowed per calendar day. |
+| `price_cents` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Monthly price in NOK øre. |
+| `currency` | `VARCHAR(3)` | `NOT NULL`, `DEFAULT 'NOK'` | ISO currency code. |
+| `features_json` | `JSONB` | `NULLABLE`, `$type<string[]>` | List of features and perks for marketing and app UI. |
+| `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Timestamp of last admin update. |
+
+### 2.7 `referral_rewards`
+Tracks active bonus tests awarded for successful referrals.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Reward identifier. |
+| `referrer_user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)` | Recipient user ID. |
+| `referred_user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)` | Referred friend user ID. |
+| `bonus_tests_per_day` | `INTEGER` | `NOT NULL`, `DEFAULT 1` | Extra daily tests granted. |
+| `starts_at` | `TIMESTAMPTZ` | `NOT NULL` | Activation timestamp. |
+| `expires_at` | `TIMESTAMPTZ` | `NOT NULL` | Expiration timestamp. |
+
+### 2.8 `system_configs`
+Key-value store for global system settings such as referral bonus defaults.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `key` | `VARCHAR(64)` | `PRIMARY KEY` | Configuration key (e.g. `'REFERRAL_BONUS_DAILY_TESTS'`). |
+| `value` | `TEXT` | `NOT NULL` | Value stored as string. |
+| `description` | `TEXT` | `NULLABLE` | Human-readable explanation. |
+| `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Last update timestamp. |
+
 ---
 
 ## 3. JSONB Data Structures

@@ -129,11 +129,36 @@ Queries or tops up the candidate's remaining practice seconds (`remainingAudioSe
 
 ---
 
-## 8. Web Admin Portal Endpoints (`/api/admin/exams`)
+## 8. Authentication Endpoints (`/api/auth/*`)
+Authentication is built with Better Auth and JWT token support for web and mobile Expo clients.
+
+- **`POST /api/auth/register`**: Registers a new user with `email`, `password`, `name`, and optional `referralCode`. Issues an auth cookie / Bearer token and assigns a unique personal referral code.
+- **`POST /api/auth/login`**: Authenticates with `email` and `password`, returning user details, subscription tier, and auth token.
+- **`POST /api/auth/google`**: Verifies Google ID tokens via `google-auth-library` and signs in or registers the user.
+- **`POST /api/auth/apple`**: Extensible Apple OAuth identity token verification endpoint.
+- **`GET /api/auth/me`**: Returns the profile, subscription tier, referral code, and earned referral statistics of the currently authenticated user.
+
+---
+
+## 9. Subscription & Tier Endpoints
+- **`GET /api/config/tiers`**: Public endpoint returning all tier policies (`FREE`, `STANDARD`, `PREMIUM`) including daily test limits, monthly pricing, and feature arrays.
+- **`POST /api/stripe/checkout`**: Initiates a Stripe Checkout session for subscription tier upgrade (`STANDARD` or `PREMIUM`).
+- **`POST /api/stripe/webhook`**: Handles Stripe lifecycle webhooks (`customer.subscription.created`, `updated`, `deleted`).
+- **`GET /api/referrals`**: Returns the authenticated user's referral code, total friends referred, and active bonus days.
+
+---
+
+## 10. Web Admin Portal Endpoints
 Protected by the `x-admin-secret` header (checked against `process.env.ADMIN_SECRET`, defaulting to `admin123` in local development). Powers the Next.js Web Admin Portal at `/admin`.
 
+### 10.1 Exam Catalog (`/api/admin/exams`)
 - **`GET /api/admin/exams`**: Lists all exams (`exam_topics`) ordered by `createdAt` DESC with `sessionCount`.
 - **`POST /api/admin/exams`**: Creates a new exam with `titleNo`, `level` (`'B1' | 'B2'`), `monologuePromptNo` (Del 1), `discussionPromptNo` (Del 2), `followUpQuestionsNo` (Del 3 question pool array), and `isActive`.
 - **`PATCH /api/admin/exams/[id]`**: Updates exam prompts, question pool, level, title, or `isActive` status.
 - **`DELETE /api/admin/exams/[id]`**: Unlinks historical sessions and deletes the exam topic row.
+
+### 10.2 Configuration Management (`/api/admin/config`)
+- **`GET /api/admin/config`**: Returns current tier policies (`tiers`) and referral parameters (`referral: { bonusDailyTests, durationDays }`).
+- **`PUT /api/admin/config`**: Updates a tier limit, monthly price, and feature array (`tier`, `dailyTestLimit`, `priceCents`, `currency`, `features: string[]`), or updates referral bonus parameters (`bonusDailyTests`, `durationDays`). Saves directly to `tier_configs` and `system_configs`.
+
 
