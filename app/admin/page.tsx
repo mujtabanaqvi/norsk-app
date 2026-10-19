@@ -119,7 +119,12 @@ export default function AdminPortalPage() {
     }
   }, []);
 
-  const handleUpdateTier = async (tier: string, dailyLimit: number, priceCents: number) => {
+  const handleUpdateTier = async (
+    tier: string,
+    dailyLimit: number,
+    priceCents: number,
+    features: string[] = []
+  ) => {
     setIsSavingConfig(true);
     setGlobalError(null);
     setSuccessBanner(null);
@@ -135,6 +140,7 @@ export default function AdminPortalPage() {
           tier,
           dailyTestLimit: dailyLimit,
           priceCents,
+          features,
         }),
       });
       if (!res.ok) {
@@ -198,7 +204,11 @@ export default function AdminPortalPage() {
       setAuthError('Vennligst skriv inn admin-nøkkel.');
       return;
     }
-    await fetchExamsWithSecret(adminSecret.trim());
+    const secret = adminSecret.trim();
+    const success = await fetchExamsWithSecret(secret);
+    if (success) {
+      await fetchConfigsWithSecret(secret);
+    }
   };
 
   const handleLogout = () => {
@@ -864,176 +874,421 @@ export default function AdminPortalPage() {
         )}
         </div>
         ) : (
-          /* Subscription Tiers & Referral Configuration Tab */
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-            <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #334155' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '6px' }}>
-                Abonnementsplaner &amp; Daglige Testgrenser
-              </h2>
-              <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '20px' }}>
-                Endre hvor mange tester gratis og betalte brukere kan ta per kalenderdøgn (nullstilles ved midnatt).
-              </p>
-
-              {isLoadingConfig ? (
-                <div>Laster inn abonnementsinnstillinger...</div>
-              ) : tierPolicies ? (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: '20px' }}>
-                  {/* Free Tier */}
-                  <div style={{ backgroundColor: '#0F172A', padding: '20px', borderRadius: '10px', border: '1px solid #334155' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#F8FAFC', marginBottom: '12px' }}>
-                      Gratis Nivå (Free)
-                    </div>
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={styles.label}>Daglige tester per døgn:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        defaultValue={tierPolicies.FREE?.dailyTestLimit || 1}
-                        id="free_limit"
-                        style={styles.input}
-                      />
-                    </div>
-                    <button
-                      disabled={isSavingConfig}
-                      onClick={() => {
-                        const input = document.getElementById('free_limit') as HTMLInputElement;
-                        handleUpdateTier('FREE', parseInt(input.value, 10), 0);
-                      }}
-                      style={styles.primaryButton}
-                    >
-                      Lagre Gratis Nivå
-                    </button>
+              <div
+                style={{
+                  backgroundColor: '#1E293B',
+                  padding: '24px',
+                  borderRadius: '12px',
+                  border: '1px solid #334155',
+                }}
+              >
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '12px', marginBottom: '16px' }}>
+                  <div>
+                    <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 6px 0' }}>
+                      Abonnementsplaner &amp; Daglige Testgrenser
+                    </h2>
+                    <p style={{ color: '#94A3B8', fontSize: '14px', margin: 0 }}>
+                      Endre hvor mange tester gratis og betalte brukere kan ta per kalenderdøgn samt inkluderte funksjoner og fordeler.
+                    </p>
                   </div>
-
-                  {/* Standard Tier */}
-                  <div style={{ backgroundColor: '#0F172A', padding: '20px', borderRadius: '10px', border: '1px solid #0284C7' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#38BDF8', marginBottom: '12px' }}>
-                      Standard Nivå
-                    </div>
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={styles.label}>Daglige tester per døgn:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        defaultValue={tierPolicies.STANDARD?.dailyTestLimit || 5}
-                        id="standard_limit"
-                        style={styles.input}
-                      />
-                    </div>
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={styles.label}>Månedspris i NOK (kr):</label>
-                      <input
-                        type="number"
-                        min="0"
-                        defaultValue={(tierPolicies.STANDARD?.priceCents || 14900) / 100}
-                        id="standard_price"
-                        style={styles.input}
-                      />
-                    </div>
-                    <button
-                      disabled={isSavingConfig}
-                      onClick={() => {
-                        const limitInput = document.getElementById('standard_limit') as HTMLInputElement;
-                        const priceInput = document.getElementById('standard_price') as HTMLInputElement;
-                        handleUpdateTier('STANDARD', parseInt(limitInput.value, 10), parseInt(priceInput.value, 10) * 100);
-                      }}
-                      style={styles.primaryButton}
-                    >
-                      Lagre Standard Nivå
-                    </button>
-                  </div>
-
-                  {/* Premium Tier */}
-                  <div style={{ backgroundColor: '#0F172A', padding: '20px', borderRadius: '10px', border: '1px solid #F59E0B' }}>
-                    <div style={{ fontSize: '18px', fontWeight: 700, color: '#F59E0B', marginBottom: '12px' }}>
-                      Premium Nivå
-                    </div>
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={styles.label}>Daglige tester per døgn:</label>
-                      <input
-                        type="number"
-                        min="1"
-                        defaultValue={tierPolicies.PREMIUM?.dailyTestLimit || 20}
-                        id="premium_limit"
-                        style={styles.input}
-                      />
-                    </div>
-                    <div style={{ marginBottom: '14px' }}>
-                      <label style={styles.label}>Månedspris i NOK (kr):</label>
-                      <input
-                        type="number"
-                        min="0"
-                        defaultValue={(tierPolicies.PREMIUM?.priceCents || 29900) / 100}
-                        id="premium_price"
-                        style={styles.input}
-                      />
-                    </div>
-                    <button
-                      disabled={isSavingConfig}
-                      onClick={() => {
-                        const limitInput = document.getElementById('premium_limit') as HTMLInputElement;
-                        const priceInput = document.getElementById('premium_price') as HTMLInputElement;
-                        handleUpdateTier('PREMIUM', parseInt(limitInput.value, 10), parseInt(priceInput.value, 10) * 100);
-                      }}
-                      style={{ ...styles.primaryButton, backgroundColor: '#F59E0B', color: '#0F172A' }}
-                    >
-                      Lagre Premium Nivå
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => fetchConfigsWithSecret(adminSecret)}
+                    disabled={isLoadingConfig}
+                    style={{ ...styles.secondaryButton, padding: '8px 14px', fontSize: '13px' }}
+                  >
+                    {isLoadingConfig ? 'Oppdaterer...' : '↻ Oppfrisk'}
+                  </button>
                 </div>
-              ) : null}
-            </div>
 
-            {/* Referral Settings Card */}
-            <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #334155' }}>
-              <h2 style={{ fontSize: '20px', fontWeight: 800, marginBottom: '6px' }}>
-                Verveprogram Innstillinger (Referrals)
-              </h2>
-              <p style={{ color: '#94A3B8', fontSize: '14px', marginBottom: '20px' }}>
-                Konfigurer hvor mange ekstra tester en bruker mottar per dag når en vervet venn registrerer seg, og varigheten på bonusen.
-              </p>
+                {isLoadingConfig && !tierPolicies ? (
+                  <div style={{ padding: '24px 0', textAlign: 'center', color: '#94A3B8' }}>
+                    Laster inn abonnementsinnstillinger fra databasen...
+                  </div>
+                ) : tierPolicies ? (
+                  <div
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))',
+                      gap: '20px',
+                    }}
+                  >
+                    <TierConfigCard
+                      tier="FREE"
+                      title="Gratis Nivå (Free)"
+                      borderColor="#334155"
+                      titleColor="#F8FAFC"
+                      badgeLabel="Grunnpakke"
+                      initialLimit={tierPolicies.FREE?.dailyTestLimit ?? 1}
+                      initialPriceCents={tierPolicies.FREE?.priceCents ?? 0}
+                      initialFeatures={tierPolicies.FREE?.features ?? []}
+                      isPaid={false}
+                      isSaving={isSavingConfig}
+                      onSave={(dailyLimit, priceCents, features) =>
+                        handleUpdateTier('FREE', dailyLimit, priceCents, features)
+                      }
+                    />
 
+                    <TierConfigCard
+                      tier="STANDARD"
+                      title="Standard Nivå"
+                      borderColor="#0284C7"
+                      titleColor="#38BDF8"
+                      badgeLabel="Populær"
+                      initialLimit={tierPolicies.STANDARD?.dailyTestLimit ?? 5}
+                      initialPriceCents={tierPolicies.STANDARD?.priceCents ?? 14900}
+                      initialFeatures={tierPolicies.STANDARD?.features ?? []}
+                      isPaid={true}
+                      isSaving={isSavingConfig}
+                      onSave={(dailyLimit, priceCents, features) =>
+                        handleUpdateTier('STANDARD', dailyLimit, priceCents, features)
+                      }
+                    />
+
+                    <TierConfigCard
+                      tier="PREMIUM"
+                      title="Premium Nivå"
+                      borderColor="#F59E0B"
+                      titleColor="#F59E0B"
+                      badgeLabel="Maksimal øving"
+                      initialLimit={tierPolicies.PREMIUM?.dailyTestLimit ?? 20}
+                      initialPriceCents={tierPolicies.PREMIUM?.priceCents ?? 29900}
+                      initialFeatures={tierPolicies.PREMIUM?.features ?? []}
+                      isPaid={true}
+                      isSaving={isSavingConfig}
+                      onSave={(dailyLimit, priceCents, features) =>
+                        handleUpdateTier('PREMIUM', dailyLimit, priceCents, features)
+                      }
+                    />
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Referral Settings Card */}
               {referralSettings && (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '20px', alignItems: 'end' }}>
-                  <div>
-                    <label style={styles.label}>Ekstra tester per dag per vervet venn:</label>
-                    <input
-                      type="number"
-                      min="1"
-                      defaultValue={referralSettings.bonusDailyTests || 2}
-                      id="ref_bonus"
-                      style={styles.input}
-                    />
-                  </div>
-                  <div>
-                    <label style={styles.label}>Varighet (dager):</label>
-                    <input
-                      type="number"
-                      min="1"
-                      defaultValue={referralSettings.durationDays || 7}
-                      id="ref_duration"
-                      style={styles.input}
-                    />
-                  </div>
-                  <div>
-                    <button
-                      disabled={isSavingConfig}
-                      onClick={() => {
-                        const bonusInput = document.getElementById('ref_bonus') as HTMLInputElement;
-                        const durationInput = document.getElementById('ref_duration') as HTMLInputElement;
-                        handleUpdateReferral(parseInt(bonusInput.value, 10), parseInt(durationInput.value, 10));
-                      }}
-                      style={{ ...styles.primaryButton, width: '100%' }}
-                    >
-                      Lagre Verveinnstillinger
-                    </button>
-                  </div>
-                </div>
+                <ReferralConfigCard
+                  initialBonus={referralSettings.bonusDailyTests ?? 2}
+                  initialDuration={referralSettings.durationDays ?? 7}
+                  isSaving={isSavingConfig}
+                  onSave={(bonus, duration) => handleUpdateReferral(bonus, duration)}
+                />
               )}
             </div>
-          </div>
-        )}
+          )}
       </div>
+    </div>
+  );
+}
+
+interface TierConfigCardProps {
+  tier: 'FREE' | 'STANDARD' | 'PREMIUM';
+  title: string;
+  borderColor: string;
+  titleColor: string;
+  badgeLabel: string;
+  initialLimit: number;
+  initialPriceCents: number;
+  initialFeatures: string[];
+  isPaid: boolean;
+  isSaving: boolean;
+  onSave: (dailyLimit: number, priceCents: number, features: string[]) => void;
+}
+
+function TierConfigCard({
+  tier,
+  title,
+  borderColor,
+  titleColor,
+  badgeLabel,
+  initialLimit,
+  initialPriceCents,
+  initialFeatures,
+  isPaid,
+  isSaving,
+  onSave,
+}: TierConfigCardProps) {
+  const [dailyLimit, setDailyLimit] = useState<number>(initialLimit);
+  const [priceNok, setPriceNok] = useState<number>(Math.round(initialPriceCents / 100));
+  const [features, setFeatures] = useState<string[]>(initialFeatures);
+  const [newFeatureText, setNewFeatureText] = useState<string>('');
+
+  useEffect(() => {
+    setDailyLimit(initialLimit);
+    setPriceNok(Math.round(initialPriceCents / 100));
+    setFeatures(initialFeatures);
+  }, [initialLimit, initialPriceCents, initialFeatures]);
+
+  const handleAddFeature = () => {
+    const trimmed = newFeatureText.trim();
+    if (!trimmed) return;
+    setFeatures((prev) => [...prev, trimmed]);
+    setNewFeatureText('');
+  };
+
+  const handleRemoveFeature = (index: number) => {
+    setFeatures((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleFeatureChange = (index: number, val: string) => {
+    setFeatures((prev) => {
+      const next = [...prev];
+      next[index] = val;
+      return next;
+    });
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const cleanFeatures = features.map((f) => f.trim()).filter((f) => f.length > 0);
+    onSave(dailyLimit, isPaid ? priceNok * 100 : 0, cleanFeatures);
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: '#0F172A',
+        padding: '22px',
+        borderRadius: '12px',
+        border: `1px solid ${borderColor}`,
+        display: 'flex',
+        flexDirection: 'column',
+        justifyContent: 'space-between',
+        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.2)',
+      }}
+    >
+      <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+        <div>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '14px',
+            }}
+          >
+            <span
+              style={{
+                fontSize: '18px',
+                fontWeight: 700,
+                color: titleColor,
+              }}
+            >
+              {title}
+            </span>
+            <span
+              style={{
+                fontSize: '11px',
+                fontWeight: 700,
+                padding: '3px 8px',
+                borderRadius: '6px',
+                backgroundColor: 'rgba(255, 255, 255, 0.08)',
+                color: '#94A3B8',
+                border: '1px solid #334155',
+              }}
+            >
+              {badgeLabel}
+            </span>
+          </div>
+
+          <div style={{ marginBottom: '14px' }}>
+            <label style={styles.label}>Daglige tester per døgn:</label>
+            <input
+              type="number"
+              min="1"
+              value={dailyLimit}
+              onChange={(e) => setDailyLimit(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              style={styles.input}
+              required
+            />
+          </div>
+
+          {isPaid && (
+            <div style={{ marginBottom: '14px' }}>
+              <label style={styles.label}>Månedspris i NOK (kr):</label>
+              <input
+                type="number"
+                min="0"
+                value={priceNok}
+                onChange={(e) => setPriceNok(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                style={styles.input}
+                required
+              />
+            </div>
+          )}
+
+          {/* Planned Features List */}
+          <div style={{ marginTop: '16px', marginBottom: '18px' }}>
+            <label style={{ ...styles.label, marginBottom: '8px' }}>
+              Inkluderte funksjoner &amp; fordeler:
+            </label>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '10px' }}>
+              {features.map((feature, idx) => (
+                <div key={idx} style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <input
+                    type="text"
+                    value={feature}
+                    onChange={(e) => handleFeatureChange(idx, e.target.value)}
+                    placeholder="f.eks. Ubegrenset tilgang, AI stemme..."
+                    style={{ ...styles.input, marginBottom: 0, fontSize: '13px', padding: '8px 10px' }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleRemoveFeature(idx)}
+                    title="Fjern funksjon"
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.15)',
+                      border: '1px solid rgba(239, 68, 68, 0.4)',
+                      color: '#FCA5A5',
+                      borderRadius: '6px',
+                      padding: '8px 10px',
+                      cursor: 'pointer',
+                      fontSize: '12px',
+                    }}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+
+            {/* Add new feature input */}
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+              <input
+                type="text"
+                value={newFeatureText}
+                onChange={(e) => setNewFeatureText(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleAddFeature();
+                  }
+                }}
+                placeholder="+ Legg til ny funksjon..."
+                style={{ ...styles.input, marginBottom: 0, fontSize: '13px', padding: '8px 10px' }}
+              />
+              <button
+                type="button"
+                onClick={handleAddFeature}
+                style={{
+                  backgroundColor: '#0C4A6E',
+                  border: '1px solid #38BDF8',
+                  color: '#BAE6FD',
+                  borderRadius: '6px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                Legg til
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <button
+          type="submit"
+          disabled={isSaving}
+          style={{
+            ...styles.primaryButton,
+            width: '100%',
+            marginTop: 'auto',
+            backgroundColor: tier === 'PREMIUM' ? '#F59E0B' : tier === 'STANDARD' ? '#0284C7' : '#334155',
+            color: tier === 'PREMIUM' ? '#0F172A' : '#FFFFFF',
+          }}
+        >
+          {isSaving ? 'Lagrer...' : `Lagre ${tier} plan`}
+        </button>
+      </form>
+    </div>
+  );
+}
+
+interface ReferralConfigCardProps {
+  initialBonus: number;
+  initialDuration: number;
+  isSaving: boolean;
+  onSave: (bonusDailyTests: number, durationDays: number) => void;
+}
+
+function ReferralConfigCard({
+  initialBonus,
+  initialDuration,
+  isSaving,
+  onSave,
+}: ReferralConfigCardProps) {
+  const [bonusDailyTests, setBonusDailyTests] = useState<number>(initialBonus);
+  const [durationDays, setDurationDays] = useState<number>(initialDuration);
+
+  useEffect(() => {
+    setBonusDailyTests(initialBonus);
+    setDurationDays(initialDuration);
+  }, [initialBonus, initialDuration]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSave(bonusDailyTests, durationDays);
+  };
+
+  return (
+    <div
+      style={{
+        backgroundColor: '#1E293B',
+        padding: '24px',
+        borderRadius: '12px',
+        border: '1px solid #334155',
+      }}
+    >
+      <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 6px 0' }}>
+        Verveprogram Innstillinger (Referrals)
+      </h2>
+      <p style={{ color: '#94A3B8', fontSize: '14px', margin: '0 0 20px 0' }}>
+        Konfigurer hvor mange ekstra tester en bruker mottar per dag når en vervet venn registrerer seg, og varigheten på bonusen.
+      </p>
+
+      <form onSubmit={handleSubmit}>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))',
+            gap: '20px',
+            alignItems: 'end',
+          }}
+        >
+          <div>
+            <label style={styles.label}>Ekstra tester per dag per vervet venn:</label>
+            <input
+              type="number"
+              min="1"
+              value={bonusDailyTests}
+              onChange={(e) => setBonusDailyTests(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              style={{ ...styles.input, marginBottom: 0 }}
+              required
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Varighet (dager):</label>
+            <input
+              type="number"
+              min="1"
+              value={durationDays}
+              onChange={(e) => setDurationDays(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              style={{ ...styles.input, marginBottom: 0 }}
+              required
+            />
+          </div>
+          <div>
+            <button
+              type="submit"
+              disabled={isSaving}
+              style={{ ...styles.primaryButton, width: '100%' }}
+            >
+              {isSaving ? 'Lagrer...' : 'Lagre Verveinnstillinger'}
+            </button>
+          </div>
+        </div>
+      </form>
     </div>
   );
 }

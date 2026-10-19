@@ -2,7 +2,8 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import { db, pool } from './index';
-import { examTopics, userQuotas } from './schema';
+import { examTopics, userQuotas, tierConfigs, systemConfigs } from './schema';
+import { DEFAULT_TIER_CONFIGS, DEFAULT_REFERRAL_CONFIG } from '../../lib/tier-policy';
 import { sql } from 'drizzle-orm';
 
 export const SAMPLE_TOPICS = [
@@ -121,6 +122,66 @@ export async function seed() {
       },
     });
   console.log(`✓ Seeded user quota: ${TEST_USER_ID} with 1800 remaining audio seconds`);
+
+  // 3. Seed tier configurations (FREE, STANDARD, PREMIUM) from fallback defaults
+  for (const tierKey of ['FREE', 'STANDARD', 'PREMIUM'] as const) {
+    const config = DEFAULT_TIER_CONFIGS[tierKey];
+    await db
+      .insert(tierConfigs)
+      .values({
+        tier: config.tier,
+        dailyTestLimit: config.dailyTestLimit,
+        priceCents: config.priceCents,
+        currency: config.currency,
+        featuresJson: config.features,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: tierConfigs.tier,
+        set: {
+          dailyTestLimit: config.dailyTestLimit,
+          priceCents: config.priceCents,
+          currency: config.currency,
+          featuresJson: config.features,
+          updatedAt: new Date(),
+        },
+      });
+    console.log(`✓ Seeded tier config: ${config.tier} (${config.dailyTestLimit} tests/day, ${config.priceCents / 100} ${config.currency})`);
+  }
+
+  // 4. Seed system configurations (referral bonus and duration) from fallback defaults
+  await db
+    .insert(systemConfigs)
+    .values({
+      key: 'REFERRAL_BONUS_DAILY_TESTS',
+      value: DEFAULT_REFERRAL_CONFIG.bonusDailyTests.toString(),
+      description: 'Antall ekstra tester per dag gitt for hver vervet venn',
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: systemConfigs.key,
+      set: {
+        value: DEFAULT_REFERRAL_CONFIG.bonusDailyTests.toString(),
+        updatedAt: new Date(),
+      },
+    });
+
+  await db
+    .insert(systemConfigs)
+    .values({
+      key: 'REFERRAL_BONUS_DURATION_DAYS',
+      value: DEFAULT_REFERRAL_CONFIG.durationDays.toString(),
+      description: 'Antall dager vervebonusen er aktiv',
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: systemConfigs.key,
+      set: {
+        value: DEFAULT_REFERRAL_CONFIG.durationDays.toString(),
+        updatedAt: new Date(),
+      },
+    });
+  console.log(`✓ Seeded system configs: REFERRAL_BONUS_DAILY_TESTS=${DEFAULT_REFERRAL_CONFIG.bonusDailyTests}, REFERRAL_BONUS_DURATION_DAYS=${DEFAULT_REFERRAL_CONFIG.durationDays}`);
 
   console.log('--- Database seed completed successfully ---');
 }
