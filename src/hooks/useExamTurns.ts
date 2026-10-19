@@ -13,6 +13,7 @@ import {
   finishExamSession,
   resolveAudioUrl,
 } from '../api';
+import { getAuthToken } from '../identity';
 import type {
   CoCandidateMode,
   ExamReply,
@@ -157,14 +158,22 @@ export function useExamTurns({
         resolve();
       }
 
-      try {
-        setAudioModeAsync({
-          allowsRecording: false,
-          playsInSilentMode: true,
-        }).catch(() => {});
+      (async () => {
+        try {
+          const token = await getAuthToken();
+          const audioUrl = resolveAudioUrl(reply.audioUrl, token);
 
-        const player = createAudioPlayer(audioUrl, { updateInterval: 250 });
-        activePlayerRef.current = player;
+          setAudioModeAsync({
+            allowsRecording: false,
+            playsInSilentMode: true,
+          }).catch(() => {});
+
+          const audioSource = token
+            ? { uri: audioUrl, headers: { Authorization: `Bearer ${token}` } }
+            : audioUrl;
+
+          const player = createAudioPlayer(audioSource, { updateInterval: 250 });
+          activePlayerRef.current = player;
 
         let sawPlaying = false;
         const playerWithEvents = player as unknown as {
@@ -207,8 +216,9 @@ export function useExamTurns({
         // Brief pause so user can read the text if audio playback is unavailable
         setTimeout(finishPlayback, 2000);
       }
-    });
-  }, []);
+    })();
+  });
+}, []);
 
   /**
    * Sequentially play an array of AI replies, then transition to listening (or finish exam).

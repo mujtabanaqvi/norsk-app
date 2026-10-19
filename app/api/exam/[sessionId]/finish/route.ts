@@ -5,14 +5,16 @@ import { examSessions, usageLedger, userQuotas } from '@/src/db/schema';
 import { calculateEstimatedCostUsd } from '@/lib/cost-calculator';
 import { evaluateExamSession } from '@/src/lib/evaluate-exam';
 import { CONVERSATION_MODEL } from '@/src/server/personas';
+import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function POST(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
+    const user = await authenticateUser(req);
     const { sessionId } = await params;
 
     if (!sessionId || !UUID_REGEX.test(sessionId)) {
@@ -27,6 +29,11 @@ export async function POST(
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    // Ensure session belongs to the authenticated user
+    if (session.userId !== user.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Idempotent handling if already completed
@@ -122,6 +129,12 @@ export async function POST(
       status: 'COMPLETED',
     });
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: error.message },
+        { status: 401 }
+      );
+    }
     console.error('[POST /api/exam/[sessionId]/finish] Error:', error);
     return NextResponse.json(
       {

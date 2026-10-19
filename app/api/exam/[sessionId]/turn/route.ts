@@ -16,6 +16,7 @@ import {
 } from '@/src/server/exam-engine';
 import { generateLine } from '@/src/server/personas';
 import { transcribe } from '@/src/server/speech';
+import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -24,6 +25,7 @@ export async function POST(
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
+    const user = await authenticateUser(req);
     const { sessionId } = await params;
     if (!sessionId || !UUID_REGEX.test(sessionId)) {
       return NextResponse.json({ error: 'Invalid sessionId' }, { status: 400 });
@@ -44,6 +46,12 @@ export async function POST(
     }
 
     const { session, topic } = row;
+
+    // Verify session ownership
+    if (session.userId !== user.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    }
+
     if (session.status !== 'ACTIVE') {
       return NextResponse.json(
         { error: 'Session is no longer active', status: session.status },
@@ -289,6 +297,12 @@ export async function POST(
       replies,
     });
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: error.message },
+        { status: 401 }
+      );
+    }
     console.error('[POST /api/exam/[sessionId]/turn] Error:', error);
     return NextResponse.json(
       {

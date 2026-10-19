@@ -19,7 +19,7 @@ import { useAuth } from '../hooks/useAuth';
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 
 export const AuthScreen: React.FC<Props> = ({ navigation }) => {
-  const { login, register, loginWithGoogle } = useAuth();
+  const { user, login, register, loginWithGoogle } = useAuth();
 
   const [isLoginMode, setIsLoginMode] = useState<boolean>(true);
   const [email, setEmail] = useState<string>('');
@@ -48,7 +48,9 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
           referralCode: referralCode.trim() || undefined,
         });
       }
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Det oppstod en feil.');
     } finally {
@@ -60,8 +62,6 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
     setErrorMessage(null);
     setIsLoading(true);
     try {
-      // In dev or web environment, simulate / invoke Google auth flow
-      // A mock/placeholder token is used for initial scaffolding if Google OAuth SDK is not yet linked
       const simulatedToken = `google_mock_token_${Date.now()}.${btoa(
         JSON.stringify({
           sub: `google_user_${Date.now()}`,
@@ -71,7 +71,9 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
       )}.sig`;
 
       await loginWithGoogle(simulatedToken, referralCode.trim() || undefined);
-      navigation.goBack();
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      }
     } catch (err: any) {
       setErrorMessage(err.message || 'Google-innlogging feilet');
     } finally {
@@ -85,19 +87,68 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
         style={styles.container}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        <ScrollView contentContainerStyle={styles.scrollContent}>
-          <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
-            <Text style={styles.backButtonText}>← Tilbake</Text>
-          </TouchableOpacity>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={false}
+        >
+          {navigation.canGoBack() && (
+            <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
+              <Text style={styles.backButtonText}>← Tilbake</Text>
+            </TouchableOpacity>
+          )}
+
+          {/* App Branding & Highlights Banner */}
+          <View style={styles.brandContainer}>
+            <View style={styles.brandBadge}>
+              <Text style={styles.brandBadgeText}>NORSKPRØVEN B1 / B2</Text>
+            </View>
+            <Text style={styles.brandTitle}>Muntlig Eksamenssimulator</Text>
+            <Text style={styles.brandSubtitle}>
+              Øv på den offisielle muntlige prøven med AI-sensor og få umiddelbar HK-dir karaktervurdering.
+            </Text>
+          </View>
+
+          {/* Smart Feature Showcase Cards */}
+          <View style={styles.featuresGrid}>
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>🎙️</Text>
+              <View style={styles.featureTextWrapper}>
+                <Text style={styles.featureTitle}>Full muntlig eksamen</Text>
+                <Text style={styles.featureDesc}>
+                  Del 1 (egenpresentasjon), Del 2 (samtale) og Del 3 (oppfølging).
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>🤖</Text>
+              <View style={styles.featureTextWrapper}>
+                <Text style={styles.featureTitle}>Interaktiv AI-medkandidat</Text>
+                <Text style={styles.featureDesc}>
+                  Øv alene når det passer deg, eller ta prøven sammen med en venn.
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.featureItem}>
+              <Text style={styles.featureIcon}>📊</Text>
+              <View style={styles.featureTextWrapper}>
+                <Text style={styles.featureTitle}>HK-dir Sensorvurdering</Text>
+                <Text style={styles.featureDesc}>
+                  Detaljert poengsum på flyt, uttale, grammatikk og ordforråd.
+                </Text>
+              </View>
+            </View>
+          </View>
 
           <View style={styles.headerContainer}>
             <Text style={styles.title}>
-              {isLoginMode ? 'Velkommen tilbake' : 'Opprett konto'}
+              {isLoginMode ? 'Logg inn for å starte' : 'Opprett konto for å starte'}
             </Text>
             <Text style={styles.subtitle}>
               {isLoginMode
-                ? 'Logg inn for å få tilgang til dine tester og abonnement'
-                : 'Registrer deg for å øve til Norskprøven'}
+                ? 'Logg inn med din konto for å få tilgang til prøver og resultater.'
+                : 'Registrer deg gratis for å øve til Norskprøven i dag.'}
             </Text>
           </View>
 
@@ -162,7 +213,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
             )}
 
             <TouchableOpacity
-              style={styles.submitButton}
+              style={[styles.submitButton, isLoading && styles.disabledButton]}
               onPress={handleSubmit}
               disabled={isLoading}
             >
@@ -190,7 +241,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.googleButtonText}>Fortsett med Google</Text>
             </TouchableOpacity>
 
-            {/* Apple ID Placeholder (disabled for future) */}
+            {/* Apple ID Placeholder */}
             <TouchableOpacity
               style={[styles.appleButton, styles.disabledButton]}
               disabled={true}
@@ -213,6 +264,26 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
                 : 'Har du allerede en konto? Logg inn'}
             </Text>
           </TouchableOpacity>
+
+          {/* Public Legal & How-to Links */}
+          <View style={styles.publicLinksContainer}>
+            <TouchableOpacity
+              onPress={() => navigation.navigate('HowTo')}
+              style={styles.publicLinkBtn}
+            >
+              <Text style={styles.publicLinkText}>📖 Slik fungerer prøven</Text>
+            </TouchableOpacity>
+
+            <View style={styles.footerLinkRow}>
+              <TouchableOpacity onPress={() => navigation.navigate('Terms')}>
+                <Text style={styles.footerSubLink}>Vilkår for bruk</Text>
+              </TouchableOpacity>
+              <Text style={styles.footerDot}>•</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
+                <Text style={styles.footerSubLink}>Personvernerklæring</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -228,53 +299,118 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    padding: 24,
+    padding: 20,
     paddingBottom: 40,
   },
   backButton: {
     paddingVertical: 8,
-    marginBottom: 16,
+    marginBottom: 8,
   },
   backButtonText: {
     color: '#38BDF8',
     fontSize: 16,
     fontWeight: '600',
   },
-  headerContainer: {
-    marginBottom: 24,
+  brandContainer: {
+    alignItems: 'center',
+    marginBottom: 20,
+    marginTop: 8,
   },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: '#F8FAFC',
+  brandBadge: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#38BDF8',
     marginBottom: 8,
   },
-  subtitle: {
-    fontSize: 15,
+  brandBadgeText: {
+    color: '#38BDF8',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 1,
+  },
+  brandTitle: {
+    fontSize: 24,
+    fontWeight: '900',
+    color: '#F8FAFC',
+    textAlign: 'center',
+    marginBottom: 6,
+  },
+  brandSubtitle: {
+    fontSize: 13,
     color: '#94A3B8',
-    lineHeight: 22,
+    textAlign: 'center',
+    lineHeight: 18,
+    paddingHorizontal: 10,
+  },
+  featuresGrid: {
+    backgroundColor: '#131B2E',
+    borderRadius: 14,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: '#1E293B',
+    marginBottom: 20,
+    gap: 12,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 12,
+  },
+  featureIcon: {
+    fontSize: 20,
+  },
+  featureTextWrapper: {
+    flex: 1,
+  },
+  featureTitle: {
+    color: '#F8FAFC',
+    fontSize: 14,
+    fontWeight: '700',
+    marginBottom: 2,
+  },
+  featureDesc: {
+    color: '#94A3B8',
+    fontSize: 12,
+    lineHeight: 16,
+  },
+  headerContainer: {
+    marginBottom: 16,
+  },
+  title: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#F8FAFC',
+    marginBottom: 4,
+  },
+  subtitle: {
+    fontSize: 13,
+    color: '#94A3B8',
   },
   errorBox: {
     backgroundColor: 'rgba(239, 68, 68, 0.15)',
     borderWidth: 1,
     borderColor: '#EF4444',
-    borderRadius: 12,
     padding: 12,
-    marginBottom: 20,
+    borderRadius: 10,
+    marginBottom: 16,
   },
   errorText: {
     color: '#FCA5A5',
-    fontSize: 14,
+    fontSize: 13,
+    lineHeight: 18,
   },
   formCard: {
     backgroundColor: '#1E293B',
     borderRadius: 16,
-    padding: 20,
+    padding: 18,
     borderWidth: 1,
     borderColor: '#334155',
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 14,
   },
   inputLabel: {
     color: '#CBD5E1',
@@ -287,27 +423,30 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#334155',
     borderRadius: 10,
-    color: '#F8FAFC',
     paddingHorizontal: 14,
     paddingVertical: 12,
+    color: '#F8FAFC',
     fontSize: 15,
   },
   submitButton: {
-    backgroundColor: '#2563EB',
-    borderRadius: 12,
+    backgroundColor: '#0284C7',
+    borderRadius: 10,
     paddingVertical: 14,
     alignItems: 'center',
-    marginTop: 8,
+    marginTop: 6,
   },
   submitButtonText: {
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '700',
   },
+  disabledButton: {
+    opacity: 0.6,
+  },
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 20,
+    marginVertical: 18,
   },
   dividerLine: {
     flex: 1,
@@ -316,46 +455,77 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     color: '#64748B',
-    paddingHorizontal: 12,
-    fontSize: 12,
-    fontWeight: '600',
+    fontSize: 11,
+    fontWeight: '700',
+    marginHorizontal: 12,
   },
   googleButton: {
     backgroundColor: '#FFFFFF',
-    borderRadius: 12,
-    paddingVertical: 13,
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 10,
   },
   googleButtonText: {
     color: '#0F172A',
-    fontSize: 15,
-    fontWeight: '600',
+    fontSize: 14,
+    fontWeight: '700',
   },
   appleButton: {
     backgroundColor: '#000000',
-    borderRadius: 12,
-    paddingVertical: 13,
+    borderRadius: 10,
+    paddingVertical: 12,
     alignItems: 'center',
     borderWidth: 1,
     borderColor: '#334155',
   },
   appleButtonText: {
-    color: '#94A3B8',
+    color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '600',
   },
-  disabledButton: {
-    opacity: 0.6,
-  },
   switchModeButton: {
-    marginTop: 24,
+    marginTop: 18,
     alignItems: 'center',
+    paddingVertical: 10,
   },
   switchModeText: {
     color: '#38BDF8',
     fontSize: 14,
     fontWeight: '600',
   },
+  publicLinksContainer: {
+    marginTop: 20,
+    alignItems: 'center',
+    gap: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#1E293B',
+    paddingTop: 16,
+  },
+  publicLinkBtn: {
+    backgroundColor: '#1E293B',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#334155',
+  },
+  publicLinkText: {
+    color: '#38BDF8',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  footerLinkRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  footerSubLink: {
+    color: '#64748B',
+    fontSize: 12,
+  },
+  footerDot: {
+    color: '#475569',
+    fontSize: 12,
+  },
 });
-

@@ -10,7 +10,7 @@ import {
   TranscriptEntry,
   SessionEngineState,
 } from '@/src/db/schema';
-import { authenticateUser } from '@/lib/auth';
+import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { initialState, openingActions, toUiStage } from '@/src/server/exam-engine';
 import {
   pickRandomExamTopic,
@@ -20,7 +20,7 @@ import { generateLine } from '@/src/server/personas';
 
 // Validates the request body using Zod (topicId is optional; omit or pass 'RANDOM' for random selection)
 export const startExamSchema = z.object({
-  userId: z.string().min(1, 'userId is required'),
+  userId: z.string().optional(),
   topicId: z.string().optional(),
   level: z.enum(['B1', 'B2']),
   coCandidateMode: z.enum(['AI_PEER', 'HUMAN_LOCAL']),
@@ -28,7 +28,11 @@ export const startExamSchema = z.object({
 
 export async function POST(req: NextRequest) {
   try {
-    // 1. Parse JSON payload
+    // 1. Authenticate user strictly
+    const authUser = await authenticateUser(req);
+    const userId = authUser.userId;
+
+    // 2. Parse JSON payload
     let rawJson: Record<string, unknown>;
     try {
       rawJson = await req.json();
@@ -37,18 +41,6 @@ export async function POST(req: NextRequest) {
         { error: 'Invalid JSON payload' },
         { status: 400 }
       );
-    }
-
-    // Optional header authentication fallback for userId if omitted in JSON body
-    if (!rawJson.userId) {
-      try {
-        const authUser = await authenticateUser(req);
-        if (authUser?.userId) {
-          rawJson.userId = authUser.userId;
-        }
-      } catch {
-        // Fall through to Zod validation
-      }
     }
 
     const validationResult = startExamSchema.safeParse(rawJson);
@@ -62,7 +54,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { userId, topicId, level, coCandidateMode } = validationResult.data;
+    const { topicId, level, coCandidateMode } = validationResult.data;
 
     // 2. Fetch or create user quota row (default 1800s if none exists)
     let [quota] = await db
@@ -257,6 +249,12 @@ export async function POST(req: NextRequest) {
       { status: 201 }
     );
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: error.message },
+        { status: 401 }
+      );
+    }
     console.error('[Start Exam] Internal error:', error);
     return NextResponse.json(
       {

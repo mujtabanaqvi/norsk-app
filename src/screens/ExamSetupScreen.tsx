@@ -109,6 +109,15 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
    * Call POST /api/exam/start and navigate to Active Exam Room
    */
   const handleStartExam = async () => {
+    if (!user) {
+      Alert.alert(
+        'Innlogging påkrevd',
+        'Du må være logget inn for å ta en muntlig prøve.',
+        [{ text: 'Logg inn', onPress: () => navigation.navigate('Auth') }]
+      );
+      return;
+    }
+
     if (!selectedTopicId || filteredTopics.length === 0) {
       Alert.alert('Velg tema', 'Ingen tilgjengelige eksamenstemaer for valgt nivå.');
       return;
@@ -215,18 +224,32 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
         )}
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('HowTo')}
+            style={{
+              backgroundColor: 'rgba(56, 189, 248, 0.15)',
+              paddingHorizontal: 8,
+              paddingVertical: 5,
+              borderRadius: 8,
+            }}
+          >
+            <Text style={{ color: '#38BDF8', fontSize: 12, fontWeight: '700' }}>
+              ℹ️ Veileder
+            </Text>
+          </TouchableOpacity>
+
           <TouchableOpacity
             onPress={() => navigation.navigate('Referral')}
             style={{
               backgroundColor: 'rgba(16, 185, 129, 0.15)',
-              paddingHorizontal: 10,
+              paddingHorizontal: 8,
               paddingVertical: 5,
               borderRadius: 8,
             }}
           >
             <Text style={{ color: '#10B981', fontSize: 12, fontWeight: '700' }}>
-              🎁 Verv en venn
+              🎁 Verv
             </Text>
           </TouchableOpacity>
 
@@ -234,7 +257,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => navigation.navigate('Subscription')}
             style={{
               backgroundColor: 'rgba(245, 158, 11, 0.15)',
-              paddingHorizontal: 10,
+              paddingHorizontal: 8,
               paddingVertical: 5,
               borderRadius: 8,
             }}
@@ -243,6 +266,22 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
               ⭐ Oppgrader
             </Text>
           </TouchableOpacity>
+
+          {user && (
+            <TouchableOpacity
+              onPress={logout}
+              style={{
+                backgroundColor: 'rgba(239, 68, 68, 0.15)',
+                paddingHorizontal: 8,
+                paddingVertical: 5,
+                borderRadius: 8,
+              }}
+            >
+              <Text style={{ color: '#EF4444', fontSize: 12, fontWeight: '700' }}>
+                Logg ut
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
       </View>
 

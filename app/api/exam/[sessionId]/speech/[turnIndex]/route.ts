@@ -4,14 +4,16 @@ import { db } from '@/src/db';
 import { examSessions, TranscriptEntry } from '@/src/db/schema';
 import { synthesizeStream } from '@/src/server/speech';
 import type { Persona } from '@/src/server/exam-engine';
+import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ sessionId: string; turnIndex: string }> }
 ) {
   try {
+    const user = await authenticateUser(req);
     const { sessionId, turnIndex } = await params;
 
     if (!sessionId || !UUID_REGEX.test(sessionId)) {
@@ -31,6 +33,10 @@ export async function GET(
 
     if (!session) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 });
+    }
+
+    if (session.userId !== user.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     const transcript = (session.transcriptJson as TranscriptEntry[]) || [];
@@ -54,6 +60,9 @@ export async function GET(
       },
     });
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     console.error('[GET /api/exam/[sessionId]/speech/[turnIndex]] Error:', error);
     return NextResponse.json(
       {

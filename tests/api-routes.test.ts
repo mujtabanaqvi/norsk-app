@@ -18,13 +18,13 @@ test('Route Validation: startExamSchema validates required fields', () => {
     assert.equal(result.data.coCandidateMode, 'AI_PEER');
   }
 
-  // Reject missing userId
+  // userId in request body is optional because server derives userId from authenticated session
   const missingUser = {
     topicId: 'miljo-og-baerekraft-i-hverdagen',
     level: 'B1',
     coCandidateMode: 'AI_PEER',
   };
-  assert.equal(startExamSchema.safeParse(missingUser).success, false);
+  assert.equal(startExamSchema.safeParse(missingUser).success, true);
 
   // Allow missing topicId (triggers random exam & question selection)
   const missingTopic = {

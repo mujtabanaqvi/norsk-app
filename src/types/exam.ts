@@ -196,6 +196,9 @@ export type RootStackParamList = {
   Auth: undefined;
   Subscription: undefined;
   Referral: undefined;
+  HowTo: undefined;
+  Terms: undefined;
+  PrivacyPolicy: undefined;
 };
 
 /**

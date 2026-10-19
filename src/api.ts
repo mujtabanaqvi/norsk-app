@@ -138,12 +138,18 @@ async function readNativeAudioBytes(uri: string): Promise<Uint8Array> {
   return new Uint8Array(buffer);
 }
 
-export function resolveAudioUrl(pathOrUrl: string): string {
+export function resolveAudioUrl(pathOrUrl: string, token?: string | null): string {
   if (!pathOrUrl) return '';
-  if (pathOrUrl.startsWith('http://') || pathOrUrl.startsWith('https://')) {
-    return pathOrUrl;
+  let fullUrl = pathOrUrl;
+  if (!pathOrUrl.startsWith('http://') && !pathOrUrl.startsWith('https://')) {
+    fullUrl = `${activeApiBaseUrl}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
   }
-  return `${activeApiBaseUrl}${pathOrUrl.startsWith('/') ? '' : '/'}${pathOrUrl}`;
+
+  if (token && !fullUrl.includes('token=')) {
+    const separator = fullUrl.includes('?') ? '&' : '?';
+    fullUrl = `${fullUrl}${separator}token=${encodeURIComponent(token)}`;
+  }
+  return fullUrl;
 }
 
 export async function fetchTopicsAndQuota(): Promise<GetTopicsResponse> {

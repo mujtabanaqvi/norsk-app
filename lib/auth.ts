@@ -77,17 +77,28 @@ export async function authenticateUser(
     // Continue to Bearer / header fallback
   }
 
+  let token: string | null = null;
   const authHeader = request.headers.get('authorization');
 
   if (authHeader && authHeader.startsWith('Bearer ')) {
-    const token = authHeader.substring(7).trim();
+    token = authHeader.substring(7).trim();
+  } else if ('nextUrl' in request && request.nextUrl?.searchParams) {
+    token = request.nextUrl.searchParams.get('token') || request.nextUrl.searchParams.get('authToken');
+  } else {
+    try {
+      const url = new URL(request.url);
+      token = url.searchParams.get('token') || url.searchParams.get('authToken');
+    } catch {}
+  }
 
-    if (!token) {
+  if (token) {
+    if (!token.trim()) {
       throw new AuthenticationError('Empty Bearer token provided');
     }
+    const cleanToken = token.trim();
 
     try {
-      const payload = verifyUserToken(token);
+      const payload = verifyUserToken(cleanToken);
       return {
         userId: payload.sub,
         email: payload.email,
@@ -95,8 +106,8 @@ export async function authenticateUser(
       };
     } catch {
       // Fallback for mock/candidate token in dev/tests (e.g. user_xxx or candidate_xxx)
-      if (token.startsWith('candidate_') || token.startsWith('user_') || token.startsWith('test_')) {
-        return { userId: token };
+      if (cleanToken.startsWith('candidate_') || cleanToken.startsWith('user_') || cleanToken.startsWith('test_')) {
+        return { userId: cleanToken };
       }
       throw new AuthenticationError('Invalid authentication token');
     }

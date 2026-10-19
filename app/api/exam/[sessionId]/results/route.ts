@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/src/db';
 import { examSessions, examTopics, usageLedger } from '@/src/db/schema';
-import { authenticateUser } from '@/lib/auth';
+import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ sessionId: string }> }
 ) {
   try {
+    const user = await authenticateUser(req);
     const { sessionId } = await params;
 
     if (!sessionId) {
@@ -38,14 +39,9 @@ export async function GET(
 
     const session = row.session;
 
-    // Optional user authorization verification if credentials are present
-    try {
-      const user = await authenticateUser(req);
-      if (user && session.userId !== user.userId) {
-        return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-      }
-    } catch {
-      // Allow unauthenticated query if the client possesses the unguessable session UUID
+    // Enforce user authorization verification
+    if (session.userId !== user.userId) {
+      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
     // Fetch usageLedger entries for this session
@@ -65,6 +61,12 @@ export async function GET(
       topic: row.topic ?? null,
     });
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json(
+        { error: 'Unauthorized', message: error.message },
+        { status: 401 }
+      );
+    }
     console.error('[GET /api/exam/[sessionId]/results] Internal Error:', error);
     return NextResponse.json(
       {

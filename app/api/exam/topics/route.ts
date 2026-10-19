@@ -2,26 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { eq, and } from 'drizzle-orm';
 import { db } from '@/src/db';
 import { examTopics, userQuotas } from '@/src/db/schema';
-import { authenticateUser } from '@/lib/auth';
+import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
   try {
-    // 1. Authenticate user (or extract user identifier)
-    let userId: string;
-    try {
-      const user = await authenticateUser(req);
-      userId = user.userId;
-    } catch {
-      // Allow fallback to ?userId= query param or x-user-id header
-      const queryUserId = req.nextUrl.searchParams.get('userId') || req.headers.get('x-user-id');
-      if (!queryUserId) {
-        return NextResponse.json(
-          { error: 'Unauthorized', message: 'Authentication required' },
-          { status: 401 }
-        );
-      }
-      userId = queryUserId.trim();
-    }
+    // 1. Authenticate user
+    const user = await authenticateUser(req);
+    const userId = user.userId;
 
     // 2. Parse optional level query parameter
     const levelParam = req.nextUrl.searchParams.get('level');
@@ -83,6 +70,9 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: 'Unauthorized', message: 'Authentication required' }, { status: 401 });
+    }
     console.error('[GET /api/exam/topics] Internal Error:', error);
     return NextResponse.json(
       {

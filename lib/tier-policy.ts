@@ -14,7 +14,7 @@ export interface TierPolicy {
 export const DEFAULT_TIER_CONFIGS: Record<'FREE' | 'STANDARD' | 'PREMIUM', TierPolicy> = {
   FREE: {
     tier: 'FREE',
-    dailyTestLimit: 1, // Default free users: 1 test per 24 hours (calendar day)
+    dailyTestLimit: 10, // Default free users: 1 test per 24 hours (calendar day)
     priceCents: 0,
     currency: 'NOK',
     features: ['1 test per dag', 'B1 og B2 temaer', 'Full AI evaluering'],
