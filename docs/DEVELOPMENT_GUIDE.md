@@ -124,3 +124,18 @@ $env:RUN_INTEGRATION='1'; npm run test:integration
 | `npm run db:migrate` | Drizzle Migrate | Applies pending SQL migrations to PostgreSQL. |
 | `npm run db:push` | Drizzle Push | Pushes `src/db/schema.ts` directly to PostgreSQL without generating migration files. |
 
+
+---
+
+## 5. UI Languages (Norwegian / English)
+
+The app UI is available in Norwegian (`nb`, the default) and English (`en`). Users switch with the **NO | EN** pill on the Auth, Verify Email and Exam Setup screens; the choice is stored on the device (`AsyncStorage` key `norsk_app_locale`).
+
+Only app chrome is translated. Exam content (theme titles/descriptions, prompts, examiner and co-candidate speech, transcripts) is served by the API and always stays Norwegian. The AI feedback on the results screen has its own NO/EN toggle, which starts in the UI language.
+
+* **Dictionaries:** `src/i18n/nb.ts` is the source of truth; `src/i18n/en.ts` must mirror every key (a missing key is a TypeScript error, and `tests/i18n.test.ts` also checks list lengths and `{placeholders}`).
+* **In components:** `const { t, strings, locale } = useLocale();` then `t('setup.start')` or `t('setup.themesForLevel', { count, level })`. Use `strings.<area>.<list>` for list-valued entries (e.g. Terms sections).
+* **Outside React** (`src/api.ts`): `translate(getCurrentLocale(), key, params)`.
+* **Validation:** zod messages in `src/validation/auth.ts` are dictionary keys; read them through `fieldErrors(error, locale)` / `validateField(..., locale)`. The API calls these without a locale, so it still answers in Norwegian.
+* **API errors:** the client translates known `error` codes via `apiErrors.<CODE>`; other server messages are shown as sent (Norwegian).
+* **Web pages:** Stripe checkout receives the app's locale and returns to `/subscription/success?lang=en` / `/subscription/canceled?lang=en`.

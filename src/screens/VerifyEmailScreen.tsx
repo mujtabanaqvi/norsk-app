@@ -12,10 +12,11 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { useAuth } from '../hooks/useAuth';
+import { useLocale } from '../hooks/useLocale';
 import { ApiError, resendVerificationEmail } from '../api';
-import { Screen, Logo, Card, Button, Icon } from '../components/ui';
+import { Screen, Logo, Card, Button, Icon, LanguageToggle } from '../components/ui';
 import { colors, radius, space, type } from '../theme';
-import { OTP_LENGTH, otpSchema } from '../validation/auth';
+import { OTP_LENGTH, otpSchema, validationMessage } from '../validation/auth';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'VerifyEmail'>;
 
@@ -24,6 +25,7 @@ const DEFAULT_COOLDOWN_SECONDS = 60;
 export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { email } = route.params;
   const { verifyEmail } = useAuth();
+  const { locale, t } = useLocale();
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -46,7 +48,8 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
     setNotice(null);
     const parsed = otpSchema.safeParse(value);
     if (!parsed.success) {
-      setError(parsed.error.issues[0]?.message ?? 'Ugyldig kode');
+      const issue = parsed.error.issues[0]?.message;
+      setError(issue ? validationMessage(issue, locale) : t('verify.invalidCode'));
       return;
     }
     setError(null);
@@ -55,7 +58,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
       // On success the user is set in context and App switches to the authenticated stack.
       await verifyEmail(email, parsed.data);
     } catch (err: any) {
-      setError(err?.message || 'Bekreftelsen mislyktes');
+      setError(err?.message || t('verify.failed'));
       if (err instanceof ApiError && (err.code === 'EXPIRED' || err.code === 'TOO_MANY_ATTEMPTS')) {
         setCode('');
       }
@@ -79,14 +82,14 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       const res = await resendVerificationEmail(email);
       setCode('');
-      setNotice('Vi har sendt en ny kode. Sjekk innboksen (og søppelpost).');
+      setNotice(t('verify.resent'));
       setCooldown(res.retryAfterSeconds ?? DEFAULT_COOLDOWN_SECONDS);
       inputRef.current?.focus();
     } catch (err: any) {
       if (err instanceof ApiError && err.retryAfterSeconds) {
         setCooldown(err.retryAfterSeconds);
       }
-      setError(err?.message || 'Kunne ikke sende ny kode');
+      setError(err?.message || t('verify.resendFailed'));
     } finally {
       setIsResending(false);
     }
@@ -106,30 +109,33 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
           showsVerticalScrollIndicator={false}
         >
           <View style={styles.container}>
-            <Pressable
-              style={styles.backButton}
-              onPress={goToLogin}
-              accessibilityRole="button"
-              accessibilityLabel="Tilbake"
-            >
-              <Icon name="chevron-back" size={20} color={colors.navy} />
-              <Text style={styles.backButtonText}>Tilbake</Text>
-            </Pressable>
+            <View style={styles.topRow}>
+              <Pressable
+                style={styles.backButton}
+                onPress={goToLogin}
+                accessibilityRole="button"
+                accessibilityLabel={t('common.back')}
+              >
+                <Icon name="chevron-back" size={20} color={colors.navy} />
+                <Text style={styles.backButtonText}>{t('common.back')}</Text>
+              </Pressable>
+              <LanguageToggle />
+            </View>
 
             <View style={styles.header}>
               <Logo size={64} />
               <View style={styles.mailIcon}>
                 <Icon name="mail-unread-outline" size={28} color={colors.red} />
               </View>
-              <Text style={styles.title}>Bekreft e-postadressen din</Text>
+              <Text style={styles.title}>{t('verify.title')}</Text>
               <Text style={styles.subtitle}>
-                Vi har sendt en {OTP_LENGTH}-sifret kode og en bekreftelseslenke til
+                {t('verify.subtitle', { digits: OTP_LENGTH })}
               </Text>
               <Text style={styles.email}>{email}</Text>
             </View>
 
             <Card style={styles.card}>
-              <Text style={styles.inputLabel}>Bekreftelseskode</Text>
+              <Text style={styles.inputLabel}>{t('verify.codeLabel')}</Text>
               <TextInput
                 ref={inputRef}
                 style={[styles.codeInput, !!error && styles.codeInputError]}
@@ -144,7 +150,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
                 placeholderTextColor={colors.textMuted}
                 autoFocus
                 editable={!isVerifying}
-                accessibilityLabel="Bekreftelseskode"
+                accessibilityLabel={t('verify.codeLabel')}
                 onSubmitEditing={() => submit()}
               />
 
@@ -162,7 +168,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
               )}
 
               <Button
-                title="Bekreft og fortsett"
+                title={t('verify.submit')}
                 variant="primary"
                 size="lg"
                 fullWidth
@@ -173,7 +179,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
               />
 
               <Button
-                title={cooldown > 0 ? `Send ny kode (${cooldown}s)` : 'Send ny kode'}
+                title={cooldown > 0 ? t('verify.resendCountdown', { seconds: cooldown }) : t('verify.resend')}
                 variant="ghost"
                 size="md"
                 icon="refresh-outline"
@@ -187,18 +193,18 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
             <View style={styles.linkHelp}>
               <Icon name="link-outline" size={16} color={colors.textSecondary} />
               <Text style={styles.linkHelpText}>
-                Har du heller trykket på lenken i e-posten? Da er kontoen bekreftet og du kan logge inn.
+                {t('verify.linkHelp')}
               </Text>
             </View>
 
             <Pressable style={styles.footerAction} onPress={goToLogin}>
-              <Text style={styles.footerActionText}>Jeg har bekreftet – logg inn</Text>
+              <Text style={styles.footerActionText}>{t('verify.confirmedLogin')}</Text>
             </Pressable>
             <Pressable
               style={styles.footerAction}
               onPress={() => navigation.navigate('Auth', { mode: 'register' })}
             >
-              <Text style={styles.footerSubText}>Feil e-postadresse? Registrer deg på nytt</Text>
+              <Text style={styles.footerSubText}>{t('verify.wrongEmail')}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -218,13 +224,17 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: space.sm,
+  },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingVertical: space.sm,
-    marginBottom: space.sm,
-    alignSelf: 'flex-start',
   },
   backButtonText: {
     color: colors.navy,

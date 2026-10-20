@@ -8,3 +8,4 @@ export { Badge, TierBadge, type BadgeTone } from './Badge';
 export { Screen } from './Screen';
 export { AppHeader } from './AppHeader';
 export { Waveform } from './Waveform';
+export { LanguageToggle } from './LanguageToggle';

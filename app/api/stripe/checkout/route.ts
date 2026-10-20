@@ -6,11 +6,14 @@ import { eq } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { stripe } from '@/lib/stripe';
 import { getTierConfigs } from '@/lib/tier-policy';
+import { DEFAULT_LOCALE, translate } from '@/src/i18n';
 
 const checkoutSchema = z.object({
   tier: z.enum(['STANDARD', 'PREMIUM']),
   successUrl: z.string().url().optional(),
   cancelUrl: z.string().url().optional(),
+  /** UI language of the app, used for Stripe's checkout page and our return pages. */
+  locale: z.enum(['nb', 'en']).optional(),
 });
 
 export async function POST(req: NextRequest) {
@@ -26,7 +29,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { tier, successUrl, cancelUrl } = parsed.data;
+    const { tier, successUrl, cancelUrl, locale = DEFAULT_LOCALE } = parsed.data;
 
     // Fetch user
     const [user] = await db
@@ -61,20 +64,28 @@ export async function POST(req: NextRequest) {
     }
 
     const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
-    const finalSuccessUrl = successUrl || `${origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}`;
-    const finalCancelUrl = cancelUrl || `${origin}/subscription/canceled`;
+    const langQuery = locale === DEFAULT_LOCALE ? '' : `lang=${locale}`;
+    const finalSuccessUrl =
+      successUrl ||
+      `${origin}/subscription/success?session_id={CHECKOUT_SESSION_ID}${langQuery ? `&${langQuery}` : ''}`;
+    const finalCancelUrl = cancelUrl || `${origin}/subscription/canceled${langQuery ? `?${langQuery}` : ''}`;
 
     // Create Checkout Session
     const session = await stripe.checkout.sessions.create({
       customer: customerId,
       mode: 'subscription',
+      locale,
       line_items: [
         {
           price_data: {
             currency: selectedPlan.currency.toLowerCase(),
             product_data: {
-              name: `Norsk App ${tier === 'STANDARD' ? 'Standard' : 'Premium'} Abonnement`,
-              description: `Tilgang til ${selectedPlan.dailyTestLimit} tester per dag og full AI-vurdering`,
+              name: translate(locale, 'web.stripeProductName', {
+                tier: tier === 'STANDARD' ? 'Standard' : 'Premium',
+              }),
+              description: translate(locale, 'web.stripeProductDescription', {
+                count: selectedPlan.dailyTestLimit,
+              }),
             },
             unit_amount: selectedPlan.priceCents,
             recurring: {

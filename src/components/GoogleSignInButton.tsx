@@ -3,6 +3,7 @@ import { Platform, type StyleProp, type ViewStyle } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { Button, GoogleIcon } from './ui';
+import { useLocale } from '../hooks/useLocale';
 
 // Completes the OAuth popup/redirect on web.
 WebBrowser.maybeCompleteAuthSession();
@@ -19,8 +20,6 @@ const platformClientId = Platform.select({
   android: GOOGLE_CLIENT_IDS.androidClientId,
   default: GOOGLE_CLIENT_IDS.webClientId,
 });
-
-const TITLE = 'Fortsett med Google';
 
 interface GoogleSignInButtonProps {
   disabled?: boolean;
@@ -40,6 +39,7 @@ const OAuthGoogleButton: React.FC<GoogleSignInButtonProps> = ({
   onError,
   style,
 }) => {
+  const { t } = useLocale();
   const [request, response, promptAsync] = Google.useIdTokenAuthRequest(GOOGLE_CLIENT_IDS);
 
   useEffect(() => {
@@ -49,17 +49,17 @@ const OAuthGoogleButton: React.FC<GoogleSignInButtonProps> = ({
       if (idToken) {
         onIdToken(idToken);
       } else {
-        onError('Google returnerte ingen ID-token. Prøv igjen.');
+        onError(t('auth.googleNoToken'));
       }
     } else if (response.type === 'error') {
-      onError(response.error?.message || 'Google-innlogging ble avbrutt.');
+      onError(response.error?.message || t('auth.googleCancelled'));
     }
     // 'cancel' / 'dismiss' — user closed the popup; nothing to report.
   }, [response]);
 
   return (
     <Button
-      title={TITLE}
+      title={t('auth.googleButton')}
       variant="outline"
       size="lg"
       leading={<GoogleIcon size={20} />}
@@ -73,6 +73,7 @@ const OAuthGoogleButton: React.FC<GoogleSignInButtonProps> = ({
 };
 
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = (props) => {
+  const { t } = useLocale();
   if (platformClientId) {
     return <OAuthGoogleButton {...props} />;
   }
@@ -81,7 +82,7 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = (props) => 
   // server accepts only when it has no Google client IDs configured either.
   return (
     <Button
-      title={__DEV__ ? `${TITLE} (dev)` : TITLE}
+      title={__DEV__ ? `${t('auth.googleButton')} (dev)` : t('auth.googleButton')}
       variant="outline"
       size="lg"
       leading={<GoogleIcon size={20} />}

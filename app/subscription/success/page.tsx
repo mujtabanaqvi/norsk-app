@@ -1,13 +1,14 @@
 import React from 'react';
+import { resolveLocale, translate } from '@/src/i18n';
 
-export default function SubscriptionSuccessPage({
+export default async function SubscriptionSuccessPage({
   searchParams,
 }: {
-  searchParams: Promise<{ session_id?: string }>;
+  searchParams: Promise<{ session_id?: string; lang?: string }>;
 }) {
-  void searchParams;
+  const locale = resolveLocale((await searchParams).lang);
   return (
-    <main className="snakkly-center-shell">
+    <main className="snakkly-center-shell" lang={locale}>
       <div
         className="snakkly-card"
         style={{
@@ -66,7 +67,7 @@ export default function SubscriptionSuccessPage({
             letterSpacing: '-0.02em',
           }}
         >
-          Takk for ditt kjøp!
+          {translate(locale, 'web.successTitle')}
         </h1>
         <p
           style={{
@@ -76,12 +77,11 @@ export default function SubscriptionSuccessPage({
             margin: '0 0 1.75rem',
           }}
         >
-          Ditt abonnement er nå aktivert. Du har fått utvidet din daglige testkvote og kan nå øve
-          videre til muntlig Norskprøve.
+          {translate(locale, 'web.successBody')}
         </p>
 
         <a href="/" className="snakkly-btn-primary">
-          Tilbake til appen
+          {translate(locale, 'web.backToApp')}
         </a>
       </div>
     </main>

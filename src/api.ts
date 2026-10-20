@@ -1,6 +1,14 @@
 import { Platform } from 'react-native';
 import { API_BASE_URL, getCandidateApiBaseUrls } from './config';
 import { getOrCreateUserId, getAuthToken, setAuthToken, setStoredUser, clearAuthSession } from './identity';
+import {
+  DEFAULT_LOCALE,
+  getCurrentLocale,
+  hasTranslation,
+  translate,
+  type TranslationKey,
+  type TranslationParams,
+} from './i18n';
 import type {
   CefrLevel,
   CoCandidateMode,
@@ -10,6 +18,10 @@ import type {
   StartExamResponse,
   TurnResponse,
 } from './types/exam';
+
+/** Client-side messages follow the UI language chosen in the app. */
+const tr = (key: TranslationKey, params?: TranslationParams) =>
+  translate(getCurrentLocale(), key, params);
 
 const DEFAULT_TIMEOUT_MS = 35_000;
 const FALLBACK_PROBE_TIMEOUT_MS = 6_000;
@@ -93,7 +105,7 @@ async function fetchWithTimeout(
         errMsg.includes('Unsupported FormDataPart') ||
         errMsg.includes('Unsupported BodyInit')
       ) {
-        throw new Error(`Feil ved klargjøring av lyddata på enheten: ${errMsg}`);
+        throw new Error(tr('network.prepareAudio', { error: errMsg }));
       }
     }
   }
@@ -103,14 +115,10 @@ async function fetchWithTimeout(
     lastError instanceof Error &&
     (lastError.name === 'AbortError' || lastError.message.includes('aborted'))
   ) {
-    throw new Error(
-      `Tidsavbrudd ved tilkobling til serveren (${triedList}). Sjekk at Next.js-serveren kjører (npm run dev).`
-    );
+    throw new Error(tr('network.timeout', { urls: triedList }));
   }
 
-  throw new Error(
-    `Kunne ikke koble til serveren (${triedList}). Sjekk at PC og telefon er på samme Wi-Fi og at npm run dev kjører.`
-  );
+  throw new Error(tr('network.connectFailed', { urls: triedList }));
 }
 
 /**
@@ -132,7 +140,7 @@ async function readNativeAudioBytes(uri: string): Promise<Uint8Array> {
 
   const fileRes = await fetch(uri);
   if (!fileRes.ok) {
-    throw new Error(`Kunne ikke lese lydfil (${fileRes.status})`);
+    throw new Error(tr('network.readAudio', { status: fileRes.status }));
   }
   const buffer = await fileRes.arrayBuffer();
   return new Uint8Array(buffer);
@@ -166,7 +174,7 @@ export async function fetchTopicsAndQuota(): Promise<GetTopicsResponse> {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || body.error || `Kunne ikke hente temaer (${res.status})`);
+    throw new Error(body.message || body.error || tr('network.fetchTopics', { status: res.status }));
   }
 
   return res.json();
@@ -195,9 +203,7 @@ export async function startExamSession(params: {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(
-      body.message || body.error || `Kunne ikke starte muntlig prøve (${res.status})`
-    );
+    throw new Error(body.message || body.error || tr('network.startExam', { status: res.status }));
   }
 
   return res.json();
@@ -237,7 +243,7 @@ export async function submitExamTurn(
 
     if (!res.ok) {
       const body = await res.json().catch(() => ({}));
-      throw new Error(body.message || body.error || `Feil ved innsending (${res.status})`);
+      throw new Error(body.message || body.error || tr('network.submitTurn', { status: res.status }));
     }
     return res.json();
   }
@@ -293,9 +299,7 @@ export async function submitExamTurn(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(
-      body.message || body.error || `Kunne ikke sende lydopptak (${res.status})`
-    );
+    throw new Error(body.message || body.error || tr('network.uploadAudio', { status: res.status }));
   }
 
   return res.json();
@@ -316,7 +320,7 @@ export async function finishExamSession(sessionId: string): Promise<FinishExamRe
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || body.error || `Kunne ikke avslutte prøve (${res.status})`);
+    throw new Error(body.message || body.error || tr('network.finishExam', { status: res.status }));
   }
 
   return res.json();
@@ -337,9 +341,9 @@ export async function fetchExamResults(sessionId: string): Promise<ExamResultsRe
 
   if (!res.ok) {
     if (res.status === 404) {
-      throw new Error('Eksamensesjonen ble ikke funnet.');
+      throw new Error(tr('network.sessionNotFound'));
     }
-    throw new Error(`Kunne ikke hente resultat (${res.status})`);
+    throw new Error(tr('network.fetchResult', { status: res.status }));
   }
 
   return res.json();
@@ -357,14 +361,30 @@ export class ApiError extends Error {
   retryAfterSeconds?: number;
 
   constructor(status: number, data: any, fallbackMessage: string) {
-    super(data?.message || fallbackMessage);
+    const localized = localizedApiMessage(data);
+    super(localized || data?.message || fallbackMessage);
     this.name = 'ApiError';
     this.status = status;
     this.code = data?.error;
-    this.fieldErrors = data?.fieldErrors;
+    // Server field errors for a known code carry the same message, so swap in the translation.
+    this.fieldErrors =
+      localized && data?.fieldErrors
+        ? Object.fromEntries(Object.keys(data.fieldErrors).map((field) => [field, localized]))
+        : data?.fieldErrors;
     this.email = data?.email;
     this.retryAfterSeconds = data?.retryAfterSeconds;
   }
+}
+
+/**
+ * The API answers in Norwegian; for another UI language, translate known error codes
+ * (`apiErrors.<CODE>`). Unknown codes keep the server's Norwegian message.
+ */
+function localizedApiMessage(data: any): string | null {
+  const locale = getCurrentLocale();
+  const key = `apiErrors.${data?.error}`;
+  if (locale === DEFAULT_LOCALE || !data?.error || !hasTranslation(key)) return null;
+  return translate(locale, key, { seconds: data?.retryAfterSeconds ?? '' });
 }
 
 async function postAuthJson(path: string, payload: unknown, fallbackMessage: string) {
@@ -397,23 +417,23 @@ export async function registerWithEmail(params: {
   name: string;
   referralCode?: string;
 }): Promise<RegisterResult> {
-  return postAuthJson('/api/auth/register', params, 'Registrering mislyktes');
+  return postAuthJson('/api/auth/register', params, tr('network.registerFailed'));
 }
 
 export async function loginWithEmail(params: { email: string; password: string }) {
-  return postAuthJson('/api/auth/login', params, 'Innlogging mislyktes');
+  return postAuthJson('/api/auth/login', params, tr('network.loginFailed'));
 }
 
 export async function verifyEmailCode(email: string, code: string) {
-  return postAuthJson('/api/auth/verify-email', { email, code }, 'Bekreftelsen mislyktes');
+  return postAuthJson('/api/auth/verify-email', { email, code }, tr('network.verifyFailed'));
 }
 
 export async function resendVerificationEmail(email: string): Promise<{ retryAfterSeconds?: number }> {
-  return postAuthJson('/api/auth/resend-verification', { email }, 'Kunne ikke sende ny kode');
+  return postAuthJson('/api/auth/resend-verification', { email }, tr('network.resendFailed'));
 }
 
 export async function loginWithGoogleToken(idToken: string, referralCode?: string) {
-  return postAuthJson('/api/auth/google', { idToken, referralCode }, 'Google-innlogging mislyktes');
+  return postAuthJson('/api/auth/google', { idToken, referralCode }, tr('network.googleFailed'));
 }
 
 export async function logoutUser() {
@@ -430,7 +450,7 @@ export async function fetchCurrentUser() {
       await clearAuthSession();
       return null;
     }
-    throw new Error('Kunne ikke hente brukerprofil');
+    throw new Error(tr('network.fetchProfile'));
   }
   return res.json();
 }
@@ -441,7 +461,7 @@ export async function fetchTierConfigs() {
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {
-    throw new Error('Kunne ikke hente abonnementsplaner');
+    throw new Error(tr('network.fetchPlans'));
   }
   return res.json();
 }
@@ -452,7 +472,7 @@ export async function fetchReferrals() {
     headers: { Accept: 'application/json' },
   });
   if (!res.ok) {
-    throw new Error('Kunne ikke hente vervekode');
+    throw new Error(tr('network.fetchReferral'));
   }
   return res.json();
 }
@@ -461,11 +481,11 @@ export async function createStripeCheckout(tier: 'STANDARD' | 'PREMIUM', success
   const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/stripe/checkout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ tier, successUrl, cancelUrl }),
+    body: JSON.stringify({ tier, successUrl, cancelUrl, locale: getCurrentLocale() }),
   });
   const data = await res.json();
   if (!res.ok) {
-    throw new Error(data.message || data.error || 'Kunne ikke starte betaling');
+    throw new Error(data.message || data.error || tr('network.checkout'));
   }
   return data;
 }

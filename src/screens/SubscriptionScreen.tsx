@@ -12,6 +12,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { fetchTierConfigs, createStripeCheckout } from '../api';
 import { useAuth } from '../hooks/useAuth';
+import { useLocale } from '../hooks/useLocale';
 import { Screen, AppHeader, Card, Badge, Button, Icon } from '../components/ui';
 import { colors, space, type } from '../theme';
 
@@ -19,6 +20,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 
 export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
+  const { t, strings } = useLocale();
   const [plans, setPlans] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
@@ -29,24 +31,21 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         const data = await fetchTierConfigs();
         setPlans(data.tiers);
       } catch (err: any) {
-        Alert.alert('Feil', err.message || 'Kunne ikke hente abonnementsplaner');
+        Alert.alert(t('common.error'), err.message || t('subscription.loadFailed'));
       } finally {
         setIsLoading(false);
       }
     }
     loadPlans();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const handleSubscribe = async (tier: 'STANDARD' | 'PREMIUM') => {
     if (!user) {
-      Alert.alert(
-        'Konto påkrevd',
-        'Du må logge inn eller opprette en konto for å kjøpe et abonnement.',
-        [
-          { text: 'Avbryt', style: 'cancel' },
-          { text: 'Logg inn', onPress: () => navigation.navigate('Auth') },
-        ]
-      );
+      Alert.alert(t('subscription.accountRequiredTitle'), t('subscription.accountRequiredBody'), [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.login'), onPress: () => navigation.navigate('Auth') },
+      ]);
       return;
     }
 
@@ -57,7 +56,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         await Linking.openURL(res.url);
       }
     } catch (err: any) {
-      Alert.alert('Feil under betaling', err.message || 'Kunne ikke åpne Stripe kasse');
+      Alert.alert(t('subscription.paymentErrorTitle'), err.message || t('subscription.paymentErrorBody'));
     } finally {
       setIsProcessing(false);
     }
@@ -66,19 +65,19 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const freePlan = plans?.FREE || {
     priceCents: 0,
     dailyTestLimit: 1,
-    features: ['1 test per dag', 'B1 og B2 temaer', 'AI-sensor og vurdering'],
+    features: strings.subscription.freeFeatures,
   };
 
   const standard = plans?.STANDARD || {
     priceCents: 14900,
     dailyTestLimit: 5,
-    features: ['5 tester per dag', 'B1 og B2 temaer', 'Prioritert AI stemme'],
+    features: strings.subscription.standardFeatures,
   };
 
   const premium = plans?.PREMIUM || {
     priceCents: 29900,
     dailyTestLimit: 20,
-    features: ['20 tester per dag', 'B1 og B2 temaer', 'Full historikk & uttaleanalyse', '24/7 tilgang'],
+    features: strings.subscription.premiumFeatures,
   };
 
   const currentTier = user?.subscriptionTier || 'FREE';
@@ -86,7 +85,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <Screen>
       <AppHeader
-        title="Abonnement"
+        title={t('nav.subscription')}
         onBack={() => navigation.goBack()}
         bordered
       />
@@ -94,9 +93,9 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.container}>
           <View style={styles.hero}>
-            <Text style={styles.title}>Velg ditt abonnement</Text>
+            <Text style={styles.title}>{t('subscription.title')}</Text>
             <Text style={styles.subtitle}>
-              Få ubegrenset selvtillit til muntlig prøve med flere daglige øvingstester.
+              {t('subscription.subtitle')}
             </Text>
           </View>
 
@@ -110,18 +109,18 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               <Card style={styles.planCard}>
                 <View style={styles.planHeader}>
                   <View style={styles.planTitleGroup}>
-                    <Text style={styles.planName}>Gratis</Text>
+                    <Text style={styles.planName}>{t('subscription.free')}</Text>
                     {currentTier === 'FREE' && (
-                      <Badge label="NÅVÆRENDE" tone="neutral" />
+                      <Badge label={t('subscription.current')} tone="neutral" />
                     )}
                   </View>
                   <Text style={styles.planPrice}>
-                    0 kr <Text style={styles.planPeriod}>/ mnd</Text>
+                    0 kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
                   </Text>
                 </View>
 
                 <Badge
-                  label={`${freePlan.dailyTestLimit} test per dag`}
+                  label={t('subscription.testsPerDayOne', { count: freePlan.dailyTestLimit })}
                   tone="neutral"
                   icon="mic-outline"
                   style={styles.quotaBadge}
@@ -143,16 +142,16 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <View style={styles.planTitleGroup}>
                     <Text style={styles.planName}>Standard</Text>
                     {currentTier === 'STANDARD' && (
-                      <Badge label="NÅVÆRENDE" tone="navy" />
+                      <Badge label={t('subscription.current')} tone="navy" />
                     )}
                   </View>
                   <Text style={styles.planPrice}>
-                    {standard.priceCents / 100} kr <Text style={styles.planPeriod}>/ mnd</Text>
+                    {standard.priceCents / 100} kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
                   </Text>
                 </View>
 
                 <Badge
-                  label={`${standard.dailyTestLimit} tester per dag`}
+                  label={t('subscription.testsPerDay', { count: standard.dailyTestLimit })}
                   tone="navy"
                   icon="flash"
                   style={styles.quotaBadge}
@@ -168,7 +167,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
 
                 <Button
-                  title={currentTier === 'STANDARD' ? 'Aktivt abonnement' : 'Velg Standard'}
+                  title={currentTier === 'STANDARD' ? t('subscription.active') : t('subscription.chooseStandard')}
                   variant="secondary"
                   size="lg"
                   fullWidth
@@ -181,21 +180,21 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
               {/* Premium Plan */}
               <Card style={[styles.planCard, styles.premiumCard]}>
                 <View style={styles.popularRow}>
-                  <Badge label="MEST POPULÆR" tone="gold" icon="star" />
+                  <Badge label={t('subscription.mostPopular')} tone="gold" icon="star" />
                   {currentTier === 'PREMIUM' && (
-                    <Badge label="NÅVÆRENDE" tone="gold" />
+                    <Badge label={t('subscription.current')} tone="gold" />
                   )}
                 </View>
 
                 <View style={styles.planHeader}>
                   <Text style={[styles.planName, { color: colors.gold }]}>Premium</Text>
                   <Text style={styles.planPrice}>
-                    {premium.priceCents / 100} kr <Text style={styles.planPeriod}>/ mnd</Text>
+                    {premium.priceCents / 100} kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
                   </Text>
                 </View>
 
                 <Badge
-                  label={`${premium.dailyTestLimit} tester per dag (Ubegrenset)`}
+                  label={t('subscription.testsPerDayUnlimited', { count: premium.dailyTestLimit })}
                   tone="gold"
                   icon="star"
                   style={styles.quotaBadge}
@@ -211,7 +210,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
 
                 <Button
-                  title={currentTier === 'PREMIUM' ? 'Aktivt abonnement' : 'Velg Premium'}
+                  title={currentTier === 'PREMIUM' ? t('subscription.active') : t('subscription.choosePremium')}
                   variant="gold"
                   size="lg"
                   fullWidth

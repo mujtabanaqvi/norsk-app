@@ -14,6 +14,7 @@ import {
   resolveAudioUrl,
 } from '../api';
 import { getAuthToken } from '../identity';
+import { useLocale } from './useLocale';
 import type {
   CoCandidateMode,
   ExamReply,
@@ -68,6 +69,11 @@ export function useExamTurns({
   const [micPermissionGranted, setMicPermissionGranted] = useState<boolean | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [hintMessage, setHintMessage] = useState<string | null>(null);
+
+  // Read through a ref so a language switch doesn't recreate the recording callbacks.
+  const { t } = useLocale();
+  const tRef = useRef(t);
+  tRef.current = t;
 
   const recorder = useAudioRecorder(RECORDING_OPTIONS);
   const recorderState = useAudioRecorderState(recorder, 200);
@@ -301,9 +307,7 @@ export function useExamTurns({
 
     const granted = micPermissionGranted || (await ensureMicPermission());
     if (!granted) {
-      setErrorMessage(
-        'Mikrofontilgang er nødvendig for muntlig prøve. Vennligst gi tilgang i innstillingene.'
-      );
+      setErrorMessage(tRef.current('room.micPermission'));
       setPhase('error');
       return;
     }
@@ -323,8 +327,7 @@ export function useExamTurns({
       recorder.record();
       setPhase('recording');
     } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : 'Kunne ikke starte mikrofonopptak.';
+      const msg = err instanceof Error ? err.message : tRef.current('room.micStartFailed');
       setErrorMessage(msg);
       setPhase('error');
     }
@@ -357,7 +360,7 @@ export function useExamTurns({
     const uri = stopStatusUrl || recorder.uri || recorderState.url;
     if (!uri) {
       isStoppingRecordingRef.current = false;
-      setHintMessage('Ingen lyd ble fanget opp. Prøv å trykke på mikrofonen igjen.');
+      setHintMessage(tRef.current('room.noAudio'));
       setPhase('listening');
       return;
     }
@@ -379,10 +382,7 @@ export function useExamTurns({
       isExamDoneRef.current = response.done;
 
       if (response.retry) {
-        setHintMessage(
-          response.message ||
-            'Sensoren hørte ikke hva du sa. Prøv å snakke litt høyere og nærmere mikrofonen.'
-        );
+        setHintMessage(response.message || tRef.current('room.notHeard'));
         setPhase('listening');
         return;
       }
@@ -407,8 +407,7 @@ export function useExamTurns({
       }
     } catch (err) {
       if (!isMountedRef.current) return;
-      const msg =
-        err instanceof Error ? err.message : 'Feil ved innsending av svar.';
+      const msg = err instanceof Error ? err.message : tRef.current('room.submitFailed');
       setErrorMessage(msg);
       setPhase('error');
     } finally {
@@ -497,10 +496,7 @@ export function useExamTurns({
       }
     } catch (err) {
       if (!isMountedRef.current) return;
-      const msg =
-        err instanceof Error
-          ? err.message
-          : 'Kunne ikke gå videre til Del 3. Vennligst prøv igjen.';
+      const msg = err instanceof Error ? err.message : tRef.current('room.del3Failed');
       setErrorMessage(msg);
       setPhase('error');
     }

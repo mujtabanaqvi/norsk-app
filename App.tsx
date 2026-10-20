@@ -4,6 +4,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, DefaultTheme, type Theme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
+import { LocaleProvider, useLocale } from './src/hooks/useLocale';
 import { ExamSetupScreen } from './src/screens/ExamSetupScreen';
 import { ExamRoomScreen } from './src/screens/ExamRoomScreen';
 import { ExamResultsScreen } from './src/screens/ExamResultsScreen';
@@ -35,8 +36,9 @@ const navigationTheme: Theme = {
 
 function AppNavigation() {
   const { user, isLoading } = useAuth();
+  const { t, isLoading: isLocaleLoading } = useLocale();
 
-  if (isLoading) {
+  if (isLoading || isLocaleLoading) {
     return (
       <View
         style={{
@@ -70,13 +72,13 @@ function AppNavigation() {
             <Stack.Screen
               name="ExamSetup"
               component={ExamSetupScreen}
-              options={{ title: 'Eksamensforberedelse' }}
+              options={{ title: t('nav.examSetup') }}
             />
             <Stack.Screen
               name="ExamRoom"
               component={ExamRoomScreen}
               options={{
-                title: 'Muntlig Eksamensrom',
+                title: t('nav.examRoom'),
                 gestureEnabled: false,
               }}
             />
@@ -84,34 +86,34 @@ function AppNavigation() {
               name="ExamResults"
               component={ExamResultsScreen}
               options={{
-                title: 'Resultater & Tilbakemelding',
+                title: t('nav.examResults'),
                 gestureEnabled: false,
               }}
             />
             <Stack.Screen
               name="Subscription"
               component={SubscriptionScreen}
-              options={{ title: 'Abonnement' }}
+              options={{ title: t('nav.subscription') }}
             />
             <Stack.Screen
               name="Referral"
               component={ReferralScreen}
-              options={{ title: 'Verv en venn' }}
+              options={{ title: t('nav.referral') }}
             />
             <Stack.Screen
               name="HowTo"
               component={HowToScreen}
-              options={{ title: 'Slik fungerer prøven' }}
+              options={{ title: t('nav.howTo') }}
             />
             <Stack.Screen
               name="Terms"
               component={TermsScreen}
-              options={{ title: 'Vilkår for bruk' }}
+              options={{ title: t('nav.terms') }}
             />
             <Stack.Screen
               name="PrivacyPolicy"
               component={PrivacyPolicyScreen}
-              options={{ title: 'Personvernerklæring' }}
+              options={{ title: t('nav.privacy') }}
             />
           </>
         ) : (
@@ -120,27 +122,27 @@ function AppNavigation() {
             <Stack.Screen
               name="Auth"
               component={AuthScreen}
-              options={{ title: 'Innlogging & Registrering' }}
+              options={{ title: t('nav.auth') }}
             />
             <Stack.Screen
               name="VerifyEmail"
               component={VerifyEmailScreen}
-              options={{ title: 'Bekreft e-post' }}
+              options={{ title: t('nav.verifyEmail') }}
             />
             <Stack.Screen
               name="HowTo"
               component={HowToScreen}
-              options={{ title: 'Slik fungerer prøven' }}
+              options={{ title: t('nav.howTo') }}
             />
             <Stack.Screen
               name="Terms"
               component={TermsScreen}
-              options={{ title: 'Vilkår for bruk' }}
+              options={{ title: t('nav.terms') }}
             />
             <Stack.Screen
               name="PrivacyPolicy"
               component={PrivacyPolicyScreen}
-              options={{ title: 'Personvernerklæring' }}
+              options={{ title: t('nav.privacy') }}
             />
           </>
         )}
@@ -152,9 +154,11 @@ function AppNavigation() {
 export default function App() {
   return (
     <SafeAreaProvider>
-      <AuthProvider>
-        <AppNavigation />
-      </AuthProvider>
+      <LocaleProvider>
+        <AuthProvider>
+          <AppNavigation />
+        </AuthProvider>
+      </LocaleProvider>
     </SafeAreaProvider>
   );
 }

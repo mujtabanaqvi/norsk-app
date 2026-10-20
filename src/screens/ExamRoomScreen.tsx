@@ -16,6 +16,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useExamTurns } from '../hooks/useExamTurns';
+import { useLocale } from '../hooks/useLocale';
 import type {
   RootStackParamList,
   ExamStage,
@@ -42,6 +43,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
     initialTranscript,
   } = route.params;
 
+  const { t } = useLocale();
   const hasNavigatedRef = useRef<boolean>(false);
 
   const handleNavigateToResults = useCallback(() => {
@@ -136,9 +138,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const handleConfirmEndExam = () => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
-      const ok = window.confirm(
-        'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere din HK-dir vurdering.'
-      );
+      const ok = window.confirm(t('room.endConfirmBody'));
       if (ok) {
         endExamEarly();
       }
@@ -146,12 +146,12 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
     }
 
     Alert.alert(
-      'Avslutt prøve',
-      'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere din HK-dir vurdering.',
+      t('room.endConfirmTitle'),
+      t('room.endConfirmBody'),
       [
-        { text: 'Avbryt', style: 'cancel' },
+        { text: t('common.cancel'), style: 'cancel' },
         {
-          text: 'Avslutt og få vurdering',
+          text: t('room.endConfirmAction'),
           style: 'destructive',
           onPress: () => {
             endExamEarly();
@@ -172,19 +172,21 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const statusBadgeLabel =
     phase === 'recording'
-      ? 'OPPTAK'
+      ? t('room.statusRecording')
       : phase === 'thinking'
-        ? 'TENKER'
+        ? t('room.statusThinking')
         : phase === 'speaking'
-          ? 'SENSOR TALER'
-          : 'KLAR';
+          ? t('room.statusSpeaking')
+          : t('room.statusReady');
 
   const currentTaskDescription =
     stage === 'DEL_1'
-      ? monologuePromptNo || 'Presenter dine tanker om temaet i en kort monolog.'
+      ? monologuePromptNo || t('room.defaultTaskDel1')
       : stage === 'DEL_2'
-        ? discussionPromptNo || 'Diskuter temaet med samtalepartneren din.'
-        : 'Svar på oppfølgingsspørsmålene fra sensoren.';
+        ? discussionPromptNo || t('room.defaultTaskDel2')
+        : t('room.defaultTaskDel3');
+
+  const stageNumber = stage === 'DEL_1' ? 1 : stage === 'DEL_2' ? 2 : 3;
 
   return (
     <SafeAreaView edges={['top']} style={styles.topSafeArea}>
@@ -227,10 +229,10 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             const isActive = stage === pillStage;
             const label =
               pillStage === 'DEL_1'
-                ? 'Del 1: Monolog'
+                ? t('room.pillDel1')
                 : pillStage === 'DEL_2'
-                  ? 'Del 2: Samtale'
-                  : 'Del 3: Oppfølging';
+                  ? t('room.pillDel2')
+                  : t('room.pillDel3');
             return (
               <View
                 key={pillStage}
@@ -267,9 +269,9 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 <Text style={styles.promptBannerLabel}>
                   {phase === 'speaking'
                     ? activeAiSpeaker === 'co_candidate'
-                      ? 'AI Medkandidat sier:'
-                      : 'Sensor sier:'
-                    : `Oppgave (${stage === 'DEL_1' ? 'Del 1' : stage === 'DEL_2' ? 'Del 2' : 'Del 3'}):`}
+                      ? t('room.coCandidateSays')
+                      : t('room.examinerSays')
+                    : t('room.task', { part: t('room.part', { n: stageNumber }) })}
                 </Text>
               </View>
               <Text style={styles.promptBannerText}>
@@ -291,11 +293,11 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Text style={styles.avatarLetter}>S</Text>
                 </View>
                 <View style={styles.participantMeta}>
-                  <Text style={styles.participantName}>Sensor (AI Sensor)</Text>
-                  <Text style={styles.participantRole}>Offisiell eksaminator (HK-dir)</Text>
+                  <Text style={styles.participantName}>{t('room.examinerName')}</Text>
+                  <Text style={styles.participantRole}>{t('room.examinerRole')}</Text>
                 </View>
                 <Badge
-                  label={isExaminerSpeaking ? 'Taler nå' : 'Lytter'}
+                  label={isExaminerSpeaking ? t('room.speakingNow') : t('room.listening')}
                   tone={isExaminerSpeaking ? 'solidNavy' : 'neutral'}
                 />
               </View>
@@ -326,21 +328,21 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                   </View>
                   <View style={styles.participantMeta}>
                     <Text style={styles.participantName}>
-                      {stage === 'DEL_2' ? 'AI Medkandidat & Deg' : 'Kandidat (Deg)'}
+                      {stage === 'DEL_2' ? t('room.peerAndYou') : t('room.candidateYou')}
                     </Text>
                     <Text style={styles.participantRole}>
                       {stage === 'DEL_2'
-                        ? `Samtalepartner på nivå ${level}`
-                        : `Målnivå ${level}`}
+                        ? t('room.peerRole', { level })
+                        : t('room.targetLevel', { level })}
                     </Text>
                   </View>
                   <Badge
                     label={
                       isAiCoCandidateSpeaking
-                        ? 'Medkandidat taler'
+                        ? t('room.peerSpeaking')
                         : isLocalSpeaking
-                          ? 'Du snakker nå'
-                          : 'Klar'
+                          ? t('room.youSpeaking')
+                          : t('room.ready')
                     }
                     tone={
                       isAiCoCandidateSpeaking
@@ -384,15 +386,19 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                   </View>
                   <View style={styles.participantMeta}>
                     <Text style={styles.participantName}>
-                      Kandidat 1 & Kandidat 2 (Delt mikrofon)
+                      {t('room.sharedMicTitle')}
                     </Text>
                     <Text style={styles.participantRole}>
-                      Aktiv taler:{' '}
-                      {candidateSpeaker === 'CANDIDATE_2' ? 'Kandidat 2' : 'Kandidat 1'}
+                      {t('room.activeSpeaker', {
+                        name:
+                          candidateSpeaker === 'CANDIDATE_2'
+                            ? t('common.candidate2')
+                            : t('common.candidate1'),
+                      })}
                     </Text>
                   </View>
                   <Badge
-                    label={isLocalSpeaking ? 'Mikrofon aktiv' : 'Klar'}
+                    label={isLocalSpeaking ? t('room.micActive') : t('room.ready')}
                     tone={isLocalSpeaking ? 'solidRed' : 'neutral'}
                   />
                 </View>
@@ -422,7 +428,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                             selected && styles.speakerSelectButtonTextActive,
                           ]}
                         >
-                          {cand === 'CANDIDATE_1' ? 'Kandidat 1' : 'Kandidat 2'}
+                          {cand === 'CANDIDATE_1' ? t('common.candidate1') : t('common.candidate2')}
                         </Text>
                       </Pressable>
                     );
@@ -454,11 +460,11 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={styles.errorBanner}>
                 <View style={styles.errorHeaderRow}>
                   <Icon name="alert-circle" size={18} color={colors.danger} />
-                  <Text style={styles.errorBannerTitle}>Tilkoblings- eller opptaksfeil</Text>
+                  <Text style={styles.errorBannerTitle}>{t('room.errorTitle')}</Text>
                 </View>
                 <Text style={styles.errorBannerText}>{errorMessage}</Text>
                 <Button
-                  title="Prøv på nytt"
+                  title={t('common.retry')}
                   variant="primary"
                   size="sm"
                   icon="refresh"
@@ -482,14 +488,14 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                   </View>
                   <Text style={styles.micStatusTitle}>
                     {activeAiSpeaker === 'co_candidate'
-                      ? 'AI Medkandidat snakker...'
-                      : 'Sensor snakker...'}
+                      ? t('room.peerTalking')
+                      : t('room.examinerTalking')}
                   </Text>
                   <Text style={styles.micStatusSubtext}>
-                    Lytt til oppgaven. Det blir din tur straks talen er ferdig.
+                    {t('room.listenHint')}
                   </Text>
                   <Button
-                    title="Hopp over tale — Svar nå"
+                    title={t('room.skipSpeech')}
                     variant="outline"
                     size="md"
                     iconRight="arrow-forward"
@@ -503,7 +509,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Pressable
                     onPress={startRecording}
                     accessibilityRole="button"
-                    accessibilityLabel="Trykk for å snakke"
+                    accessibilityLabel={t('room.tapToSpeak')}
                     style={({ pressed }) => [
                       styles.heroMicButton,
                       pressed && styles.heroMicButtonPressed,
@@ -511,12 +517,12 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                   >
                     <Icon name="mic" size={34} color={colors.white} />
                   </Pressable>
-                  <Text style={styles.micStatusTitle}>Din tur til å snakke</Text>
+                  <Text style={styles.micStatusTitle}>{t('room.yourTurn')}</Text>
                   <Text style={styles.micStatusSubtext}>
-                    Trykk på mikrofonen for å starte opptaket. Opptaket stopper automatisk ved pause, eller når du trykker «Ferdig».
+                    {t('room.tapHint')}
                   </Text>
                   <Button
-                    title="Trykk for å snakke"
+                    title={t('room.tapToSpeak')}
                     variant="primary"
                     size="lg"
                     icon="mic"
@@ -538,7 +544,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                     <Pressable
                       onPress={stopRecordingAndSubmit}
                       accessibilityRole="button"
-                      accessibilityLabel="Ferdig å snakke — Send svar"
+                      accessibilityLabel={t('room.doneSpeaking')}
                       style={styles.heroMicButtonRecording}
                     >
                       <Waveform
@@ -551,13 +557,13 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                     </Pressable>
                   </View>
                   <Text style={styles.micStatusTitleRecording}>
-                    Opptak pågår ({formattedRecordingTime})
+                    {t('room.recordingTime', { time: formattedRecordingTime })}
                   </Text>
                   <Text style={styles.micStatusSubtext}>
-                    Snakk tydelig på norsk. Trykk «Ferdig å snakke» når du har svart.
+                    {t('room.recordingHint')}
                   </Text>
                   <Button
-                    title="Ferdig å snakke — Send svar"
+                    title={t('room.doneSpeaking')}
                     variant="secondary"
                     size="lg"
                     icon="stop"
@@ -571,10 +577,10 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.micStateBox}>
                   <ActivityIndicator size="large" color={colors.red} />
                   <Text style={[styles.micStatusTitle, { marginTop: space.sm }]}>
-                    Behandler svaret ditt...
+                    {t('room.processing')}
                   </Text>
                   <Text style={styles.micStatusSubtext}>
-                    Transkriberer norsk tale og genererer neste respons
+                    {t('room.processingHint')}
                   </Text>
                 </View>
               )}
@@ -583,7 +589,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.micStateBox}>
                   <ActivityIndicator size="small" color={colors.success} />
                   <Text style={[styles.micStatusTitle, { marginTop: space.xs }]}>
-                    Prøven er fullført! Henter vurdering...
+                    {t('room.doneFetching')}
                   </Text>
                 </View>
               )}
@@ -595,16 +601,16 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.moderatorIconRow}>
                   <Icon name="people" size={20} color={colors.navy} />
                   <Text style={styles.moderatorTitle}>
-                    Del 2: Samtale mellom Kandidat 1 og 2
+                    {t('room.moderatorTitle')}
                   </Text>
                 </View>
 
                 <Text style={styles.moderatorDescription}>
-                  Ta opp flere replikker mellom Kandidat 1 og Kandidat 2. Sensoren lytter passivt uten å avbryte. Når dere er ferdige med diskusjonen, trykk på knappen under for å gå til Del 3.
+                  {t('room.moderatorDesc')}
                 </Text>
 
                 <Button
-                  title="Fullfør diskusjon — Gå til Del 3"
+                  title={t('room.finishDiscussion')}
                   variant="secondary"
                   size="md"
                   iconRight="arrow-forward"
@@ -633,12 +639,12 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={styles.transcriptTitleGroup}>
                 <Icon name="chatbubbles-outline" size={16} color={colors.navy} />
                 <Text style={styles.transcriptHeaderTitle}>
-                  Transkripsjon ({transcripts.length})
+                  {t('room.transcriptCount', { count: transcripts.length })}
                 </Text>
               </View>
               <View style={styles.transcriptHintGroup}>
                 <Text style={styles.drawerExpandHint}>
-                  {isDrawerExpanded ? 'Skjul' : 'Vis transkripsjon'}
+                  {isDrawerExpanded ? t('common.hide') : t('room.showTranscript')}
                 </Text>
                 <Icon
                   name={isDrawerExpanded ? 'chevron-down' : 'chevron-up'}
@@ -658,7 +664,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             >
               {transcripts.length === 0 ? (
                 <Text style={styles.emptyTranscriptText}>
-                  Transkripsjon vises her etter hvert som deltakerne snakker...
+                  {t('room.transcriptEmpty')}
                 </Text>
               ) : (
                 transcripts.map((turn, index) => {
@@ -682,12 +688,12 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                         <Badge
                           label={
                             isExaminer
-                              ? 'Sensor'
+                              ? t('common.examiner')
                               : isPeer
-                                ? 'AI Medkandidat'
+                                ? t('common.aiCoCandidate')
                                 : isCandidate2
-                                  ? 'Kandidat 2'
-                                  : 'Kandidat 1'
+                                  ? t('common.candidate2')
+                                  : t('common.candidate1')
                           }
                           tone={isExaminer ? 'solidNavy' : isPeer ? 'neutral' : 'solidRed'}
                         />
@@ -711,7 +717,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
         <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
           <View style={styles.bottomBarInner}>
             <Button
-              title="Avslutt prøve og få vurdering"
+              title={t('room.endExam')}
               variant="outline"
               size="md"
               icon="flag-outline"

@@ -13,8 +13,18 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { useAuth } from '../hooks/useAuth';
+import { useLocale } from '../hooks/useLocale';
 import { ApiError } from '../api';
-import { Screen, Logo, Card, Badge, Button, Icon, FormField } from '../components/ui';
+import {
+  Screen,
+  Logo,
+  Card,
+  Badge,
+  Button,
+  Icon,
+  FormField,
+  LanguageToggle,
+} from '../components/ui';
 import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { colors, radius, space, type } from '../theme';
 import {
@@ -23,7 +33,7 @@ import {
   fieldErrors as toFieldErrors,
   validateField,
   emailSchema,
-  PASSWORD_RULES_HINT,
+  passwordRulesHint,
   type FieldErrors,
 } from '../validation/auth';
 
@@ -33,6 +43,7 @@ type FieldName = 'name' | 'email' | 'password' | 'confirmPassword' | 'referralCo
 
 export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
   const { login, register, loginWithGoogle } = useAuth();
+  const { locale, t } = useLocale();
 
   const [isLoginMode, setIsLoginMode] = useState<boolean>(route.params?.mode !== 'register');
   const [values, setValues] = useState<Record<FieldName, string>>({
@@ -66,6 +77,18 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
   const schema = isLoginMode ? loginSchema : registerSchema;
   const isBusy = isSubmitting || isGoogleLoading;
 
+  // Re-translate any visible field errors when the UI language changes.
+  useEffect(() => {
+    setErrors((prev) => {
+      const updated: FieldErrors = {};
+      for (const field of Object.keys(prev)) {
+        updated[field] = validateField(schema, values, field, locale) ?? prev[field];
+      }
+      return updated;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [locale]);
+
   const setField = (field: FieldName, value: string) => {
     const next = { ...values, [field]: value };
     setValues(next);
@@ -74,12 +97,12 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
     if (touched[field] || errors[field]) {
       setErrors((prev) => {
         const updated = { ...prev };
-        const message = validateField(schema, next, field);
+        const message = validateField(schema, next, field, locale);
         if (message) updated[field] = message;
         else delete updated[field];
         // Keep "confirm password" in sync when the password itself changes.
         if (field === 'password' && (touched.confirmPassword || prev.confirmPassword)) {
-          const confirmMessage = validateField(schema, next, 'confirmPassword');
+          const confirmMessage = validateField(schema, next, 'confirmPassword', locale);
           if (confirmMessage) updated.confirmPassword = confirmMessage;
           else delete updated.confirmPassword;
         }
@@ -89,10 +112,10 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const handleBlur = (field: FieldName) => {
-    setTouched((t) => ({ ...t, [field]: true }));
+    setTouched((prev) => ({ ...prev, [field]: true }));
     // Don't flag a field that was merely tabbed past while still empty; submit catches that.
     if (!values[field]) return;
-    const message = validateField(schema, values, field);
+    const message = validateField(schema, values, field, locale);
     setErrors((prev) => {
       const updated = { ...prev };
       if (message) updated[field] = message;
@@ -115,7 +138,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
 
     const parsed = schema.safeParse(values);
     if (!parsed.success) {
-      setErrors(toFieldErrors(parsed.error));
+      setErrors(toFieldErrors(parsed.error, locale));
       setTouched({ name: true, email: true, password: true, confirmPassword: true, referralCode: true });
       return;
     }
@@ -154,7 +177,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
           return;
         }
       }
-      setErrorMessage(err?.message || 'Det oppstod en feil. Prøv igjen.');
+      setErrorMessage(err?.message || t('common.unknownError'));
     } finally {
       setIsSubmitting(false);
     }
@@ -167,7 +190,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
       const referral = isLoginMode ? undefined : values.referralCode.trim() || undefined;
       await loginWithGoogle(idToken, referral);
     } catch (err: any) {
-      setErrorMessage(err?.message || 'Google-innlogging feilet');
+      setErrorMessage(err?.message || t('auth.googleFailed'));
       setIsGoogleLoading(false);
     }
   };
@@ -186,29 +209,34 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
-            {navigation.canGoBack() && (
-              <Pressable
-                style={styles.backButton}
-                onPress={() => navigation.goBack()}
-                accessibilityRole="button"
-                accessibilityLabel="Tilbake"
-              >
-                <Icon name="chevron-back" size={20} color={colors.navy} />
-                <Text style={styles.backButtonText}>Tilbake</Text>
-              </Pressable>
-            )}
+            <View style={styles.topRow}>
+              {navigation.canGoBack() ? (
+                <Pressable
+                  style={styles.backButton}
+                  onPress={() => navigation.goBack()}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('common.back')}
+                >
+                  <Icon name="chevron-back" size={20} color={colors.navy} />
+                  <Text style={styles.backButtonText}>{t('common.back')}</Text>
+                </Pressable>
+              ) : (
+                <View />
+              )}
+              <LanguageToggle />
+            </View>
 
             {/* App Branding & Highlights Hero */}
             <View style={styles.brandContainer}>
               <Logo size={76} withWordmark />
               <Badge
-                label="NORSKPRØVEN MUNTLIG · B1 / B2"
+                label={t('auth.badge')}
                 tone="red"
                 style={styles.brandBadge}
               />
-              <Text style={styles.brandTitle}>Muntlig Eksamenssimulator</Text>
+              <Text style={styles.brandTitle}>{t('auth.brandTitle')}</Text>
               <Text style={styles.brandSubtitle}>
-                Øv på den offisielle muntlige prøven med AI-sensor og få umiddelbar HK-dir karaktervurdering.
+                {t('auth.brandSubtitle')}
               </Text>
             </View>
 
@@ -219,9 +247,9 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Icon name="mic-outline" size={20} color={colors.red} />
                 </View>
                 <View style={styles.featureTextWrapper}>
-                  <Text style={styles.featureTitle}>Full muntlig eksamen</Text>
+                  <Text style={styles.featureTitle}>{t('auth.feature1Title')}</Text>
                   <Text style={styles.featureDesc}>
-                    Del 1 (egenpresentasjon), Del 2 (samtale) og Del 3 (oppfølging).
+                    {t('auth.feature1Desc')}
                   </Text>
                 </View>
               </Card>
@@ -231,9 +259,9 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Icon name="people-outline" size={20} color={colors.navy} />
                 </View>
                 <View style={styles.featureTextWrapper}>
-                  <Text style={styles.featureTitle}>Interaktiv AI-medkandidat</Text>
+                  <Text style={styles.featureTitle}>{t('auth.feature2Title')}</Text>
                   <Text style={styles.featureDesc}>
-                    Øv alene når det passer deg, eller ta prøven sammen med en venn.
+                    {t('auth.feature2Desc')}
                   </Text>
                 </View>
               </Card>
@@ -243,9 +271,9 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Icon name="analytics-outline" size={20} color={colors.red} />
                 </View>
                 <View style={styles.featureTextWrapper}>
-                  <Text style={styles.featureTitle}>HK-dir Sensorvurdering</Text>
+                  <Text style={styles.featureTitle}>{t('auth.feature3Title')}</Text>
                   <Text style={styles.featureDesc}>
-                    Detaljert poengsum på flyt, uttale, grammatikk og ordforråd.
+                    {t('auth.feature3Desc')}
                   </Text>
                 </View>
               </Card>
@@ -253,12 +281,10 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
 
             <View style={styles.headerContainer}>
               <Text style={styles.title}>
-                {isLoginMode ? 'Logg inn for å starte' : 'Opprett konto for å starte'}
+                {isLoginMode ? t('auth.loginTitle') : t('auth.registerTitle')}
               </Text>
               <Text style={styles.subtitle}>
-                {isLoginMode
-                  ? 'Logg inn med din konto for å få tilgang til prøver og resultater.'
-                  : 'Registrer deg gratis for å øve til Norskprøven i dag.'}
+                {isLoginMode ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
               </Text>
             </View>
 
@@ -289,29 +315,29 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
 
               {/* Apple ID Placeholder */}
               <Button
-                title="Logg inn med Apple (Kommer snart)"
+                title={t('auth.appleButton')}
                 variant="outline"
                 size="lg"
                 icon="logo-apple"
                 fullWidth
                 disabled={true}
                 onPress={() =>
-                  Alert.alert('Kommer snart', 'Apple ID-innlogging blir tilgjengelig snart.')
+                  Alert.alert(t('common.comingSoon'), t('auth.appleComingSoon'))
                 }
               />
 
               <View style={styles.dividerContainer}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>ELLER MED E-POST</Text>
+                <Text style={styles.dividerText}>{t('auth.dividerEmail')}</Text>
                 <View style={styles.dividerLine} />
               </View>
 
               {!isLoginMode && (
                 <FormField
-                  label="Fullt navn"
-                  placeholder="Ola Nordmann"
+                  label={t('auth.nameLabel')}
+                  placeholder={t('auth.namePlaceholder')}
                   value={values.name}
-                  onChangeText={(t) => setField('name', t)}
+                  onChangeText={(text) => setField('name', text)}
                   onBlur={() => handleBlur('name')}
                   error={errors.name}
                   autoCapitalize="words"
@@ -325,10 +351,10 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
 
               <FormField
                 ref={emailRef}
-                label="E-postadresse"
-                placeholder="ola@eksempel.no"
+                label={t('auth.emailLabel')}
+                placeholder={t('auth.emailPlaceholder')}
                 value={values.email}
-                onChangeText={(t) => setField('email', t)}
+                onChangeText={(text) => setField('email', text)}
                 onBlur={() => handleBlur('email')}
                 error={errors.email}
                 keyboardType="email-address"
@@ -342,13 +368,15 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
 
               <FormField
                 ref={passwordRef}
-                label="Passord"
-                placeholder={isLoginMode ? 'Ditt passord' : 'Velg et passord'}
+                label={t('auth.passwordLabel')}
+                placeholder={
+                  isLoginMode ? t('auth.passwordPlaceholderLogin') : t('auth.passwordPlaceholderRegister')
+                }
                 value={values.password}
-                onChangeText={(t) => setField('password', t)}
+                onChangeText={(text) => setField('password', text)}
                 onBlur={() => handleBlur('password')}
                 error={errors.password}
-                hint={isLoginMode ? undefined : PASSWORD_RULES_HINT}
+                hint={isLoginMode ? undefined : passwordRulesHint(locale)}
                 password
                 autoCapitalize="none"
                 autoComplete={isLoginMode ? 'current-password' : 'new-password'}
@@ -361,10 +389,10 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
               {!isLoginMode && (
                 <FormField
                   ref={confirmRef}
-                  label="Bekreft passord"
-                  placeholder="Skriv passordet på nytt"
+                  label={t('auth.confirmPasswordLabel')}
+                  placeholder={t('auth.confirmPasswordPlaceholder')}
                   value={values.confirmPassword}
-                  onChangeText={(t) => setField('confirmPassword', t)}
+                  onChangeText={(text) => setField('confirmPassword', text)}
                   onBlur={() => handleBlur('confirmPassword')}
                   error={errors.confirmPassword}
                   password
@@ -380,10 +408,10 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
               {!isLoginMode && (
                 <FormField
                   ref={referralRef}
-                  label="Vervekode (valgfritt)"
-                  placeholder="F.eks. A1B2C3D4"
+                  label={t('auth.referralLabel')}
+                  placeholder={t('auth.referralPlaceholder')}
                   value={values.referralCode}
-                  onChangeText={(t) => setField('referralCode', t)}
+                  onChangeText={(text) => setField('referralCode', text)}
                   onBlur={() => handleBlur('referralCode')}
                   error={errors.referralCode}
                   autoCapitalize="characters"
@@ -395,7 +423,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
               )}
 
               <Button
-                title={isLoginMode ? 'Logg inn' : 'Registrer konto'}
+                title={isLoginMode ? t('auth.loginButton') : t('auth.registerButton')}
                 variant="primary"
                 size="lg"
                 fullWidth
@@ -407,16 +435,14 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
 
               {!isLoginMode && (
                 <Text style={styles.verifyNote}>
-                  Vi sender en bekreftelseskode til e-postadressen din.
+                  {t('auth.verifyNote')}
                 </Text>
               )}
             </Card>
 
             <Pressable style={styles.switchModeButton} onPress={switchMode} disabled={isBusy}>
               <Text style={styles.switchModeText}>
-                {isLoginMode
-                  ? 'Har du ikke en konto? Registrer deg her'
-                  : 'Har du allerede en konto? Logg inn'}
+                {isLoginMode ? t('auth.switchToRegister') : t('auth.switchToLogin')}
               </Text>
             </Pressable>
 
@@ -427,16 +453,16 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                 style={({ pressed }) => [styles.publicLinkBtn, pressed && styles.pressed]}
               >
                 <Icon name="book-outline" size={16} color={colors.navy} />
-                <Text style={styles.publicLinkText}>Slik fungerer prøven</Text>
+                <Text style={styles.publicLinkText}>{t('nav.howTo')}</Text>
               </Pressable>
 
               <View style={styles.footerLinkRow}>
                 <Pressable onPress={() => navigation.navigate('Terms')}>
-                  <Text style={styles.footerSubLink}>Vilkår for bruk</Text>
+                  <Text style={styles.footerSubLink}>{t('nav.terms')}</Text>
                 </Pressable>
                 <Text style={styles.footerDot}>•</Text>
                 <Pressable onPress={() => navigation.navigate('PrivacyPolicy')}>
-                  <Text style={styles.footerSubLink}>Personvernerklæring</Text>
+                  <Text style={styles.footerSubLink}>{t('nav.privacy')}</Text>
                 </Pressable>
               </View>
             </View>
@@ -458,13 +484,17 @@ const styles = StyleSheet.create({
     maxWidth: 480,
     alignSelf: 'center',
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: space.sm,
+  },
   backButton: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
     paddingVertical: space.sm,
-    marginBottom: space.sm,
-    alignSelf: 'flex-start',
   },
   backButtonText: {
     color: colors.navy,

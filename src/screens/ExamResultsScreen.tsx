@@ -14,6 +14,8 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchExamResults } from '../api';
+import { useLocale } from '../hooks/useLocale';
+import { LOCALE_TAGS } from '../i18n';
 import type {
   RootStackParamList,
   ExamResultsResponse,
@@ -44,16 +46,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'ExamResults'>;
 
 // Polling interval in milliseconds
 const POLLING_INTERVAL_MS = 3000;
-
-// Engaging messages cycled during HK-dir gpt-4o evaluation
-const EVALUATION_LOADING_STEPS = [
-  'Sensoren vurderer prestasjonen din etter HK-dir sine kriterier for B1/B2...',
-  'Analyserer flyt, responstid og turtaking i samtalen...',
-  'Vurderer uttale, intonasjon og setningsmelodi...',
-  'Sjekker ordforrådets bredde, idiomer og presisjon...',
-  'Gransker V2-regelen, leddsetninger og substantivkjønn...',
-  'Beregner helhetlig HK-dir måloppnåelse og poengsum...',
-];
 
 /**
  * Helper to format timestamp into MM:SS
@@ -120,17 +112,18 @@ const CriterionCard: React.FC<{
   criterion: CriterionScore;
   showEnglish: boolean;
 }> = ({ titleNo, titleEn, criterion, showEnglish }) => {
+  const { t } = useLocale();
   const score = criterion.score || 1;
   const feedbackText = showEnglish
     ? criterion.feedbackEn || criterion.feedbackNo
     : criterion.feedbackNo;
 
   const getScoreBadgeText = (val: number) => {
-    if (val >= 8) return 'Sterk B2';
-    if (val >= 6) return 'B2-nivå';
-    if (val >= 5) return 'B1-nivå';
-    if (val >= 4) return 'Nærmer seg B1';
-    return 'Under B1';
+    if (val >= 8) return t('results.bandStrongB2');
+    if (val >= 6) return t('results.bandB2');
+    if (val >= 5) return t('results.bandB1');
+    if (val >= 4) return t('results.bandNearB1');
+    return t('results.bandBelowB1');
   };
 
   return (
@@ -153,7 +146,7 @@ const CriterionCard: React.FC<{
             label={getScoreBadgeText(score)}
             tone={score >= 7 ? 'success' : score >= 5 ? 'navy' : score >= 4 ? 'warning' : 'red'}
           />
-          <Text style={styles.criterionLevelPercent}>HK-dir standard</Text>
+          <Text style={styles.criterionLevelPercent}>{t('results.hkdirStandard')}</Text>
         </View>
       </View>
 
@@ -166,6 +159,9 @@ const CriterionCard: React.FC<{
 
 export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const { sessionId } = route.params;
+  const { locale, t, strings } = useLocale();
+  // Engaging messages cycled during HK-dir gpt-4o evaluation
+  const loadingSteps = strings.results.loadingSteps;
 
   // Polling & Data State
   const [resultsData, setResultsData] = useState<ExamResultsResponse | null>(null);
@@ -176,8 +172,8 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   // Active Candidate Index (0 = CANDIDATE_1, 1 = CANDIDATE_2)
   const [activeCandidateIndex, setActiveCandidateIndex] = useState<number>(0);
 
-  // Bilingual Feedback Toggle (false = Norwegian, true = English)
-  const [showEnglishFeedback, setShowEnglishFeedback] = useState<boolean>(false);
+  // Bilingual Feedback Toggle (false = Norwegian, true = English); starts in the UI language
+  const [showEnglishFeedback, setShowEnglishFeedback] = useState<boolean>(locale === 'en');
 
   // Accordion Expand/Collapse States
   const [isTranscriptExpanded, setIsTranscriptExpanded] = useState<boolean>(false);
@@ -214,7 +210,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     pulseLoop.start();
 
     loadingStepTimerRef.current = setInterval(() => {
-      setLoadingStepIndex((prev) => (prev + 1) % EVALUATION_LOADING_STEPS.length);
+      setLoadingStepIndex((prev) => (prev + 1) % loadingSteps.length);
     }, 3200);
 
     return () => {
@@ -224,7 +220,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
         loadingStepTimerRef.current = null;
       }
     };
-  }, [isLoading, pulseAnim]);
+  }, [isLoading, pulseAnim, loadingSteps.length]);
 
   const resultsDataRef = useRef<ExamResultsResponse | null>(null);
   resultsDataRef.current = resultsData;
@@ -234,7 +230,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
    */
   const fetchResults = useCallback(async (isManualRefresh = false) => {
     if (!sessionId) {
-      setPollError('Ugyldig sesjons-ID');
+      setPollError(t('results.invalidSession'));
       setIsLoading(false);
       return;
     }
@@ -261,7 +257,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
         }
       }
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Feil ved henting av vurdering';
+      const message = err instanceof Error ? err.message : t('results.fetchFailed');
       // If we haven't loaded anything yet, surface error
       if (!resultsDataRef.current) {
         setPollError(message);
@@ -271,7 +267,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
         setIsRefreshing(false);
       }
     }
-  }, [sessionId]);
+  }, [sessionId, t]);
 
   /**
    * Setup polling every 3 seconds while active or evaluation is null, with 3-minute timeout
@@ -293,9 +289,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
       }
       if (!resultsDataRef.current?.evaluationJson) {
         setIsLoading(false);
-        setPollError(
-          'Vurderingen tok lenger tid enn forventet. Vennligst trykk «Prøv på nytt» eller gå tilbake.'
-        );
+        setPollError(t('results.timeout'));
       }
     }, 180_000);
 
@@ -310,7 +304,9 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
       }
       clearTimeout(timeoutTimer);
     };
-  }, [fetchResults]);
+    // Only restart polling for a new session, not on a language switch.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId]);
 
   /**
    * Candidates list and active candidate
@@ -378,16 +374,32 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
   const handleShareResults = async () => {
     if (!currentCandidate) return;
     try {
-      const summary = `Snakkly · Norskprøven Muntlig Resultat (${currentCandidate.targetLevel})\n` +
-        `Kandidat: ${currentCandidate.speakerRole === 'CANDIDATE_1' ? 'Kandidat 1' : 'Kandidat 2'}\n` +
-        `Vurdert nivå: ${currentCandidate.assessedLevel}\n` +
-        `Målnivå: ${currentCandidate.passedTargetLevel ? 'BESTÅTT' : 'IKKE BESTÅTT'}\n` +
-        `Snittscore: ${averageScore}/10\n\n` +
-        `Oppsummering: ${currentCandidate.overallSummaryNo}`;
+      const overallSummary =
+        locale === 'en'
+          ? currentCandidate.overallSummaryEn || currentCandidate.overallSummaryNo
+          : currentCandidate.overallSummaryNo;
+      const summary = [
+        t('results.shareHeading', { level: currentCandidate.targetLevel }),
+        t('results.shareCandidate', {
+          name:
+            currentCandidate.speakerRole === 'CANDIDATE_1'
+              ? t('common.candidate1')
+              : t('common.candidate2'),
+        }),
+        t('results.shareAssessed', { level: currentCandidate.assessedLevel }),
+        t('results.shareTarget', {
+          status: currentCandidate.passedTargetLevel
+            ? t('results.sharePassed')
+            : t('results.shareFailed'),
+        }),
+        t('results.shareAverage', { score: averageScore }),
+        '',
+        t('results.shareSummary', { summary: overallSummary }),
+      ].join('\n');
 
       await Share.share({
         message: summary,
-        title: 'Norskprøven Resultat',
+        title: t('results.shareTitle'),
       });
     } catch {
       // Ignore share dismissal
@@ -422,7 +434,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     return (
       <Screen>
         <View style={styles.loadingContainer}>
-          <Badge label="HK-DIR SENSOR VURDERING" tone="red" icon="analytics-outline" />
+          <Badge label={t('results.badge')} tone="red" icon="analytics-outline" />
 
           {/* Animated Logo Pulse */}
           <Animated.View
@@ -440,14 +452,12 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
 
           <ActivityIndicator size="small" color={colors.red} style={{ marginBottom: space.md }} />
 
-          <Text style={styles.loadingMainTitle}>
-            Sensoren vurderer prestasjonen din etter HK-dir sine kriterier for B1/B2...
-          </Text>
+          <Text style={styles.loadingMainTitle}>{t('results.loadingTitle')}</Text>
 
           <Card style={styles.loadingStepCard}>
             <View style={styles.loadingStepDot} />
             <Text style={styles.loadingStepText}>
-              {EVALUATION_LOADING_STEPS[loadingStepIndex]}
+              {loadingSteps[loadingStepIndex % loadingSteps.length]}
             </Text>
           </Card>
 
@@ -456,33 +466,33 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={styles.stepCircle}>
                 <Text style={styles.stepNumber}>1</Text>
               </View>
-              <Text style={styles.stepLabel}>Transkripsjon</Text>
+              <Text style={styles.stepLabel}>{t('results.stepTranscription')}</Text>
             </View>
             <View style={styles.stepConnector} />
             <View style={styles.stepItem}>
               <View style={styles.stepCircle}>
                 <Text style={styles.stepNumber}>2</Text>
               </View>
-              <Text style={styles.stepLabel}>HK-dir Rubrikk</Text>
+              <Text style={styles.stepLabel}>{t('results.stepRubric')}</Text>
             </View>
             <View style={styles.stepConnector} />
             <View style={styles.stepItem}>
               <View style={styles.stepCircle}>
                 <Text style={styles.stepNumber}>3</Text>
               </View>
-              <Text style={styles.stepLabel}>Rettelser</Text>
+              <Text style={styles.stepLabel}>{t('results.stepCorrections')}</Text>
             </View>
           </View>
 
           <Text style={styles.loadingHelpNote}>
-            Dette tar vanligvis 10–25 sekunder mens GPT-4o analyserer grammatikk, uttale og flyt i samtalen.
+            {t('results.loadingNote')}
           </Text>
 
           {pollError && (
             <View style={styles.pollErrorBanner}>
               <Text style={styles.pollErrorText}>{pollError}</Text>
               <Button
-                title="Prøv igjen"
+                title={t('common.tryAgain')}
                 variant="primary"
                 size="sm"
                 onPress={() => fetchResults(true)}
@@ -504,10 +514,10 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.errorIconCircle}>
             <Icon name="alert-circle" size={32} color={colors.danger} />
           </View>
-          <Text style={styles.errorTitle}>Kunne ikke laste resultater</Text>
+          <Text style={styles.errorTitle}>{t('results.loadFailedTitle')}</Text>
           <Text style={styles.errorMessage}>{pollError}</Text>
           <Button
-            title="Prøv på nytt"
+            title={t('common.retry')}
             variant="primary"
             size="lg"
             icon="refresh"
@@ -518,7 +528,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
             style={{ marginBottom: space.sm }}
           />
           <Button
-            title="Tilbake til start"
+            title={t('results.backToStart')}
             variant="ghost"
             size="md"
             onPress={() => navigation.replace('ExamSetup')}
@@ -536,12 +546,12 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.errorIconCircle}>
             <Icon name="document-text-outline" size={32} color={colors.navy} />
           </View>
-          <Text style={styles.errorTitle}>Ingen vurdering tilgjengelig</Text>
+          <Text style={styles.errorTitle}>{t('results.noEvalTitle')}</Text>
           <Text style={styles.errorMessage}>
-            Det ble ikke funnet noen godkjente ytringer eller evaluering for denne prøven.
+            {t('results.noEvalBody')}
           </Text>
           <Button
-            title="Start ny prøve"
+            title={t('results.startNew')}
             variant="primary"
             size="lg"
             onPress={() => navigation.replace('ExamSetup')}
@@ -558,13 +568,13 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
     <Screen>
       {/* TOP APP BAR */}
       <AppHeader
-        title={resultsData?.topic?.titleNo || 'Eksamensresultat'}
-        subtitle="HK-dir B1/B2 Vurdering"
+        title={resultsData?.topic?.titleNo || t('results.headerFallback')}
+        subtitle={t('results.headerSubtitle')}
         onBack={() => navigation.replace('ExamSetup')}
         bordered
         right={
           <Button
-            title="Del"
+            title={t('results.share')}
             variant="outline"
             size="sm"
             icon="share-outline"
@@ -593,7 +603,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={styles.dualTabsNotice}>
                 <Icon name="people-outline" size={16} color={colors.navy} />
                 <Text style={styles.dualTabsNoticeText}>
-                  Lokal to-kandidaters prøve – Velg kandidat for å se individuell vurdering:
+                  {t('results.dualNotice')}
                 </Text>
               </View>
               <View style={styles.dualTabsRow}>
@@ -615,7 +625,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                           active && styles.dualTabTitleActive,
                         ]}
                       >
-                        {idx === 0 ? 'Kandidat 1' : 'Kandidat 2'}
+                        {idx === 0 ? t('common.candidate1') : t('common.candidate2')}
                       </Text>
                       <Badge
                         label={cand?.assessedLevel || '--'}
@@ -633,12 +643,12 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.headerCandidateRow}>
               <Text style={styles.headerCandidateLabel}>
                 {currentCandidate.speakerRole === 'CANDIDATE_1'
-                  ? 'Kandidat 1'
-                  : 'Kandidat 2'}
-                {hasDualCandidates ? '' : ' (Deg)'}
+                  ? t('common.candidate1')
+                  : t('common.candidate2')}
+                {hasDualCandidates ? '' : t('results.youSuffix')}
               </Text>
               <Badge
-                label={`Målnivå: ${currentCandidate.targetLevel}`}
+                label={t('results.targetLevelBadge', { level: currentCandidate.targetLevel })}
                 tone="navy"
               />
             </View>
@@ -654,7 +664,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                   },
                 ]}
               >
-                <Text style={styles.assessedLevelLabel}>Vurdert nivå</Text>
+                <Text style={styles.assessedLevelLabel}>{t('results.assessedLevel')}</Text>
                 <Text
                   style={[
                     styles.assessedLevelValue,
@@ -666,9 +676,9 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
               </View>
 
               <View style={styles.scoreMetricCard}>
-                <Text style={styles.scoreMetricLabel}>HK-dir Snitt</Text>
+                <Text style={styles.scoreMetricLabel}>{t('results.average')}</Text>
                 <Text style={styles.scoreMetricValue}>{averageScore}</Text>
-                <Text style={styles.scoreMetricSub}>av 10 poeng</Text>
+                <Text style={styles.scoreMetricSub}>{t('results.outOf10')}</Text>
               </View>
             </View>
 
@@ -691,12 +701,15 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                     { color: isPassed ? colors.success : colors.warning },
                   ]}
                 >
-                  {isPassed ? 'BESTÅTT MÅLNIVÅ' : 'TRENGER MER ØVING'}
+                  {isPassed ? t('results.passed') : t('results.needsWork')}
                 </Text>
                 <Text style={styles.passStatusSubtitle}>
                   {isPassed
-                    ? `Gratulerer! Du oppfyller HK-dir sine kompetansemål for nivå ${currentCandidate.targetLevel}.`
-                    : `Du er vurdert til ${currentCandidate.assessedLevel}. Øv mer for å nå målnivå ${currentCandidate.targetLevel}.`}
+                    ? t('results.passedBody', { level: currentCandidate.targetLevel })
+                    : t('results.needsWorkBody', {
+                        assessed: currentCandidate.assessedLevel,
+                        target: currentCandidate.targetLevel,
+                      })}
                 </Text>
               </View>
             </View>
@@ -705,14 +718,14 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           {/* 2. OVERALL SUMMARY SECTION WITH BILINGUAL TOGGLE */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>Sensorens helhetsvurdering</Text>
+              <Text style={styles.sectionTitle}>{t('results.summaryTitle')}</Text>
               <Pressable
                 style={styles.langTogglePill}
                 onPress={() => setShowEnglishFeedback(!showEnglishFeedback)}
               >
                 <Icon name="language-outline" size={14} color={colors.navy} />
                 <Text style={styles.langToggleLabel}>
-                  {showEnglishFeedback ? 'Vis på norsk' : 'Show English'}
+                  {showEnglishFeedback ? t('results.feedbackShowNo') : t('results.feedbackShowEn')}
                 </Text>
               </Pressable>
             </View>
@@ -730,8 +743,8 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           {/* 3. 4 OFFICIAL HK-DIR CRITERIA CARDS */}
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>HK-dir Vurderingskriterier</Text>
-              <Text style={styles.sectionSubtitle}>Skala 1–10</Text>
+              <Text style={styles.sectionTitle}>{t('results.criteriaTitle')}</Text>
+              <Text style={styles.sectionSubtitle}>{t('results.scale')}</Text>
             </View>
 
             <CriterionCard
@@ -767,36 +780,36 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeaderRow}>
               <Text style={styles.sectionTitle}>
-                Konkrete forbedringer fra samtalen
+                {t('results.correctionsTitle')}
               </Text>
               <Badge
-                label={`${currentCandidate.concreteCorrections.length} eksempler`}
+                label={t('results.examplesCount', { count: currentCandidate.concreteCorrections.length })}
                 tone="navy"
               />
             </View>
             <Text style={styles.sectionExplainer}>
-              Sensor har plukket ut konkrete ytringer fra transkripsjonen med forslag til forbedringer:
+              {t('results.correctionsExplainer')}
             </Text>
 
             {currentCandidate.concreteCorrections.length === 0 ? (
               <Card style={styles.emptyCorrectionsCard}>
                 <Icon name="checkmark-circle" size={24} color={colors.success} />
                 <Text style={styles.emptyCorrectionsText}>
-                  Ingen spesifikke grammatikkfeil registrert i ytringene. God presisjon!
+                  {t('results.noCorrections')}
                 </Text>
               </Card>
             ) : (
               currentCandidate.concreteCorrections.map((item: ConcreteCorrection, idx: number) => (
                 <Card key={idx} style={styles.correctionCard}>
                   <View style={styles.correctionHeaderRow}>
-                    <Badge label={`Punkt #${idx + 1}`} tone="neutral" />
+                    <Badge label={t('results.point', { n: idx + 1 })} tone="neutral" />
                   </View>
 
                   {/* Red Box: Hva du sa */}
                   <View style={styles.correctionBoxRed}>
                     <View style={styles.correctionBoxLabelRow}>
                       <Icon name="close-circle" size={15} color={colors.danger} />
-                      <Text style={styles.correctionLabelRed}>HVA DU SA</Text>
+                      <Text style={styles.correctionLabelRed}>{t('results.whatYouSaid')}</Text>
                     </View>
                     <Text style={styles.quoteTextRed}>
                       "{item.originalQuote}"
@@ -807,7 +820,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                   <View style={styles.correctionBoxGreen}>
                     <View style={styles.correctionBoxLabelRow}>
                       <Icon name="checkmark-circle" size={15} color={colors.success} />
-                      <Text style={styles.correctionLabelGreen}>SLIK BØR DET SIES</Text>
+                      <Text style={styles.correctionLabelGreen}>{t('results.howToSay')}</Text>
                     </View>
                     <Text style={styles.quoteTextGreen}>
                       "{item.correctedNorwegian}"
@@ -818,7 +831,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                   <View style={styles.ruleExplanationBox}>
                     <View style={styles.correctionBoxLabelRow}>
                       <Icon name="bulb-outline" size={15} color={colors.navy} />
-                      <Text style={styles.ruleLabel}>REGEL & FORKLARING</Text>
+                      <Text style={styles.ruleLabel}>{t('results.rule')}</Text>
                     </View>
                     <Text style={styles.ruleText}>{item.grammarOrVocabRule}</Text>
                   </View>
@@ -838,15 +851,15 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Icon name="chatbubbles-outline" size={18} color={colors.navy} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.accordionTitle}>Full samtalelogg (Transkripsjon)</Text>
+                  <Text style={styles.accordionTitle}>{t('results.transcriptTitle')}</Text>
                   <Text style={styles.accordionSubtitle}>
-                    {(resultsData?.transcriptJson || []).length} ytringer registrert under prøven
+                    {t('results.transcriptSubtitle', { count: (resultsData?.transcriptJson || []).length })}
                   </Text>
                 </View>
               </View>
               <View style={styles.accordionRightRow}>
                 <Text style={styles.accordionChevron}>
-                  {isTranscriptExpanded ? 'Skjul' : 'Vis'}
+                  {isTranscriptExpanded ? t('common.hide') : t('common.show')}
                 </Text>
                 <Icon
                   name={isTranscriptExpanded ? 'chevron-up' : 'chevron-down'}
@@ -860,7 +873,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
               <Card style={styles.transcriptListContainer}>
                 {(resultsData?.transcriptJson || []).length === 0 ? (
                   <Text style={styles.emptyTranscriptText}>
-                    Ingen transkripsjon lagret for denne sesjonen.
+                    {t('results.noTranscript')}
                   </Text>
                 ) : (
                   resultsData?.transcriptJson.map((turn: TranscriptTurn, index: number) => {
@@ -869,12 +882,12 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                     const isCandidate2 = turn.role === 'CANDIDATE_2';
 
                     const roleName = isExaminer
-                      ? 'Sensor'
+                      ? t('common.examiner')
                       : isPeer
-                        ? 'AI-medkandidat'
+                        ? t('common.aiCoCandidate')
                         : isCandidate2
-                          ? 'Kandidat 2'
-                          : 'Kandidat 1';
+                          ? t('common.candidate2')
+                          : t('common.candidate1');
 
                     const timeStr = formatTimestamp(turn.timestamp, baseTimestamp);
 
@@ -917,15 +930,15 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Icon name="flash-outline" size={18} color={colors.navy} />
                 </View>
                 <View style={{ flex: 1 }}>
-                  <Text style={styles.accordionTitle}>Sesjonsforbruk & Token Ledger</Text>
+                  <Text style={styles.accordionTitle}>{t('results.usageTitle')}</Text>
                   <Text style={styles.accordionSubtitle}>
-                    Audio, GPT-4o & ElevenLabs ressursbruk
+                    {t('results.usageSubtitle')}
                   </Text>
                 </View>
               </View>
               <View style={styles.accordionRightRow}>
                 <Text style={styles.accordionChevron}>
-                  {isUsageExpanded ? 'Skjul' : 'Vis'}
+                  {isUsageExpanded ? t('common.hide') : t('common.show')}
                 </Text>
                 <Icon
                   name={isUsageExpanded ? 'chevron-up' : 'chevron-down'}
@@ -940,44 +953,44 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
                 <View style={styles.usageMetricGrid}>
                   <View style={styles.usageMetricBox}>
                     <Text style={styles.usageMetricVal}>
-                      {sessionUsageSummary.totalSttSeconds} sek
+                      {t('results.seconds', { sec: sessionUsageSummary.totalSttSeconds })}
                     </Text>
-                    <Text style={styles.usageMetricSub}>Talt lydtid (STT)</Text>
+                    <Text style={styles.usageMetricSub}>{t('results.sttLabel')}</Text>
                   </View>
 
                   <View style={styles.usageMetricBox}>
                     <Text style={styles.usageMetricVal}>
-                      {sessionUsageSummary.totalTokens.toLocaleString('no-NO')}
+                      {sessionUsageSummary.totalTokens.toLocaleString(LOCALE_TAGS[locale])}
                     </Text>
-                    <Text style={styles.usageMetricSub}>Totale LLM Tokens</Text>
+                    <Text style={styles.usageMetricSub}>{t('results.tokensLabel')}</Text>
                   </View>
 
                   <View style={styles.usageMetricBox}>
                     <Text style={styles.usageMetricVal}>
-                      {sessionUsageSummary.totalTtsChars.toLocaleString('no-NO')}
+                      {sessionUsageSummary.totalTtsChars.toLocaleString(LOCALE_TAGS[locale])}
                     </Text>
-                    <Text style={styles.usageMetricSub}>TTS Tegn</Text>
+                    <Text style={styles.usageMetricSub}>{t('results.ttsLabel')}</Text>
                   </View>
 
                   <View style={styles.usageMetricBox}>
                     <Text style={styles.usageMetricVal}>
                       ${sessionUsageSummary.totalCostUsdFormatted}
                     </Text>
-                    <Text style={styles.usageMetricSub}>Estimert sesjonskost</Text>
+                    <Text style={styles.usageMetricSub}>{t('results.costLabel')}</Text>
                   </View>
                 </View>
 
                 <View style={styles.usageLedgerEntriesList}>
                   <Text style={styles.usageLedgerEntriesTitle}>
-                    Ledger transaksjoner ({sessionUsageSummary.entriesCount}):
+                    {t('results.ledgerTitle', { count: sessionUsageSummary.entriesCount })}
                   </Text>
                   {(resultsData?.usage || []).map((entry: UsageLedgerEntry, idx: number) => (
                     <View key={entry.id || idx} style={styles.ledgerRow}>
                       <View style={styles.ledgerRowLeft}>
                         <Text style={styles.ledgerSourceText}>
                           {entry.source === 'POST_EXAM_RUBRIC_EVAL'
-                            ? 'Rubrikkvurdering (gpt-4o)'
-                            : 'Sanntidssamtale (Voice Agent)'}
+                            ? t('results.ledgerRubric')
+                            : t('results.ledgerRealtime')}
                         </Text>
                         <Text style={styles.ledgerModelText}>
                           {entry.llmModel} • In: {entry.llmPromptTokens} • Out:{' '}
@@ -997,7 +1010,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
           {/* 7. BOTTOM ACTION BUTTONS */}
           <View style={styles.bottomActionsContainer}>
             <Button
-              title="Ta en ny prøve"
+              title={t('results.takeNew')}
               variant="primary"
               size="lg"
               icon="mic"
@@ -1006,7 +1019,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
             />
 
             <Button
-              title="Del eller lagre resultat"
+              title={t('results.shareOrSave')}
               variant="outline"
               size="lg"
               icon="share-outline"

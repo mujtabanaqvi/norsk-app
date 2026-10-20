@@ -3,39 +3,17 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { Screen, AppHeader, Card, Badge, Icon } from '../components/ui';
+import { useLocale } from '../hooks/useLocale';
 import { colors, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'HowTo'>;
 
-const STEPS = [
-  {
-    number: '1',
-    badge: 'DEL 1',
-    title: 'Individuell presentasjon (Monolog)',
-    description:
-      'Sensoren stiller et oppstartsspørsmål knyttet til et valgt tema. Du snakker i ca. 1,5–2 minutter om temaet uten avbrytelser.',
-  },
-  {
-    number: '2',
-    badge: 'DEL 2',
-    title: 'Samtale med medkandidat',
-    description:
-      'Du diskuterer et dilemma eller et tema sammen med en medkandidat. I appen kan du øve alene med en interaktiv AI-medkandidat, eller dele mikrofonen med en venn ved siden av deg.',
-  },
-  {
-    number: '3',
-    badge: 'DEL 3',
-    title: 'Oppfølgingsspørsmål fra sensor',
-    description:
-      'Sensoren stiller fordypende spørsmål for å teste evnen din til å reflektere, begrunne meninger og bruke et nyansert ordforråd på B1- eller B2-nivå.',
-  },
-];
-
 export const HowToScreen: React.FC<Props> = ({ navigation }) => {
+  const { t, strings } = useLocale();
   return (
     <Screen>
       <AppHeader
-        title="Slik fungerer prøven"
+        title={t('nav.howTo')}
         onBack={() => navigation.goBack()}
         bordered
       />
@@ -45,19 +23,16 @@ export const HowToScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.introBox}>
             <View style={styles.introHeaderRow}>
               <Icon name="information-circle" size={20} color={colors.navy} />
-              <Text style={styles.introTitle}>Offisiell HK-dir B1/B2 Eksamenssimulator</Text>
+              <Text style={styles.introTitle}>{t('howTo.introTitle')}</Text>
             </View>
-            <Text style={styles.introText}>
-              Simulatoren er bygget etter retningslinjene til Direktoratet for høyere utdanning og kompetanse (HK-dir)
-              og trener deg på den muntlige delen av Norskprøven.
-            </Text>
+            <Text style={styles.introText}>{t('howTo.introText')}</Text>
           </View>
 
-          {STEPS.map((step) => (
-            <Card key={step.number} style={styles.stepCard}>
+          {strings.howTo.steps.map((step, index) => (
+            <Card key={step.badge} style={styles.stepCard}>
               <View style={styles.stepTopRow}>
                 <View style={styles.stepCircle}>
-                  <Text style={styles.stepCircleText}>{step.number}</Text>
+                  <Text style={styles.stepCircleText}>{index + 1}</Text>
                 </View>
                 <Badge label={step.badge} tone="navy" />
               </View>
@@ -71,13 +46,10 @@ export const HowToScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.evalCircle}>
                 <Icon name="checkmark" size={16} color={colors.white} />
               </View>
-              <Badge label="VURDERING" tone="success" />
+              <Badge label={t('howTo.evalBadge')} tone="success" />
             </View>
-            <Text style={styles.stepTitle}>Umiddelbar tilbakemelding & poeng</Text>
-            <Text style={styles.stepDescription}>
-              Etter fullført prøve vurderes din tale automatisk etter 5 offisielle kriterier: flyt, uttale,
-              vokabular, grammatikk og oppgaveforståelse.
-            </Text>
+            <Text style={styles.stepTitle}>{t('howTo.evalTitle')}</Text>
+            <Text style={styles.stepDescription}>{t('howTo.evalDesc')}</Text>
           </Card>
         </View>
       </ScrollView>

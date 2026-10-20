@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { View, Text, TextInput, Pressable, StyleSheet, type TextInputProps } from 'react-native';
 import { colors, radius, space, type } from '../../theme';
 import { Icon } from './Icon';
+import { useLocale } from '../../hooks/useLocale';
 
 interface FormFieldProps extends Omit<TextInputProps, 'style'> {
   label: string;
@@ -14,6 +15,7 @@ interface FormFieldProps extends Omit<TextInputProps, 'style'> {
 /** Labelled text input with focus styling, inline error and optional hint. */
 export const FormField = React.forwardRef<TextInput, FormFieldProps>(
   ({ label, error, hint, password = false, onFocus, onBlur, ...inputProps }, ref) => {
+    const { t } = useLocale();
     const [focused, setFocused] = useState(false);
     const [revealed, setRevealed] = useState(false);
     const hasError = !!error;
@@ -51,7 +53,7 @@ export const FormField = React.forwardRef<TextInput, FormFieldProps>(
               onPress={() => setRevealed((v) => !v)}
               style={styles.reveal}
               accessibilityRole="button"
-              accessibilityLabel={revealed ? 'Skjul passord' : 'Vis passord'}
+              accessibilityLabel={revealed ? t('common.hidePassword') : t('common.showPassword')}
               hitSlop={8}
             >
               <Icon name={revealed ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />

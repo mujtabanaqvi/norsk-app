@@ -12,6 +12,8 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { fetchReferrals } from '../api';
 import { useAuth } from '../hooks/useAuth';
+import { useLocale } from '../hooks/useLocale';
+import { LOCALE_TAGS } from '../i18n';
 import { Screen, AppHeader, Card, Badge, Button, Icon } from '../components/ui';
 import { colors, radius, space, type } from '../theme';
 
@@ -19,6 +21,7 @@ type Props = NativeStackScreenProps<RootStackParamList, 'Referral'>;
 
 export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
   const { user } = useAuth();
+  const { locale, t } = useLocale();
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
@@ -32,19 +35,20 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
         const res = await fetchReferrals();
         setData(res);
       } catch (err: any) {
-        Alert.alert('Feil', err.message || 'Kunne ikke hente verveopplysninger');
+        Alert.alert(t('common.error'), err.message || t('referral.loadFailed'));
       } finally {
         setIsLoading(false);
       }
     }
     loadData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   const handleShare = async () => {
     if (!data?.referralCode) return;
     try {
       await Share.share({
-        message: `Hei! Øv til muntlig Norskprøve med meg på Snakkly. Registrer deg med vervekoden min ${data.referralCode} for å få tilgang!`,
+        message: t('referral.shareMessage', { code: data.referralCode }),
       });
     } catch (err: any) {
       console.error('Share error:', err);
@@ -55,7 +59,7 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
     return (
       <Screen>
         <AppHeader
-          title="Verv en venn"
+          title={t('referral.title')}
           onBack={() => navigation.goBack()}
           bordered
         />
@@ -63,12 +67,12 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
           <View style={styles.giftCircle}>
             <Icon name="gift-outline" size={32} color={colors.red} />
           </View>
-          <Text style={styles.title}>Verv en venn</Text>
+          <Text style={styles.title}>{t('referral.title')}</Text>
           <Text style={[styles.subtitle, { textAlign: 'center', marginBottom: space.xl }]}>
-            Logg inn for å få din personlige vervekode og motta ekstra daglige tester i 1 uke for hver venn du verver!
+            {t('referral.loggedOutBody')}
           </Text>
           <Button
-            title="Logg inn / Registrer deg"
+            title={t('referral.loginOrRegister')}
             variant="primary"
             size="lg"
             icon="person-outline"
@@ -85,7 +89,7 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <Screen>
       <AppHeader
-        title="Verv en venn"
+        title={t('referral.title')}
         onBack={() => navigation.goBack()}
         bordered
       />
@@ -97,10 +101,10 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
               <View style={styles.giftCircleSmall}>
                 <Icon name="gift-outline" size={22} color={colors.red} />
               </View>
-              <Text style={styles.title}>Verv en venn</Text>
+              <Text style={styles.title}>{t('referral.title')}</Text>
             </View>
             <Text style={styles.subtitle}>
-              Få +{bonusPerDay} ekstra tester per dag i {durationDays} dager for hver venn som registrerer seg med din kode!
+              {t('referral.heroBody', { bonus: bonusPerDay, days: durationDays })}
             </Text>
           </View>
 
@@ -112,12 +116,12 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
             <View style={styles.content}>
               {/* Referral Code Ticket Card */}
               <View style={styles.ticketCard}>
-                <Text style={styles.codeLabel}>DIN PERSONLIGE VERVEKODE</Text>
+                <Text style={styles.codeLabel}>{t('referral.codeLabel')}</Text>
                 <Text selectable style={styles.codeValue}>
                   {data?.referralCode || '------'}
                 </Text>
                 <Button
-                  title="Del kode med venner"
+                  title={t('referral.shareCode')}
                   variant="primary"
                   size="lg"
                   icon="share-outline"
@@ -130,20 +134,20 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
               <Card style={styles.statsCard}>
                 <View style={styles.statCol}>
                   <Text style={styles.statNumber}>{data?.stats?.totalReferredCount || 0}</Text>
-                  <Text style={styles.statLabel}>Venner vervet</Text>
+                  <Text style={styles.statLabel}>{t('referral.friendsReferred')}</Text>
                 </View>
                 <View style={styles.dividerVertical} />
                 <View style={styles.statCol}>
                   <Text style={[styles.statNumber, { color: colors.success }]}>
                     +{data?.stats?.currentBonusTestsPerDay || 0}
                   </Text>
-                  <Text style={styles.statLabel}>Ekstra tester i dag</Text>
+                  <Text style={styles.statLabel}>{t('referral.bonusToday')}</Text>
                 </View>
               </Card>
 
               {/* Referral History */}
               <Card>
-                <Text style={styles.historyTitle}>Dine vervebonuser</Text>
+                <Text style={styles.historyTitle}>{t('referral.historyTitle')}</Text>
                 {data?.rewards && data.rewards.length > 0 ? (
                   data.rewards.map((r: any, idx: number) => {
                     const isActive = new Date(r.expiresAt) > new Date();
@@ -157,14 +161,16 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
                       >
                         <View>
                           <Text style={styles.rewardItemText}>
-                            +{r.bonusTestsPerDay} tester/dag
+                            {t('referral.rewardTests', { count: r.bonusTestsPerDay })}
                           </Text>
                           <Text style={styles.rewardSubtext}>
-                            Utløper: {new Date(r.expiresAt).toLocaleDateString('no-NO')}
+                            {t('referral.expires', {
+                              date: new Date(r.expiresAt).toLocaleDateString(LOCALE_TAGS[locale]),
+                            })}
                           </Text>
                         </View>
                         <Badge
-                          label={isActive ? 'AKTIV' : 'UTLØPT'}
+                          label={isActive ? t('referral.active') : t('referral.expired')}
                           tone={isActive ? 'success' : 'neutral'}
                         />
                       </View>
@@ -172,7 +178,7 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
                   })
                 ) : (
                   <Text style={styles.emptyHistoryText}>
-                    Du har ingen aktive vervebonuser ennå. Del koden din for å låse opp ekstra tester!
+                    {t('referral.empty')}
                   </Text>
                 )}
               </Card>

@@ -1,8 +1,14 @@
 import React from 'react';
+import { resolveLocale, translate } from '@/src/i18n';
 
-export default function SubscriptionCanceledPage() {
+export default async function SubscriptionCanceledPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ lang?: string }>;
+}) {
+  const locale = resolveLocale((await searchParams).lang);
   return (
-    <main className="snakkly-center-shell">
+    <main className="snakkly-center-shell" lang={locale}>
       <div
         className="snakkly-card"
         style={{
@@ -62,7 +68,7 @@ export default function SubscriptionCanceledPage() {
             letterSpacing: '-0.02em',
           }}
         >
-          Bestilling avbrutt
+          {translate(locale, 'web.canceledTitle')}
         </h1>
         <p
           style={{
@@ -72,12 +78,11 @@ export default function SubscriptionCanceledPage() {
             margin: '0 0 1.75rem',
           }}
         >
-          Betalingen ble ikke fullført, og kortet ditt ble ikke belastet. Du kan når som helst prøve
-          igjen for å oppgradere abonnementet ditt.
+          {translate(locale, 'web.canceledBody')}
         </p>
 
         <a href="/" className="snakkly-btn-primary">
-          Tilbake til appen
+          {translate(locale, 'web.backToApp')}
         </a>
       </div>
     </main>

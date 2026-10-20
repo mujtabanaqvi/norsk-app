@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { ZodError } from 'zod';
 import { fieldErrors as toFieldErrors } from '@/src/validation/auth';
+import { DEFAULT_LOCALE, translate } from '@/src/i18n';
 
 /**
  * Consistent error response shape for auth endpoints:
@@ -18,7 +19,7 @@ export function apiError(
 export function validationError(zodError: ZodError) {
   const fieldErrors = toFieldErrors(zodError);
   const first = Object.values(fieldErrors)[0];
-  return apiError(400, 'VALIDATION_ERROR', first || 'Ugyldige opplysninger', { fieldErrors });
+  return apiError(400, 'VALIDATION_ERROR', first || translate(DEFAULT_LOCALE, 'validation.invalidData'), { fieldErrors });
 }
 
 /** Better Auth APIError → its machine code (e.g. EMAIL_NOT_VERIFIED). */

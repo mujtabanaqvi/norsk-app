@@ -12,6 +12,7 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { fetchTopicsAndQuota, startExamSession } from '../api';
 import { useAuth } from '../hooks/useAuth';
+import { useLocale } from '../hooks/useLocale';
 import type {
   CefrLevel,
   CoCandidateMode,
@@ -26,6 +27,7 @@ import {
   TierBadge,
   Button,
   Icon,
+  LanguageToggle,
 } from '../components/ui';
 import { colors, radius, space, type } from '../theme';
 
@@ -47,6 +49,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [fetchError, setFetchError] = useState<string | null>(null);
 
   const { user, dailyTestStatus, logout } = useAuth();
+  const { t } = useLocale();
 
   /**
    * Fetch theme catalog and remaining user audio quota from backend
@@ -67,13 +70,13 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
         setRemainingSeconds(data.quota.remainingAudioSeconds);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Ukjent feil under henting av data';
+      const msg = err instanceof Error ? err.message : t('setup.fetchError');
       setFetchError(msg);
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     loadExamCatalog();
@@ -107,10 +110,12 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     const minutes = Math.floor(remainingSeconds / 60);
     const seconds = remainingSeconds % 60;
     if (minutes === 0) {
-      return `${seconds} sek`;
+      return t('setup.quotaSec', { sec: seconds });
     }
-    return seconds > 0 ? `${minutes} min ${seconds} sek` : `${minutes} min`;
-  }, [remainingSeconds]);
+    return seconds > 0
+      ? t('setup.quotaMinSec', { min: minutes, sec: seconds })
+      : t('setup.quotaMin', { min: minutes });
+  }, [remainingSeconds, t]);
 
   const hasInsufficientQuota =
     remainingSeconds !== null && remainingSeconds < MIN_REQUIRED_QUOTA_SECONDS;
@@ -120,23 +125,24 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
    */
   const handleStartExam = async () => {
     if (!user) {
-      Alert.alert(
-        'Innlogging påkrevd',
-        'Du må være logget inn for å ta en muntlig prøve.',
-        [{ text: 'Logg inn', onPress: () => navigation.navigate('Auth') }]
-      );
+      Alert.alert(t('setup.loginRequiredTitle'), t('setup.loginRequiredBody'), [
+        { text: t('common.login'), onPress: () => navigation.navigate('Auth') },
+      ]);
       return;
     }
 
     if (!selectedThemeId || filteredThemes.length === 0) {
-      Alert.alert('Velg tema', 'Ingen tilgjengelige eksamenstemaer for valgt nivå.');
+      Alert.alert(t('setup.chooseThemeTitle'), t('setup.noThemesForLevel'));
       return;
     }
 
     if (hasInsufficientQuota) {
       Alert.alert(
-        'Utilstrekkelig taletid',
-        `Du har kun ${formattedQuota} igjen. Minimum ${MIN_REQUIRED_QUOTA_SECONDS / 60} minutter kreves for å starte en muntlig prøve.`
+        t('setup.insufficientTitle'),
+        t('setup.insufficientBody', {
+          quota: formattedQuota,
+          minutes: MIN_REQUIRED_QUOTA_SECONDS / 60,
+        })
       );
       return;
     }
@@ -149,7 +155,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
         coCandidateMode: practiceMode,
       });
 
-      const resolvedTopicTitle = result.topic?.titleNo || 'Muntlig prøve';
+      const resolvedTopicTitle = result.topic?.titleNo || t('setup.fallbackTopic');
       const resolvedMonologuePrompt = result.topic?.monologuePromptNo;
       const resolvedDiscussionPrompt = result.topic?.discussionPromptNo;
 
@@ -165,8 +171,8 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
         initialTranscript: result.transcript || [],
       });
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Oppstart av muntlig prøve mislyktes';
-      Alert.alert('Kunne ikke starte prøven', message);
+      const message = err instanceof Error ? err.message : t('setup.startFailed');
+      Alert.alert(t('setup.startFailedTitle'), message);
     } finally {
       setIsStarting(false);
     }
@@ -185,7 +191,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.brandBlock}>
           <Logo size={32} withWordmark />
           <Text style={styles.headerSubtitle}>
-            Norskprøven Muntlig{user ? ` · ${user.name || user.email.split('@')[0]}` : ''}
+            {t('setup.headerSubtitle')}{user ? ` · ${user.name || user.email.split('@')[0]}` : ''}
           </Text>
         </View>
 
@@ -194,13 +200,13 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             <Pressable
               onPress={() => navigation.navigate('Subscription')}
               accessibilityRole="button"
-              accessibilityLabel="Abonnement"
+              accessibilityLabel={t('nav.subscription')}
             >
               <TierBadge tier={user.subscriptionTier} />
             </Pressable>
           ) : (
             <Button
-              title="Logg inn"
+              title={t('common.login')}
               variant="outline"
               size="sm"
               icon="person-outline"
@@ -208,11 +214,13 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             />
           )}
 
+          <LanguageToggle />
+
           <Pressable
             onPress={() => navigation.navigate('HowTo')}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             accessibilityRole="button"
-            accessibilityLabel="Veileder"
+            accessibilityLabel={t('setup.a11yGuide')}
           >
             <Icon name="help-circle-outline" size={20} color={colors.navy} />
           </Pressable>
@@ -221,7 +229,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => navigation.navigate('Referral')}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             accessibilityRole="button"
-            accessibilityLabel="Verv en venn"
+            accessibilityLabel={t('nav.referral')}
           >
             <Icon name="gift-outline" size={19} color={colors.navy} />
           </Pressable>
@@ -234,7 +242,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
               pressed && styles.iconBtnPressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Oppgrader"
+            accessibilityLabel={t('setup.a11yUpgrade')}
           >
             <Icon name="star" size={18} color={colors.gold} />
           </Pressable>
@@ -244,7 +252,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
               onPress={logout}
               style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
               accessibilityRole="button"
-              accessibilityLabel="Logg ut"
+              accessibilityLabel={t('setup.a11yLogout')}
             >
               <Icon name="log-out-outline" size={19} color={colors.red} />
             </Pressable>
@@ -257,7 +265,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
         <View style={styles.warningBanner}>
           <Icon name="warning-outline" size={18} color={colors.warning} />
           <Text style={styles.warningBannerText}>
-            Lav talekvote. Du trenger minst {MIN_REQUIRED_QUOTA_SECONDS / 60} minutter for å gjennomføre en full prøve.
+            {t('setup.lowQuotaBanner', { minutes: MIN_REQUIRED_QUOTA_SECONDS / 60 })}
           </Text>
         </View>
       )}
@@ -265,17 +273,17 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       {isLoading ? (
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={colors.red} />
-          <Text style={styles.loadingText}>Henter tilgjengelige temaer og talekvote...</Text>
+          <Text style={styles.loadingText}>{t('setup.loading')}</Text>
         </View>
       ) : fetchError ? (
         <View style={styles.errorContainer}>
           <View style={styles.errorIconCircle}>
             <Icon name="alert-circle" size={28} color={colors.danger} />
           </View>
-          <Text style={styles.errorTitle}>Tilkoblingsfeil</Text>
+          <Text style={styles.errorTitle}>{t('setup.connectionError')}</Text>
           <Text style={styles.errorMessage}>{fetchError}</Text>
           <Button
-            title="Prøv på nytt"
+            title={t('common.retry')}
             variant="primary"
             icon="refresh"
             onPress={() => loadExamCatalog(false)}
@@ -300,7 +308,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             <Card style={styles.statsCard}>
               <View style={styles.statsRow}>
                 <View style={styles.statColumn}>
-                  <Text style={styles.statOverline}>TALEKVOTE</Text>
+                  <Text style={styles.statOverline}>{t('setup.quotaOverline')}</Text>
                   <Text
                     style={[
                       styles.statValue,
@@ -309,13 +317,13 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                   >
                     {formattedQuota}
                   </Text>
-                  <Text style={styles.statCaption}>Tilgjengelig taletid</Text>
+                  <Text style={styles.statCaption}>{t('setup.quotaCaption')}</Text>
                 </View>
 
                 <View style={styles.statDivider} />
 
                 <View style={styles.statColumn}>
-                  <Text style={styles.statOverline}>ØVINGSTESTER I DAG</Text>
+                  <Text style={styles.statOverline}>{t('setup.dailyOverline')}</Text>
                   <Text style={styles.statValue}>
                     {dailyTestStatus
                       ? `${dailyTestStatus.testsUsedToday} / ${dailyTestStatus.totalAllowedToday}`
@@ -324,11 +332,11 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                   <Text style={styles.statCaption}>
                     {dailyTestStatus
                       ? dailyTestStatus.remainingToday > 0
-                        ? `${dailyTestStatus.remainingToday} gjenstår i dag`
-                        : 'Dagens grense er nådd'
-                      : 'Nullstilles ved midnatt'}
+                        ? t('setup.remainingToday', { count: dailyTestStatus.remainingToday })
+                        : t('setup.limitReached')
+                      : t('setup.resetsMidnight')}
                     {dailyTestStatus && dailyTestStatus.bonusTests > 0
-                      ? ` (+${dailyTestStatus.bonusTests} bonus)`
+                      ? t('setup.bonus', { count: dailyTestStatus.bonusTests })
                       : ''}
                   </Text>
                 </View>
@@ -348,10 +356,10 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                   {dailyTestStatus.remainingToday === 0 && (
                     <View style={styles.unlockRow}>
                       <Text style={styles.unlockHint}>
-                        Dagens grense er nådd. Nullstilles ved midnatt.
+                        {t('setup.limitReachedHint')}
                       </Text>
                       <Button
-                        title="Lås opp flere"
+                        title={t('setup.unlockMore')}
                         variant="gold"
                         size="sm"
                         icon="star"
@@ -365,7 +373,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
             {/* Section 1: Target Level Selector (Segmented Control) */}
             <View style={styles.section}>
-              <Text style={styles.sectionOverline}>1. VELG MÅLNIVÅ (CEFR)</Text>
+              <Text style={styles.sectionOverline}>{t('setup.step1')}</Text>
               <View style={styles.segmentedControl}>
                 {(['B1', 'B2'] as CefrLevel[]).map((level) => {
                   const isSelected = targetLevel === level;
@@ -386,7 +394,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                           isSelected && styles.segmentTitleSelected,
                         ]}
                       >
-                        Nivå {level}
+                        {t('setup.levelLabel', { level })}
                       </Text>
                       <Text
                         style={[
@@ -394,9 +402,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                           isSelected && styles.segmentSubtitleSelected,
                         ]}
                       >
-                        {level === 'B1'
-                          ? 'Selvstendig bruker (Middels)'
-                          : 'Flytende & Nyansert (Høyere)'}
+                        {level === 'B1' ? t('setup.levelB1Desc') : t('setup.levelB2Desc')}
                       </Text>
                     </Pressable>
                   );
@@ -406,7 +412,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
             {/* Section 2: Practice Mode Selector */}
             <View style={styles.section}>
-              <Text style={styles.sectionOverline}>2. VELG ØVINGSMODUS</Text>
+              <Text style={styles.sectionOverline}>{t('setup.step2')}</Text>
 
               {/* AI_PEER Card */}
               <Card
@@ -425,17 +431,17 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <View style={styles.modeTitleContainer}>
                     <Text style={styles.modeCardTitle}>
-                      Øv alene (AI Sensor + AI Medkandidat)
+                      {t('setup.aiPeerTitle')}
                     </Text>
                     <Badge
-                      label="Anbefalt for egentrening"
+                      label={t('setup.aiPeerBadge')}
                       tone="red"
                       style={styles.modeBadge}
                     />
                   </View>
                 </View>
                 <Text style={styles.modeCardDescription}>
-                  AI spiller både den autoriserte sensoren og en vennlig medkandidat i samtaledelen. Full samtalesimulering direkte på telefonen.
+                  {t('setup.aiPeerDesc')}
                 </Text>
               </Card>
 
@@ -456,17 +462,17 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                   </View>
                   <View style={styles.modeTitleContainer}>
                     <Text style={styles.modeCardTitle}>
-                      Øv med en venn ved siden av deg (Delt mikrofon)
+                      {t('setup.humanTitle')}
                     </Text>
                     <Badge
-                      label="Delt mikrofon (2 personer)"
+                      label={t('setup.humanBadge')}
                       tone="navy"
                       style={styles.modeBadge}
                     />
                   </View>
                 </View>
                 <Text style={styles.modeCardDescription}>
-                  AI-sensor leder prøven mens to kandidater sitter fysisk sammen og deler telefonens mikrofon. Sensoren lytter passivt under Del 2 (Samtaleoppgave).
+                  {t('setup.humanDesc')}
                 </Text>
               </Card>
             </View>
@@ -474,16 +480,16 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             {/* Section 3: Theme Selection */}
             <View style={styles.section}>
               <View style={styles.topicSectionHeader}>
-                <Text style={styles.sectionOverline}>3. VELG TEMA</Text>
+                <Text style={styles.sectionOverline}>{t('setup.step3')}</Text>
                 <Text style={styles.topicCounter}>
-                  {filteredThemes.length} temaer for {targetLevel}
+                  {t('setup.themesForLevel', { count: filteredThemes.length, level: targetLevel })}
                 </Text>
               </View>
 
               {filteredThemes.length === 0 ? (
                 <Card style={styles.emptyTopicsBox}>
                   <Text style={styles.emptyTopicsText}>
-                    Ingen temaer funnet for nivå {targetLevel}.
+                    {t('setup.noThemesFound', { level: targetLevel })}
                   </Text>
                 </Card>
               ) : (
@@ -495,9 +501,9 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                     style={styles.topicCard}
                   >
                     <View style={styles.topicCardTop}>
-                      <Badge label="TILFELDIG" tone="solidRed" icon="shuffle" />
+                      <Badge label={t('setup.randomBadge')} tone="solidRed" icon="shuffle" />
                       <Text style={styles.topicCardTitle}>
-                        Tilfeldig prøve (Anbefalt)
+                        {t('setup.randomTitle')}
                       </Text>
                       {selectedThemeId === 'RANDOM' && (
                         <Icon name="checkmark-circle" size={22} color={colors.red} />
@@ -505,7 +511,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                     </View>
 
                     <Text style={styles.topicCardPreview}>
-                      Som på den ekte Norskprøven trekkes hver del av prøven tilfeldig fra ulike temaer for nivå {targetLevel} når du starter ({filteredThemes.length} tilgjengelige temaer).
+                      {t('setup.randomDesc', { level: targetLevel, count: filteredThemes.length })}
                     </Text>
                   </Card>
 
@@ -537,7 +543,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                           </Text>
                         )}
                         <Text style={styles.topicCounter}>
-                          {setCount} oppgavesett · spørsmålene trekkes tilfeldig innen temaet
+                          {t('setup.setCount', { count: setCount })}
                         </Text>
                       </Card>
                     );
@@ -553,7 +559,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       <View style={styles.footer}>
         <View style={styles.footerInner}>
           <Button
-            title={isStarting ? 'Forbereder eksamensrom...' : 'Start muntlig prøve'}
+            title={isStarting ? t('setup.starting') : t('setup.start')}
             variant="primary"
             size="lg"
             icon="mic"
@@ -582,6 +588,7 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     flexShrink: 1,
+    minWidth: 128,
   },
   headerSubtitle: {
     ...type.caption,
@@ -590,6 +597,10 @@ const styles = StyleSheet.create({
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
+    // Wrap onto a second row on narrow phones instead of squashing the logo.
+    flexShrink: 1,
+    flexWrap: 'wrap',
+    justifyContent: 'flex-end',
     gap: 6,
   },
   iconBtn: {
