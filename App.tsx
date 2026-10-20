@@ -12,6 +12,7 @@ import { AuthScreen } from './src/screens/AuthScreen';
 import { VerifyEmailScreen } from './src/screens/VerifyEmailScreen';
 import { SubscriptionScreen } from './src/screens/SubscriptionScreen';
 import { ReferralScreen } from './src/screens/ReferralScreen';
+import { LearningProfileScreen } from './src/screens/LearningProfileScreen';
 import { HowToScreen } from './src/screens/HowToScreen';
 import { TermsScreen } from './src/screens/TermsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
@@ -99,6 +100,11 @@ function AppNavigation() {
               name="Referral"
               component={ReferralScreen}
               options={{ title: t('nav.referral') }}
+            />
+            <Stack.Screen
+              name="LearningProfile"
+              component={LearningProfileScreen}
+              options={{ title: t('nav.profile') }}
             />
             <Stack.Screen
               name="HowTo"

@@ -13,6 +13,7 @@ import {
   index,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
+import type { LearningInsight } from '../types/learning-profile';
 
 // Enums
 export const cefrLevelEnum = pgEnum('cefr_level', ['B1', 'B2']);
@@ -198,6 +199,16 @@ export const examSessions = pgTable(
     index('idx_exam_sessions_theme_id').on(table.themeId),
   ]
 );
+
+/**
+ * 3b. learning_profiles Table (rolling summary of the user's latest evaluated exams)
+ */
+export const learningProfiles = pgTable('learning_profiles', {
+  userId: varchar('user_id', { length: 128 }).primaryKey(),
+  insightJson: jsonb('insight_json').$type<LearningInsight>().notNull(),
+  basedOnSessionIds: jsonb('based_on_session_ids').$type<string[]>().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
 
 /**
  * 4. usage_ledger Table
@@ -477,6 +488,9 @@ export type NewUserQuota = typeof userQuotas.$inferInsert;
 
 export type ExamSession = typeof examSessions.$inferSelect;
 export type NewExamSession = typeof examSessions.$inferInsert;
+
+export type LearningProfile = typeof learningProfiles.$inferSelect;
+export type NewLearningProfile = typeof learningProfiles.$inferInsert;
 
 export type UsageLedgerEntry = typeof usageLedger.$inferSelect;
 export type NewUsageLedgerEntry = typeof usageLedger.$inferInsert;

@@ -17,6 +17,7 @@ import {
   userQuotas,
   TranscriptEntry,
 } from '../db/schema';
+import { updateLearningProfile } from './learning-profile';
 
 /**
  * Criterion Score Schema (1-10 scale with bilingual feedback)
@@ -592,4 +593,11 @@ ${
   console.log(
     `[Evaluation] Evaluation complete and persisted for session ${sessionId} (Tokens: ${totalLlmTokens}, Cost: $${estimatedCostUsd})`
   );
+
+  // 6. Refresh the user's rolling learning profile; never fail the evaluation over it
+  try {
+    await updateLearningProfile(session.userId);
+  } catch (profileErr) {
+    console.error(`[Evaluation] Learning profile update failed for user ${session.userId}:`, profileErr);
+  }
 }

@@ -29,6 +29,13 @@
       "when": 1792515372151,
       "tag": "0003_verify_existing_users",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1792525053161,
+      "tag": "0004_minor_scarlet_spider",
+      "breakpoints": true
     }
   ]
 }

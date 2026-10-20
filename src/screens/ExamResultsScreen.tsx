@@ -570,7 +570,7 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
       <AppHeader
         title={resultsData?.topic?.titleNo || t('results.headerFallback')}
         subtitle={t('results.headerSubtitle')}
-        onBack={() => navigation.replace('ExamSetup')}
+        onBack={() => (navigation.canGoBack() ? navigation.goBack() : navigation.replace('ExamSetup'))}
         bordered
         right={
           <Button
@@ -1016,6 +1016,15 @@ export const ExamResultsScreen: React.FC<Props> = ({ route, navigation }) => {
               icon="mic"
               fullWidth
               onPress={() => navigation.replace('ExamSetup')}
+            />
+
+            <Button
+              title={t('profile.seeProgress')}
+              variant="secondary"
+              size="lg"
+              icon="stats-chart-outline"
+              fullWidth
+              onPress={() => navigation.navigate('LearningProfile')}
             />
 
             <Button

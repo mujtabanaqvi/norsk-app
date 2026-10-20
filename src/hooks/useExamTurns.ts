@@ -82,6 +82,8 @@ export function useExamTurns({
   const activePlayerRef = useRef<AudioPlayer | null>(null);
   const isExamDoneRef = useRef<boolean>(false);
   const isStoppingRecordingRef = useRef<boolean>(false);
+  /** Set synchronously while a start is in flight so a double tap can't prepare twice */
+  const isStartingRecordingRef = useRef<boolean>(false);
   const recordingStartTimeRef = useRef<number>(0);
   const hasDetectedSpeechRef = useRef<boolean>(false);
   const silenceStartRef = useRef<number | null>(null);
@@ -299,39 +301,68 @@ export function useExamTurns({
   }, [onExamComplete, sessionId]);
 
   /**
+   * Release the native recording session if one is prepared or running.
+   * The recorder must be stopped before it can be prepared again, so this is checked
+   * against the recorder's own status rather than our UI phase.
+   */
+  const releaseRecorder = useCallback(async () => {
+    try {
+      const status = recorder.getStatus();
+      if (status.isRecording || status.canRecord || recorder.isRecording) {
+        await recorder.stop();
+      }
+    } catch (err) {
+      console.warn('[Recorder] Error releasing recorder:', err);
+    }
+  }, [recorder]);
+
+  /**
    * Start recording the candidate's voice answer.
    */
   const startRecording = useCallback(async () => {
+    if (isStartingRecordingRef.current || isStoppingRecordingRef.current) return;
+    isStartingRecordingRef.current = true;
+
     setErrorMessage(null);
     setHintMessage(null);
 
-    const granted = micPermissionGranted || (await ensureMicPermission());
-    if (!granted) {
-      setErrorMessage(tRef.current('room.micPermission'));
-      setPhase('error');
-      return;
-    }
-
     try {
+      const granted = micPermissionGranted || (await ensureMicPermission());
+      if (!granted) {
+        setErrorMessage(tRef.current('room.micPermission'));
+        setPhase('error');
+        return;
+      }
+
+      // Clear out a session left over from an earlier failed or interrupted turn
+      await releaseRecorder();
+
       await setAudioModeAsync({
         allowsRecording: true,
         playsInSilentMode: true,
       });
 
       await recorder.prepareToRecordAsync(RECORDING_OPTIONS);
+      if (!isMountedRef.current) {
+        await releaseRecorder();
+        return;
+      }
       recordingStartTimeRef.current = Date.now();
       hasDetectedSpeechRef.current = false;
       silenceStartRef.current = null;
-      isStoppingRecordingRef.current = false;
 
       recorder.record();
       setPhase('recording');
     } catch (err) {
+      // Don't leave a prepared session behind, or every retry fails with "already prepared"
+      await releaseRecorder();
       const msg = err instanceof Error ? err.message : tRef.current('room.micStartFailed');
       setErrorMessage(msg);
       setPhase('error');
+    } finally {
+      isStartingRecordingRef.current = false;
     }
-  }, [ensureMicPermission, micPermissionGranted, recorder]);
+  }, [ensureMicPermission, micPermissionGranted, recorder, releaseRecorder]);
 
   /**
    * Stop recording and upload the audio turn to /api/exam/[sessionId]/turn.
@@ -468,13 +499,7 @@ export function useExamTurns({
     setErrorMessage(null);
     setHintMessage(null);
 
-    if (phase === 'recording') {
-      try {
-        await recorder.stop();
-      } catch {
-        // Ignore
-      }
-    }
+    await releaseRecorder();
 
     setPhase('thinking');
     try {
@@ -500,7 +525,7 @@ export function useExamTurns({
       setErrorMessage(msg);
       setPhase('error');
     }
-  }, [candidateSpeaker, phase, playRepliesSequence, recorder, sessionId]);
+  }, [candidateSpeaker, playRepliesSequence, releaseRecorder, sessionId]);
 
   /**
    * End the exam early (when user confirms "Avslutt prøve og få vurdering").
@@ -515,13 +540,7 @@ export function useExamTurns({
       }
       activePlayerRef.current = null;
     }
-    if (phase === 'recording') {
-      try {
-        await recorder.stop();
-      } catch {
-        // Ignore
-      }
-    }
+    await releaseRecorder();
     setPhase('done');
     try {
       await finishExamSession(sessionId);
@@ -531,7 +550,7 @@ export function useExamTurns({
     if (isMountedRef.current) {
       onExamComplete();
     }
-  }, [onExamComplete, phase, recorder, sessionId]);
+  }, [onExamComplete, releaseRecorder, sessionId]);
 
   const dismissError = useCallback(() => {
     setErrorMessage(null);

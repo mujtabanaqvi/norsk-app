@@ -18,6 +18,7 @@ import type {
   StartExamResponse,
   TurnResponse,
 } from './types/exam';
+import type { LearningProfileResponse } from './types/learning-profile';
 
 /** Client-side messages follow the UI language chosen in the app. */
 const tr = (key: TranslationKey, params?: TranslationParams) =>
@@ -451,6 +452,22 @@ export async function fetchCurrentUser() {
       return null;
     }
     throw new Error(tr('network.fetchProfile'));
+  }
+  return res.json();
+}
+
+export async function fetchLearningProfile(refresh = false): Promise<LearningProfileResponse> {
+  const res = await fetchWithTimeout(
+    `${activeApiBaseUrl}/api/learning-profile${refresh ? '?refresh=1' : ''}`,
+    {
+      method: 'GET',
+      headers: { Accept: 'application/json' },
+    },
+    // Regenerating the coach summary calls the LLM
+    refresh ? 60_000 : DEFAULT_TIMEOUT_MS
+  );
+  if (!res.ok) {
+    throw new Error(tr('network.fetchLearningProfile', { status: res.status }));
   }
   return res.json();
 }

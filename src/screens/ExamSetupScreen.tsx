@@ -216,6 +216,17 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
           <LanguageToggle />
 
+          {user && (
+            <Pressable
+              onPress={() => navigation.navigate('LearningProfile')}
+              style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+              accessibilityRole="button"
+              accessibilityLabel={t('nav.profile')}
+            >
+              <Icon name="stats-chart-outline" size={19} color={colors.navy} />
+            </Pressable>
+          )}
+
           <Pressable
             onPress={() => navigation.navigate('HowTo')}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}

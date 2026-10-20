@@ -213,6 +213,7 @@ export type RootStackParamList = {
   VerifyEmail: { email: string; retryAfterSeconds?: number };
   Subscription: undefined;
   Referral: undefined;
+  LearningProfile: undefined;
   HowTo: undefined;
   Terms: undefined;
   PrivacyPolicy: undefined;
@@ -246,6 +247,7 @@ export interface ExamResultsResponse {
   evaluationJson: ExamEvaluation | null;
   usage: UsageLedgerEntry[];
   topic: ExamTopic | null;
+  theme?: { id: string; titleNo: string } | null;
   error?: string;
   message?: string;
 }
