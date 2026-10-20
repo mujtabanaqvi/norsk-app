@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  examThemes,
   examTopics,
   userQuotas,
   examSessions,
@@ -10,13 +11,20 @@ import {
   sessionStatusEnum,
   usageSourceEnum,
 } from '../src/db/schema';
-import { SAMPLE_TOPICS, TEST_USER_ID } from '../src/db/seed';
+import { SAMPLE_THEMES, SAMPLE_TOPICS, TEST_USER_ID } from '../src/db/seed';
 import drizzleConfig from '../drizzle.config';
 import { db, pool } from '../src/db/index';
 
 test('Schema: verifies all PostgreSQL tables and columns match prompt specifications', () => {
+  // 0. exam_themes
+  assert.ok(examThemes.id, 'exam_themes.id PK exists');
+  assert.ok(examThemes.slug, 'exam_themes.slug unique exists');
+  assert.ok(examThemes.titleNo, 'exam_themes.titleNo exists');
+  assert.ok(examThemes.isActive, 'exam_themes.isActive exists');
+
   // 1. exam_topics
   assert.ok(examTopics.id, 'exam_topics.id PK exists');
+  assert.ok(examTopics.themeId, 'exam_topics.themeId FK exists');
   assert.ok(examTopics.slug, 'exam_topics.slug unique exists');
   assert.ok(examTopics.titleNo, 'exam_topics.titleNo exists');
   assert.ok(examTopics.level, 'exam_topics.level exists');
@@ -38,6 +46,7 @@ test('Schema: verifies all PostgreSQL tables and columns match prompt specificat
   assert.ok(examSessions.id, 'exam_sessions.id PK exists');
   assert.ok(examSessions.userId, 'exam_sessions.userId exists');
   assert.ok(examSessions.topicId, 'exam_sessions.topicId FK exists');
+  assert.ok(examSessions.themeId, 'exam_sessions.themeId FK exists');
   assert.ok(examSessions.level, 'exam_sessions.level exists');
   assert.ok(examSessions.coCandidateMode, 'exam_sessions.coCandidateMode exists');
   assert.ok(examSessions.status, 'exam_sessions.status exists');
@@ -77,13 +86,22 @@ test('Drizzle Config: validates config options and schema path', () => {
   assert.ok('dbCredentials' in drizzleConfig, 'dbCredentials present');
 });
 
-test('Seed Data: validates 4 realistic Norskprøven topics (2 B1, 2 B2) and test quota', () => {
-  assert.equal(SAMPLE_TOPICS.length, 4);
+test('Seed Data: validates 6 realistic Norskprøven question sets (3 B1, 3 B2), themes and test quota', () => {
+  assert.equal(SAMPLE_TOPICS.length, 6);
 
   const b1Topics = SAMPLE_TOPICS.filter((t) => t.level === 'B1');
   const b2Topics = SAMPLE_TOPICS.filter((t) => t.level === 'B2');
-  assert.equal(b1Topics.length, 2);
-  assert.equal(b2Topics.length, 2);
+  assert.equal(b1Topics.length, 3);
+  assert.equal(b2Topics.length, 3);
+
+  // Every set belongs to a seeded theme; each level spans >= 3 themes so random exams can mix themes
+  const themeSlugs = new Set(SAMPLE_THEMES.map((t) => t.slug));
+  assert.equal(themeSlugs.size, SAMPLE_THEMES.length, 'theme slugs are unique');
+  for (const topic of SAMPLE_TOPICS) {
+    assert.ok(themeSlugs.has(topic.themeSlug), `${topic.slug} has a known theme`);
+  }
+  assert.ok(new Set(b1Topics.map((t) => t.themeSlug)).size >= 3);
+  assert.ok(new Set(b2Topics.map((t) => t.themeSlug)).size >= 3);
 
   for (const topic of SAMPLE_TOPICS) {
     assert.ok(topic.slug.length > 0);

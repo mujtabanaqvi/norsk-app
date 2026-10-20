@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { eq } from 'drizzle-orm';
 import { db } from '@/src/db';
-import { examSessions, examTopics, usageLedger } from '@/src/db/schema';
+import { examSessions, examThemes, examTopics, usageLedger } from '@/src/db/schema';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 export async function GET(
@@ -27,9 +27,11 @@ export async function GET(
       .select({
         session: examSessions,
         topic: examTopics,
+        theme: examThemes,
       })
       .from(examSessions)
       .leftJoin(examTopics, eq(examSessions.topicId, examTopics.id))
+      .leftJoin(examThemes, eq(examSessions.themeId, examThemes.id))
       .where(eq(examSessions.id, sessionId))
       .limit(1);
 
@@ -59,6 +61,7 @@ export async function GET(
       evaluationJson: session.evaluationJson ?? null,
       usage: usageEntries,
       topic: row.topic ?? null,
+      theme: row.theme ? { id: row.theme.id, titleNo: row.theme.titleNo } : null,
     });
   } catch (error) {
     if (error instanceof AuthenticationError) {

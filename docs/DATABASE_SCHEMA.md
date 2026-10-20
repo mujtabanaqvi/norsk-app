@@ -8,14 +8,28 @@ The database layer is managed using **PostgreSQL** (hosted on Neon Serverless) a
 
 ```mermaid
 erDiagram
+    exam_themes ||--o{ exam_topics : "groups"
+    exam_themes ||--o{ exam_sessions : "chosen_for"
     exam_topics ||--o{ exam_sessions : "referenced_by"
     user_quotas ||--o{ exam_sessions : "starts"
     user_quotas ||--o{ usage_ledger : "billed_for"
     exam_sessions ||--o{ usage_ledger : "generates"
 
+    exam_themes {
+        uuid id PK
+        varchar slug UK
+        text title_no
+        text description_no
+        integer sort_order
+        boolean is_active
+        timestamp created_at
+        timestamp updated_at
+    }
+
     exam_topics {
         uuid id PK
         varchar slug UK
+        uuid theme_id FK
         text title_no
         cefr_level level "B1 | B2"
         text monologue_prompt_no
@@ -68,13 +82,27 @@ erDiagram
 
 ## 2. PostgreSQL Tables & Columns
 
+### 2.0 `exam_themes`
+Themes/categories (e.g. "Familie og barn") that group many question sets. Candidates pick a theme (or random); questions are drawn randomly from the theme's sets.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique theme UUID. |
+| `slug` | `VARCHAR(100)` | `NOT NULL`, `UNIQUE` | URL-safe identifier (e.g. `'familie-og-barn'`). |
+| `title_no` | `TEXT` | `NOT NULL` | Norwegian theme title. |
+| `description_no` | `TEXT` | `NULLABLE` | Short description shown on the setup screen. |
+| `sort_order` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Display order. |
+| `is_active` | `BOOLEAN` | `NOT NULL`, `DEFAULT true` | Theme availability flag (inactive themes are excluded from all draws). |
+| `created_at` / `updated_at` | `TIMESTAMPTZ`| `NOT NULL`, `DEFAULT now()` | Timestamps. |
+
 ### 2.1 `exam_topics`
-Catalog of official HK-dir B1 and B2 oral examination topics.
+Question sets (Del 1 monologue, Del 2 discussion, Del 3 follow-up pool) for official HK-dir B1 and B2 oral examinations. Each set belongs to a theme.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique topic UUID. |
 | `slug` | `VARCHAR(100)` | `NOT NULL`, `UNIQUE` | URL-safe identifier (e.g. `'kollektivtransport-gratis'`). |
+| `theme_id` | `UUID` | `NULLABLE`, `FK -> exam_themes(id) ON DELETE SET NULL` | Owning theme (indexed). Unthemed sets are only used as a fallback for random exams. |
 | `title_no` | `TEXT` | `NOT NULL` | Official Norwegian title. |
 | `level` | `cefr_level` | `NOT NULL` | Target level (`'B1'` or `'B2'`). |
 | `monologue_prompt_no` | `TEXT` | `NOT NULL` | Prompt for Del 1 individual monologue. |
@@ -103,7 +131,8 @@ Records each practice exam session, deterministic engine state, conversational t
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique exam session identifier. |
 | `user_id` | `VARCHAR(128)` | `NOT NULL` | Owning candidate ID (indexed). |
-| `topic_id` | `UUID` | `NULLABLE`, `FK -> exam_topics(id)` | Associated exam topic (indexed). |
+| `topic_id` | `UUID` | `NULLABLE`, `FK -> exam_topics(id)` | Question set used for Del 1 (indexed). |
+| `theme_id` | `UUID` | `NULLABLE`, `FK -> exam_themes(id) ON DELETE SET NULL` | Theme chosen by the candidate; `NULL` for random exams (indexed). |
 | `level` | `cefr_level` | `NOT NULL` | Exam level (`'B1'` or `'B2'`). |
 | `co_candidate_mode` | `co_candidate_mode` | `NOT NULL` | `'AI_PEER'` or `'HUMAN_LOCAL'`. |
 | `status` | `session_status` | `NOT NULL`, `DEFAULT 'ACTIVE'` | `'ACTIVE'`, `'COMPLETED'`, or `'FAILED'` (indexed). |
@@ -210,6 +239,15 @@ interface SessionEngineState {
   };
   /** Randomly selected Del 3 follow-up questions for this specific session */
   selectedFollowUpQuestionsNo?: string[];
+  /** Snapshot of the composed exam (Del 1/Del 2 may come from different sets/themes) */
+  selectedPrompts?: {
+    titleNo: string;
+    monologuePromptNo: string;
+    discussionPromptNo: string;
+    monologueTopicId: string;
+    discussionTopicId: string;
+    followUpThemeIds: string[];
+  };
   usage: {
     llmPromptTokens: number;
     llmCompletionTokens: number;
@@ -262,6 +300,7 @@ interface ExamEvaluation {
 ## 4. Drizzle Configuration & Migration Commands
 
 - **Seed Database & Apply Schema**: `npm run db:seed` (creates/updates `engine_state` and populates official topics and test user quota).
+- **Seed Norskprøven Content**: `npm run db:seed:norskprove` inserts the curated themes and question sets from `src/db/content/norskprove-themes.ts`. Safe for production: rows whose slug already exists are left untouched. Add `-- --dry-run` to preview without writing, or `-- --update` to overwrite existing rows with the same slugs.
 - **Push Schema**: `npm run db:push` (applies schema directly to database).
 - **Generate Migrations**: `npm run db:generate` (creates SQL migration files in `drizzle/`).
 - **Inspect DB in Browser**: `npm run db:studio` (opens Drizzle Studio).

@@ -1,10 +1,87 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import {
+  composeExam,
   pickRandomExamTopic,
   pickRandomFollowUpQuestions,
   slugifyNorwegianTitle,
 } from '../src/server/exam-randomizer';
+
+function makeSet(id: string, themeId: string | null, questionCount = 3) {
+  return {
+    id,
+    themeId,
+    followUpQuestionsNo: Array.from({ length: questionCount }, (_, i) => `${id} spørsmål ${i + 1}?`),
+  };
+}
+
+const THEMED_POOL = [
+  makeSet('fam-1', 'familie'),
+  makeSet('fam-2', 'familie'),
+  makeSet('mil-1', 'miljo'),
+  makeSet('mil-2', 'miljo'),
+  makeSet('tra-1', 'transport'),
+  makeSet('sko-1', 'skole'),
+];
+
+describe('composeExam', () => {
+  it('returns null for an empty pool or an unknown theme', () => {
+    assert.equal(composeExam([]), null);
+    assert.equal(composeExam(THEMED_POOL, { themeId: 'finnes-ikke' }), null);
+  });
+
+  it('keeps every part inside the chosen theme', () => {
+    const familySetIds = new Set(['fam-1', 'fam-2']);
+    for (let i = 0; i < 30; i++) {
+      const exam = composeExam(THEMED_POOL, { themeId: 'familie' });
+      assert.ok(exam);
+      assert.ok(familySetIds.has(exam.monologueSet.id));
+      assert.ok(familySetIds.has(exam.discussionSet.id));
+      assert.notEqual(exam.monologueSet.id, exam.discussionSet.id, 'prefers two different sets');
+      assert.deepEqual(exam.followUpThemeIds, ['familie']);
+      assert.ok(exam.followUpQuestionsNo.length <= 3);
+      assert.equal(new Set(exam.followUpQuestionsNo).size, exam.followUpQuestionsNo.length);
+      for (const q of exam.followUpQuestionsNo) {
+        assert.ok(q.startsWith('fam-'), `follow-up "${q}" comes from the family theme`);
+      }
+    }
+  });
+
+  it('draws each part from a different theme in random mode when >= 3 themes exist', () => {
+    const seenThemes = new Set<string>();
+    for (let i = 0; i < 40; i++) {
+      const exam = composeExam(THEMED_POOL);
+      assert.ok(exam);
+      const del1 = exam.monologueSet.themeId!;
+      const del2 = exam.discussionSet.themeId!;
+      const del3 = exam.followUpThemeIds[0];
+      assert.equal(new Set([del1, del2, del3]).size, 3, 'Del 1, Del 2 and Del 3 use distinct themes');
+      for (const q of exam.followUpQuestionsNo) {
+        const sourceSet = THEMED_POOL.find((s) => q.startsWith(s.id))!;
+        assert.equal(sourceSet.themeId, del3);
+      }
+      seenThemes.add(del1);
+    }
+    assert.ok(seenThemes.size > 1, 'Del 1 theme varies between attempts');
+  });
+
+  it('wraps around and still composes an exam with fewer than 3 themes', () => {
+    const twoThemes = [makeSet('a-1', 'a'), makeSet('a-2', 'a'), makeSet('b-1', 'b')];
+    for (let i = 0; i < 20; i++) {
+      const exam = composeExam(twoThemes);
+      assert.ok(exam);
+      assert.notEqual(exam.monologueSet.themeId, exam.discussionSet.themeId);
+      assert.ok(exam.followUpQuestionsNo.length > 0);
+    }
+
+    const singleSet = [makeSet('only', null)];
+    const exam = composeExam(singleSet);
+    assert.ok(exam);
+    assert.equal(exam.monologueSet.id, 'only');
+    assert.equal(exam.discussionSet.id, 'only');
+    assert.equal(exam.followUpQuestionsNo.length, 3);
+  });
+});
 
 describe('exam-randomizer & admin helpers', () => {
   it('pickRandomExamTopic returns null for empty list and single element for 1-item list', () => {

@@ -2,13 +2,79 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 import { db, pool } from './index';
-import { examTopics, userQuotas, tierConfigs, systemConfigs } from './schema';
+import { examThemes, examTopics, userQuotas, tierConfigs, systemConfigs } from './schema';
 import { DEFAULT_TIER_CONFIGS, DEFAULT_REFERRAL_CONFIG } from '../../lib/tier-policy';
 import { sql } from 'drizzle-orm';
 
+export const SAMPLE_THEMES = [
+  {
+    slug: 'familie-og-barn',
+    titleNo: 'Familie og barn',
+    descriptionNo: 'Familieliv, oppvekst, barneoppdragelse og generasjoner.',
+    sortOrder: 0,
+  },
+  {
+    slug: 'miljo-og-natur',
+    titleNo: 'Miljø og natur',
+    descriptionNo: 'Klima, bærekraft, gjenbruk og friluftsliv.',
+    sortOrder: 1,
+  },
+  {
+    slug: 'transport-og-bosted',
+    titleNo: 'Transport og bosted',
+    descriptionNo: 'Kollektivtransport, byliv, distrikt og boforhold.',
+    sortOrder: 2,
+  },
+  {
+    slug: 'skole-og-digitalisering',
+    titleNo: 'Skole og digitalisering',
+    descriptionNo: 'Utdanning, skjermbruk og digitale verktøy.',
+    sortOrder: 3,
+  },
+  {
+    slug: 'arbeid-og-teknologi',
+    titleNo: 'Arbeid og teknologi',
+    descriptionNo: 'Arbeidsliv, kunstig intelligens og fremtidens jobber.',
+    sortOrder: 4,
+  },
+];
+
 export const SAMPLE_TOPICS = [
   {
+    slug: 'familieliv-og-hverdag',
+    themeSlug: 'familie-og-barn',
+    titleNo: 'Familieliv og hverdag',
+    level: 'B1' as const,
+    monologuePromptNo:
+      'Fortell om familien din og hvordan en vanlig hverdag ser ut hjemme hos dere. Hva liker du best med familielivet?',
+    discussionPromptNo:
+      'Diskuter om barn bør hjelpe til med husarbeid hjemme, og hvor mye ansvar de bør få.',
+    followUpQuestionsNo: [
+      'Hvordan var familielivet der du vokste opp, sammenlignet med i Norge?',
+      'Hva gjør dere sammen som familie i helgene?',
+      'Synes du besteforeldre bør ha en stor rolle i barnas liv?',
+    ],
+    isActive: true,
+  },
+  {
+    slug: 'barneoppdragelse-og-foreldreansvar',
+    themeSlug: 'familie-og-barn',
+    titleNo: 'Barneoppdragelse og foreldreansvar',
+    level: 'B2' as const,
+    monologuePromptNo:
+      'Drøft hvordan synet på barneoppdragelse har endret seg i Norge de siste generasjonene, og hva som kan forklare endringene.',
+    discussionPromptNo:
+      'Diskuter om staten i for stor grad blander seg inn i familienes ansvar for barneoppdragelse, for eksempel gjennom barnehage, skole og barnevern.',
+    followUpQuestionsNo: [
+      'Hvordan kan foreldre finne en god balanse mellom arbeidsliv og familieliv?',
+      'Bør foreldrepermisjonen deles likt mellom mor og far?',
+      'Hvilke utfordringer møter familier med ulik kulturell bakgrunn i oppdragelsen av barn i Norge?',
+    ],
+    isActive: true,
+  },
+  {
     slug: 'miljo-og-baerekraft-i-hverdagen',
+    themeSlug: 'miljo-og-natur',
     titleNo: 'Miljø og bærekraft i hverdagen',
     level: 'B1' as const,
     monologuePromptNo:
@@ -24,6 +90,7 @@ export const SAMPLE_TOPICS = [
   },
   {
     slug: 'kollektivtransport-og-byutvikling',
+    themeSlug: 'transport-og-bosted',
     titleNo: 'Kollektivtransport og byutvikling',
     level: 'B1' as const,
     monologuePromptNo:
@@ -39,6 +106,7 @@ export const SAMPLE_TOPICS = [
   },
   {
     slug: 'skjermtid-og-mobilforbud-i-skolen',
+    themeSlug: 'skole-og-digitalisering',
     titleNo: 'Skjermtid og mobilforbud i skolen',
     level: 'B2' as const,
     monologuePromptNo:
@@ -54,6 +122,7 @@ export const SAMPLE_TOPICS = [
   },
   {
     slug: 'kunstig-intelligens-og-fremtidens-arbeidsliv',
+    themeSlug: 'arbeid-og-teknologi',
     titleNo: 'Kunstig intelligens og fremtidens arbeidsliv',
     level: 'B2' as const,
     monologuePromptNo:
@@ -76,12 +145,34 @@ export async function seed() {
 
   await pool.query('ALTER TABLE exam_sessions ADD COLUMN IF NOT EXISTS engine_state jsonb;');
 
-  // 1. Seed realistic Norskprøven muntlig topics (2 B1, 2 B2)
+  // 1. Seed themes (categories) that group the question sets
+  const themeIdBySlug = new Map<string, string>();
+  for (const theme of SAMPLE_THEMES) {
+    const [row] = await db
+      .insert(examThemes)
+      .values({ ...theme, isActive: true })
+      .onConflictDoUpdate({
+        target: examThemes.slug,
+        set: {
+          titleNo: theme.titleNo,
+          descriptionNo: theme.descriptionNo,
+          sortOrder: theme.sortOrder,
+          updatedAt: new Date(),
+        },
+      })
+      .returning({ id: examThemes.id });
+    themeIdBySlug.set(theme.slug, row.id);
+    console.log(`✓ Seeded theme: ${theme.titleNo} (${theme.slug})`);
+  }
+
+  // 2. Seed realistic Norskprøven muntlig question sets (3 B1, 3 B2) linked to their themes
   for (const topic of SAMPLE_TOPICS) {
+    const themeId = themeIdBySlug.get(topic.themeSlug) ?? null;
     await db
       .insert(examTopics)
       .values({
         slug: topic.slug,
+        themeId,
         titleNo: topic.titleNo,
         level: topic.level,
         monologuePromptNo: topic.monologuePromptNo,
@@ -92,6 +183,7 @@ export async function seed() {
       .onConflictDoUpdate({
         target: examTopics.slug,
         set: {
+          themeId,
           titleNo: topic.titleNo,
           level: topic.level,
           monologuePromptNo: topic.monologuePromptNo,
@@ -103,7 +195,7 @@ export async function seed() {
     console.log(`✓ Seeded topic: [${topic.level}] ${topic.titleNo} (${topic.slug})`);
   }
 
-  // 2. Seed test user quota row (30 minutes = 1800 seconds default quota)
+  // 3. Seed test user quota row (30 minutes = 1800 seconds default quota)
   await db
     .insert(userQuotas)
     .values({
@@ -123,7 +215,7 @@ export async function seed() {
     });
   console.log(`✓ Seeded user quota: ${TEST_USER_ID} with 1800 remaining audio seconds`);
 
-  // 3. Seed tier configurations (FREE, STANDARD, PREMIUM) from fallback defaults
+  // 4. Seed tier configurations (FREE, STANDARD, PREMIUM) from fallback defaults
   for (const tierKey of ['FREE', 'STANDARD', 'PREMIUM'] as const) {
     const config = DEFAULT_TIER_CONFIGS[tierKey];
     await db
@@ -149,7 +241,7 @@ export async function seed() {
     console.log(`✓ Seeded tier config: ${config.tier} (${config.dailyTestLimit} tests/day, ${config.priceCents / 100} ${config.currency})`);
   }
 
-  // 4. Seed system configurations (referral bonus and duration) from fallback defaults
+  // 5. Seed system configurations (referral bonus and duration) from fallback defaults
   await db
     .insert(systemConfigs)
     .values({

@@ -57,12 +57,24 @@ export interface SessionEngineState {
   };
   /** Randomly selected Del 3 follow-up questions for this specific session */
   selectedFollowUpQuestionsNo?: string[];
+  /** Snapshot of the exam composed for this session (Del 1/Del 2 may come from different sets/themes) */
+  selectedPrompts?: SelectedExamPrompts;
   usage: {
     llmPromptTokens: number;
     llmCompletionTokens: number;
     ttsCharacters: number;
     sttAudioSeconds: number;
   };
+}
+
+// Prompts composed for a session from one or more question sets
+export interface SelectedExamPrompts {
+  titleNo: string;
+  monologuePromptNo: string;
+  discussionPromptNo: string;
+  monologueTopicId: string;
+  discussionTopicId: string;
+  followUpThemeIds: string[];
 }
 
 // Criterion Score structure
@@ -105,19 +117,38 @@ export interface ExamEvaluation {
 }
 
 /**
- * 1. exam_topics Table
+ * 0. exam_themes Table (categories grouping many question sets, e.g. "Familie og barn")
  */
-export const examTopics = pgTable('exam_topics', {
+export const examThemes = pgTable('exam_themes', {
   id: uuid('id').defaultRandom().primaryKey(),
   slug: varchar('slug', { length: 100 }).notNull().unique(),
   titleNo: text('title_no').notNull(),
-  level: cefrLevelEnum('level').notNull(),
-  monologuePromptNo: text('monologue_prompt_no').notNull(),
-  discussionPromptNo: text('discussion_prompt_no').notNull(),
-  followUpQuestionsNo: jsonb('follow_up_questions_no').$type<string[]>().notNull(),
+  descriptionNo: text('description_no'),
+  sortOrder: integer('sort_order').notNull().default(0),
   isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
+
+/**
+ * 1. exam_topics Table (a question set: Del 1 monologue, Del 2 discussion, Del 3 follow-up pool)
+ */
+export const examTopics = pgTable(
+  'exam_topics',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    slug: varchar('slug', { length: 100 }).notNull().unique(),
+    themeId: uuid('theme_id').references(() => examThemes.id, { onDelete: 'set null' }),
+    titleNo: text('title_no').notNull(),
+    level: cefrLevelEnum('level').notNull(),
+    monologuePromptNo: text('monologue_prompt_no').notNull(),
+    discussionPromptNo: text('discussion_prompt_no').notNull(),
+    followUpQuestionsNo: jsonb('follow_up_questions_no').$type<string[]>().notNull(),
+    isActive: boolean('is_active').notNull().default(true),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index('idx_exam_topics_theme_id').on(table.themeId)]
+);
 
 /**
  * 2. user_quotas Table
@@ -149,6 +180,8 @@ export const examSessions = pgTable(
     id: uuid('id').defaultRandom().primaryKey(),
     userId: varchar('user_id', { length: 128 }).notNull(),
     topicId: uuid('topic_id').references(() => examTopics.id),
+    /** Theme chosen by the user; null when the exam was composed randomly across themes */
+    themeId: uuid('theme_id').references(() => examThemes.id, { onDelete: 'set null' }),
     level: cefrLevelEnum('level').notNull(),
     coCandidateMode: coCandidateModeEnum('co_candidate_mode').notNull(),
     status: sessionStatusEnum('status').notNull().default('ACTIVE'),
@@ -162,6 +195,7 @@ export const examSessions = pgTable(
     index('idx_exam_sessions_user_id').on(table.userId),
     index('idx_exam_sessions_status').on(table.status),
     index('idx_exam_sessions_topic_id').on(table.topicId),
+    index('idx_exam_sessions_theme_id').on(table.themeId),
   ]
 );
 
@@ -364,7 +398,16 @@ export const referralRewardsRelations = relations(referralRewards, ({ one }) => 
   }),
 }));
 
-export const examTopicsRelations = relations(examTopics, ({ many }) => ({
+export const examThemesRelations = relations(examThemes, ({ many }) => ({
+  topics: many(examTopics),
+  sessions: many(examSessions),
+}));
+
+export const examTopicsRelations = relations(examTopics, ({ one, many }) => ({
+  theme: one(examThemes, {
+    fields: [examTopics.themeId],
+    references: [examThemes.id],
+  }),
   sessions: many(examSessions),
 }));
 
@@ -377,6 +420,10 @@ export const examSessionsRelations = relations(examSessions, ({ one, many }) => 
   topic: one(examTopics, {
     fields: [examSessions.topicId],
     references: [examTopics.id],
+  }),
+  theme: one(examThemes, {
+    fields: [examSessions.themeId],
+    references: [examThemes.id],
   }),
   userQuota: one(userQuotas, {
     fields: [examSessions.userId],
@@ -418,6 +465,9 @@ export type NewReferralReward = typeof referralRewards.$inferInsert;
 
 export type SystemConfig = typeof systemConfigs.$inferSelect;
 export type NewSystemConfig = typeof systemConfigs.$inferInsert;
+
+export type ExamTheme = typeof examThemes.$inferSelect;
+export type NewExamTheme = typeof examThemes.$inferInsert;
 
 export type ExamTopic = typeof examTopics.$inferSelect;
 export type NewExamTopic = typeof examTopics.$inferInsert;

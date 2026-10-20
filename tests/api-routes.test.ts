@@ -34,6 +34,14 @@ test('Route Validation: startExamSchema validates required fields', () => {
   };
   assert.equal(startExamSchema.safeParse(missingTopic).success, true);
 
+  // Accept a theme id/slug or 'RANDOM'
+  for (const themeId of ['familie-og-barn', 'RANDOM']) {
+    const withTheme = { themeId, level: 'B1', coCandidateMode: 'AI_PEER' };
+    const parsed = startExamSchema.safeParse(withTheme);
+    assert.equal(parsed.success, true);
+    if (parsed.success) assert.equal(parsed.data.themeId, themeId);
+  }
+
   // Reject invalid level
   const invalidLevel = {
     userId: 'usr_abc123',

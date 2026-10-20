@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, and } from 'drizzle-orm';
+import { eq, and, asc } from 'drizzle-orm';
 import { db } from '@/src/db';
-import { examTopics, userQuotas } from '@/src/db/schema';
+import { examThemes, examTopics, userQuotas } from '@/src/db/schema';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 
 export async function GET(req: NextRequest) {
@@ -19,16 +19,44 @@ export async function GET(req: NextRequest) {
       );
     }
 
-    // 3. Query active examTopics (optionally filtered by level)
-    const topicConditions = [eq(examTopics.isActive, true)];
+    // 3. Query active themes that contain active question sets (optionally filtered by level)
+    const topicConditions = [eq(examTopics.isActive, true), eq(examThemes.isActive, true)];
     if (levelParam) {
       topicConditions.push(eq(examTopics.level, levelParam as 'B1' | 'B2'));
     }
 
-    const topics = await db
-      .select()
+    const rows = await db
+      .select({ theme: examThemes, level: examTopics.level })
       .from(examTopics)
-      .where(and(...topicConditions));
+      .innerJoin(examThemes, eq(examTopics.themeId, examThemes.id))
+      .where(and(...topicConditions))
+      .orderBy(asc(examThemes.sortOrder), asc(examThemes.titleNo));
+
+    const themesById = new Map<
+      string,
+      {
+        id: string;
+        slug: string;
+        titleNo: string;
+        descriptionNo: string | null;
+        setCounts: { B1: number; B2: number };
+      }
+    >();
+    for (const { theme, level } of rows) {
+      let entry = themesById.get(theme.id);
+      if (!entry) {
+        entry = {
+          id: theme.id,
+          slug: theme.slug,
+          titleNo: theme.titleNo,
+          descriptionNo: theme.descriptionNo,
+          setCounts: { B1: 0, B2: 0 },
+        };
+        themesById.set(theme.id, entry);
+      }
+      entry.setCounts[level] += 1;
+    }
+    const themes = [...themesById.values()];
 
     // 4. Fetch or initialize user quota row (default 1800s if none exists)
     let [quota] = await db
@@ -61,9 +89,9 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    // 5. Return topics and quota
+    // 5. Return themes and quota
     return NextResponse.json({
-      topics,
+      themes,
       quota: {
         remainingAudioSeconds: quota ? quota.remainingAudioSeconds : 1800,
         totalCostUsd: quota ? quota.totalCostUsd : '0',

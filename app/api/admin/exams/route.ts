@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { desc, eq, sql } from 'drizzle-orm';
 import { db } from '@/src/db';
-import { examTopics, examSessions } from '@/src/db/schema';
+import { examTopics, examSessions, examThemes } from '@/src/db/schema';
 import { verifyAdminRequest } from '@/lib/admin-auth';
 import { slugifyNorwegianTitle } from '@/src/server/exam-randomizer';
 
@@ -10,6 +10,7 @@ export const createExamSchema = z.object({
   titleNo: z.string().trim().min(3, 'Tittel må være minst 3 tegn.'),
   slug: z.string().trim().optional(),
   level: z.enum(['B1', 'B2']),
+  themeId: z.string().uuid('Ugyldig tema-ID.').nullable().optional(),
   monologuePromptNo: z
     .string()
     .trim()
@@ -31,10 +32,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const topics = await db
-      .select()
+    const topicRows = await db
+      .select({ topic: examTopics, themeTitleNo: examThemes.titleNo })
       .from(examTopics)
+      .leftJoin(examThemes, eq(examTopics.themeId, examThemes.id))
       .orderBy(desc(examTopics.createdAt));
+    const topics = topicRows.map((row) => ({ ...row.topic, themeTitleNo: row.themeTitleNo }));
 
     const sessionCounts = await db
       .select({
@@ -101,6 +104,7 @@ export async function POST(req: NextRequest) {
       titleNo,
       slug: rawSlug,
       level,
+      themeId,
       monologuePromptNo,
       discussionPromptNo,
       followUpQuestionsNo,
@@ -126,6 +130,7 @@ export async function POST(req: NextRequest) {
         titleNo,
         slug: baseSlug,
         level,
+        themeId: themeId ?? null,
         monologuePromptNo,
         discussionPromptNo,
         followUpQuestionsNo,

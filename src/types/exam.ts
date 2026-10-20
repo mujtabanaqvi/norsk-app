@@ -31,6 +31,18 @@ export interface ExamTopic {
 }
 
 /**
+ * Exam theme (category grouping many question sets) from GET /api/exam/topics
+ */
+export interface ExamTheme {
+  id: string;
+  slug: string;
+  titleNo: string;
+  descriptionNo: string | null;
+  /** Number of active question sets per level */
+  setCounts: Record<CefrLevel, number>;
+}
+
+/**
  * Transcript turn stored and displayed during active exam sessions
  */
 export interface TranscriptTurn {
@@ -116,7 +128,7 @@ export interface UserQuota {
  * GET /api/exam/topics response payload
  */
 export interface GetTopicsResponse {
-  topics: ExamTopic[];
+  themes: ExamTheme[];
   quota: UserQuota;
 }
 
@@ -125,6 +137,9 @@ export interface GetTopicsResponse {
  */
 export interface StartExamRequest {
   userId?: string;
+  /** Theme id/slug, or 'RANDOM' to compose the exam across random themes */
+  themeId?: string;
+  /** @deprecated Legacy: a specific question set id/slug */
   topicId?: string;
   level: CefrLevel;
   coCandidateMode: CoCandidateMode;
@@ -151,6 +166,7 @@ export interface StartExamResponse {
     discussionPromptNo: string;
     followUpQuestionsNo: string[];
   };
+  theme?: { id: string; titleNo: string } | null;
 }
 
 /**

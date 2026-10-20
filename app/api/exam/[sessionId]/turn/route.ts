@@ -181,12 +181,16 @@ export async function POST(
         ? existingState.selectedFollowUpQuestionsNo
         : null;
 
+    // Prefer the prompts composed at session start (may span several sets/themes)
+    const selectedPrompts = existingState.selectedPrompts;
     const topicData = {
-      titleNo: topic?.titleNo || 'Muntlig eksamenstema',
+      titleNo: selectedPrompts?.titleNo || topic?.titleNo || 'Muntlig eksamenstema',
       monologuePromptNo:
+        selectedPrompts?.monologuePromptNo ||
         topic?.monologuePromptNo ||
         'Gjør rede for dine tanker og erfaringer om temaet. Begrunn synspunktene dine.',
       discussionPromptNo:
+        selectedPrompts?.discussionPromptNo ||
         topic?.discussionPromptNo ||
         'Diskuter temaet sammen. Drøft fordeler, ulemper og mulige løsninger.',
       followUpQuestionsNo:

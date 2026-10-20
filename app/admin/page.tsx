@@ -7,12 +7,24 @@ interface AdminExamTopic {
   slug: string;
   titleNo: string;
   level: 'B1' | 'B2';
+  themeId: string | null;
+  themeTitleNo?: string | null;
   monologuePromptNo: string;
   discussionPromptNo: string;
   followUpQuestionsNo: string[];
   isActive: boolean;
   createdAt: string;
   sessionCount?: number;
+}
+
+interface AdminExamTheme {
+  id: string;
+  slug: string;
+  titleNo: string;
+  descriptionNo: string | null;
+  sortOrder: number;
+  isActive: boolean;
+  setCounts: { B1: number; B2: number };
 }
 
 const SESSION_STORAGE_KEY = 'norsk_admin_secret';
@@ -31,6 +43,14 @@ export default function AdminPortalPage() {
   // Filters
   const [levelFilter, setLevelFilter] = useState<'ALL' | 'B1' | 'B2'>('ALL');
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'ACTIVE' | 'INACTIVE'>('ALL');
+  // 'ALL', 'NONE' (unthemed sets) or a theme id
+  const [themeFilter, setThemeFilter] = useState<string>('ALL');
+
+  // Themes (categories grouping question sets)
+  const [themes, setThemes] = useState<AdminExamTheme[]>([]);
+  const [newThemeTitle, setNewThemeTitle] = useState<string>('');
+  const [newThemeDescription, setNewThemeDescription] = useState<string>('');
+  const [isSavingTheme, setIsSavingTheme] = useState<boolean>(false);
 
   // Tab navigation
   const [activeTab, setActiveTab] = useState<'EXAMS' | 'CONFIG'>('EXAMS');
@@ -47,6 +67,7 @@ export default function AdminPortalPage() {
   const [titleNo, setTitleNo] = useState<string>('');
   const [slug, setSlug] = useState<string>('');
   const [level, setLevel] = useState<'B1' | 'B2'>('B1');
+  const [formThemeId, setFormThemeId] = useState<string>('');
   const [monologuePromptNo, setMonologuePromptNo] = useState<string>('');
   const [discussionPromptNo, setDiscussionPromptNo] = useState<string>('');
   const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([
@@ -97,6 +118,116 @@ export default function AdminPortalPage() {
       setIsCheckingAuth(false);
     }
   }, []);
+
+  const fetchThemesWithSecret = useCallback(async (secretToUse: string) => {
+    try {
+      const res = await fetch('/api/admin/themes', {
+        headers: {
+          Accept: 'application/json',
+          'x-admin-secret': secretToUse,
+        },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setThemes(Array.isArray(data.themes) ? data.themes : []);
+      }
+    } catch (err) {
+      console.error('Failed to load themes:', err);
+    }
+  }, []);
+
+  const adminJsonRequest = async (url: string, method: string, body?: unknown) => {
+    const res = await fetch(url, {
+      method,
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        'x-admin-secret': adminSecret,
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const fieldIssues = data.issues ? Object.values(data.issues).flat().join(' ') : '';
+      throw new Error(fieldIssues || data.message || data.error || `HTTP ${res.status}`);
+    }
+    return data;
+  };
+
+  const handleCreateTheme = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newThemeTitle.trim()) return;
+    setIsSavingTheme(true);
+    setGlobalError(null);
+    setSuccessBanner(null);
+    try {
+      await adminJsonRequest('/api/admin/themes', 'POST', {
+        titleNo: newThemeTitle.trim(),
+        descriptionNo: newThemeDescription.trim() || null,
+        sortOrder: themes.length,
+      });
+      setSuccessBanner(`Tema «${newThemeTitle.trim()}» ble opprettet.`);
+      setNewThemeTitle('');
+      setNewThemeDescription('');
+      await fetchThemesWithSecret(adminSecret);
+    } catch (err) {
+      setGlobalError(err instanceof Error ? err.message : 'Kunne ikke opprette tema');
+    } finally {
+      setIsSavingTheme(false);
+    }
+  };
+
+  const handleEditTheme = async (theme: AdminExamTheme) => {
+    const title = window.prompt('Nytt navn på temaet:', theme.titleNo);
+    if (title === null) return;
+    const description = window.prompt('Beskrivelse (valgfritt):', theme.descriptionNo ?? '');
+    if (description === null) return;
+    setGlobalError(null);
+    setSuccessBanner(null);
+    try {
+      await adminJsonRequest(`/api/admin/themes/${encodeURIComponent(theme.id)}`, 'PATCH', {
+        titleNo: title.trim(),
+        descriptionNo: description.trim() || null,
+      });
+      setSuccessBanner(`Tema «${title.trim()}» ble oppdatert.`);
+      await Promise.all([fetchThemesWithSecret(adminSecret), fetchExamsWithSecret(adminSecret)]);
+    } catch (err) {
+      setGlobalError(err instanceof Error ? err.message : 'Kunne ikke oppdatere tema');
+    }
+  };
+
+  const handleToggleTheme = async (theme: AdminExamTheme) => {
+    setGlobalError(null);
+    setSuccessBanner(null);
+    try {
+      await adminJsonRequest(`/api/admin/themes/${encodeURIComponent(theme.id)}`, 'PATCH', {
+        isActive: !theme.isActive,
+      });
+      setThemes((prev) =>
+        prev.map((item) => (item.id === theme.id ? { ...item, isActive: !theme.isActive } : item))
+      );
+      setSuccessBanner(`Tema «${theme.titleNo}» er nå ${!theme.isActive ? 'aktivt' : 'deaktivert'}.`);
+    } catch (err) {
+      setGlobalError(err instanceof Error ? err.message : 'Kunne ikke oppdatere tema');
+    }
+  };
+
+  const handleDeleteTheme = async (theme: AdminExamTheme) => {
+    const confirmed = window.confirm(
+      `Er du sikker på at du vil slette temaet «${theme.titleNo}»? Oppgavesettene beholdes, men blir uten tema.`
+    );
+    if (!confirmed) return;
+    setGlobalError(null);
+    setSuccessBanner(null);
+    try {
+      await adminJsonRequest(`/api/admin/themes/${encodeURIComponent(theme.id)}`, 'DELETE');
+      if (themeFilter === theme.id) setThemeFilter('ALL');
+      setSuccessBanner(`Tema «${theme.titleNo}» ble slettet.`);
+      await Promise.all([fetchThemesWithSecret(adminSecret), fetchExamsWithSecret(adminSecret)]);
+    } catch (err) {
+      setGlobalError(err instanceof Error ? err.message : 'Sletting mislyktes');
+    }
+  };
 
   const fetchConfigsWithSecret = useCallback(async (secretToUse: string) => {
     setIsLoadingConfig(true);
@@ -192,11 +323,12 @@ export default function AdminPortalPage() {
     if (saved) {
       setAdminSecret(saved);
       fetchExamsWithSecret(saved);
+      fetchThemesWithSecret(saved);
       fetchConfigsWithSecret(saved);
     } else {
       setIsCheckingAuth(false);
     }
-  }, [fetchExamsWithSecret, fetchConfigsWithSecret]);
+  }, [fetchExamsWithSecret, fetchThemesWithSecret, fetchConfigsWithSecret]);
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -207,7 +339,7 @@ export default function AdminPortalPage() {
     const secret = adminSecret.trim();
     const success = await fetchExamsWithSecret(secret);
     if (success) {
-      await fetchConfigsWithSecret(secret);
+      await Promise.all([fetchThemesWithSecret(secret), fetchConfigsWithSecret(secret)]);
     }
   };
 
@@ -216,6 +348,7 @@ export default function AdminPortalPage() {
     setIsAuthenticated(false);
     setAdminSecret('');
     setExams([]);
+    setThemes([]);
   };
 
   const openCreateForm = () => {
@@ -223,6 +356,7 @@ export default function AdminPortalPage() {
     setTitleNo('');
     setSlug('');
     setLevel('B1');
+    setFormThemeId(themeFilter !== 'ALL' && themeFilter !== 'NONE' ? themeFilter : '');
     setMonologuePromptNo('');
     setDiscussionPromptNo('');
     setFollowUpQuestions(['', '', '']);
@@ -236,6 +370,7 @@ export default function AdminPortalPage() {
     setTitleNo(exam.titleNo);
     setSlug(exam.slug);
     setLevel(exam.level);
+    setFormThemeId(exam.themeId ?? '');
     setMonologuePromptNo(exam.monologuePromptNo);
     setDiscussionPromptNo(exam.discussionPromptNo);
     setFollowUpQuestions(
@@ -292,6 +427,7 @@ export default function AdminPortalPage() {
       const payload: Record<string, unknown> = {
         titleNo: titleNo.trim(),
         level,
+        themeId: formThemeId || null,
         monologuePromptNo: monologuePromptNo.trim(),
         discussionPromptNo: discussionPromptNo.trim(),
         followUpQuestionsNo: cleanedQuestions,
@@ -326,7 +462,7 @@ export default function AdminPortalPage() {
       );
       setIsFormOpen(false);
       setEditingExamId(null);
-      await fetchExamsWithSecret(adminSecret);
+      await Promise.all([fetchExamsWithSecret(adminSecret), fetchThemesWithSecret(adminSecret)]);
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Lagring feilet');
     } finally {
@@ -392,6 +528,7 @@ export default function AdminPortalPage() {
 
       setExams((prev) => prev.filter((item) => item.id !== exam.id));
       setSuccessBanner(`Eksamen «${exam.titleNo}» ble slettet.`);
+      await fetchThemesWithSecret(adminSecret);
     } catch (err) {
       setGlobalError(err instanceof Error ? err.message : 'Sletting mislyktes');
     }
@@ -402,9 +539,15 @@ export default function AdminPortalPage() {
       if (levelFilter !== 'ALL' && exam.level !== levelFilter) return false;
       if (statusFilter === 'ACTIVE' && !exam.isActive) return false;
       if (statusFilter === 'INACTIVE' && exam.isActive) return false;
+      if (themeFilter === 'NONE' && exam.themeId) return false;
+      if (themeFilter !== 'ALL' && themeFilter !== 'NONE' && exam.themeId !== themeFilter) {
+        return false;
+      }
       return true;
     });
-  }, [exams, levelFilter, statusFilter]);
+  }, [exams, levelFilter, statusFilter, themeFilter]);
+
+  const unthemedCount = useMemo(() => exams.filter((e) => !e.themeId).length, [exams]);
 
   const metrics = useMemo(() => {
     const activeB1 = exams.filter((e) => e.level === 'B1' && e.isActive).length;
@@ -601,6 +744,23 @@ export default function AdminPortalPage() {
                 </div>
 
                 <div style={{ flex: 1 }}>
+                  <label style={styles.label}>Tema</label>
+                  <select
+                    value={formThemeId}
+                    onChange={(e) => setFormThemeId(e.target.value)}
+                    style={styles.select}
+                  >
+                    <option value="">— Uten tema —</option>
+                    {themes.map((theme) => (
+                      <option key={theme.id} value={theme.id}>
+                        {theme.titleNo}
+                        {theme.isActive ? '' : ' (deaktivert)'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div style={{ flex: 1 }}>
                   <label style={styles.label}>Slug (valgfritt, genereres automatisk)</label>
                   <input
                     type="text"
@@ -733,8 +893,122 @@ export default function AdminPortalPage() {
 
         {activeTab === 'EXAMS' ? (
           <div>
+            {/* Theme Manager */}
+            <section style={styles.formPanel}>
+              <div style={styles.formHeader}>
+                <h2 style={styles.formTitle}>Temaer ({themes.length})</h2>
+              </div>
+              <p style={styles.helperText}>
+                Kandidater velger et tema (eller tilfeldig). Innen et tema trekkes Del 1, Del 2 og
+                Del 3 tilfeldig fra temaets oppgavesett. Ved tilfeldig prøve trekkes hver del fra
+                ulike temaer.
+                {unthemedCount > 0 &&
+                  ` ${unthemedCount} oppgavesett mangler tema og vises ikke som eget tema for kandidatene.`}
+              </p>
+
+              <form onSubmit={handleCreateTheme} style={styles.formRow}>
+                <div style={{ flex: 1 }}>
+                  <input
+                    type="text"
+                    value={newThemeTitle}
+                    onChange={(e) => setNewThemeTitle(e.target.value)}
+                    placeholder="Nytt tema, f.eks. Familie og barn"
+                    style={styles.input}
+                  />
+                </div>
+                <div style={{ flex: 2 }}>
+                  <input
+                    type="text"
+                    value={newThemeDescription}
+                    onChange={(e) => setNewThemeDescription(e.target.value)}
+                    placeholder="Kort beskrivelse (valgfritt)"
+                    style={styles.input}
+                  />
+                </div>
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isSavingTheme || !newThemeTitle.trim()}
+                    style={styles.primaryButton}
+                  >
+                    {isSavingTheme ? 'Lagrer...' : '+ Opprett tema'}
+                  </button>
+                </div>
+              </form>
+
+              {themes.map((theme) => (
+                <div
+                  key={theme.id}
+                  style={{
+                    ...styles.examCardHeader,
+                    opacity: theme.isActive ? 1 : 0.72,
+                    padding: '10px 0',
+                    borderTop: '1px solid #334155',
+                  }}
+                >
+                  <div style={styles.examTitleRow}>
+                    <span
+                      style={{
+                        ...styles.statusBadge,
+                        backgroundColor: theme.isActive
+                          ? 'rgba(16, 185, 129, 0.15)'
+                          : 'rgba(148, 163, 184, 0.15)',
+                        color: theme.isActive ? '#34D399' : '#94A3B8',
+                      }}
+                    >
+                      {theme.isActive ? '● Aktivt' : '○ Deaktivert'}
+                    </span>
+                    <h3 style={styles.examCardTitle}>{theme.titleNo}</h3>
+                    {theme.descriptionNo && (
+                      <span style={styles.sessionCountText}>{theme.descriptionNo}</span>
+                    )}
+                  </div>
+                  <div style={styles.examCardActions}>
+                    <span style={styles.sessionCountText}>
+                      B1: {theme.setCounts?.B1 ?? 0} · B2: {theme.setCounts?.B2 ?? 0} oppgavesett
+                    </span>
+                    <button onClick={() => handleToggleTheme(theme)} style={styles.actionButton}>
+                      {theme.isActive ? 'Deaktiver' : 'Aktiver'}
+                    </button>
+                    <button
+                      onClick={() => handleEditTheme(theme)}
+                      style={styles.actionButtonPrimary}
+                    >
+                      Rediger
+                    </button>
+                    <button
+                      onClick={() => handleDeleteTheme(theme)}
+                      style={styles.actionButtonDanger}
+                    >
+                      Slett
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </section>
+
             {/* Filter Bar */}
             <section style={styles.filterBar}>
+          <div style={styles.filterGroup}>
+            <span style={styles.filterLabel}>Tema:</span>
+            {[
+              { id: 'ALL', label: 'Alle temaer' },
+              ...themes.map((t) => ({ id: t.id, label: t.titleNo })),
+              ...(unthemedCount > 0 ? [{ id: 'NONE', label: `Uten tema (${unthemedCount})` }] : []),
+            ].map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setThemeFilter(opt.id)}
+                style={{
+                  ...styles.filterPill,
+                  ...(themeFilter === opt.id ? styles.filterPillActive : {}),
+                }}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+
           <div style={styles.filterGroup}>
             <span style={styles.filterLabel}>Nivå:</span>
             {(['ALL', 'B1', 'B2'] as const).map((lvl) => (
@@ -803,6 +1077,17 @@ export default function AdminPortalPage() {
                       }}
                     >
                       {exam.level}
+                    </span>
+                    <span
+                      style={{
+                        ...styles.statusBadge,
+                        backgroundColor: exam.themeId
+                          ? 'rgba(56, 189, 248, 0.15)'
+                          : 'rgba(245, 158, 11, 0.15)',
+                        color: exam.themeId ? '#7DD3FC' : '#FBBF24',
+                      }}
+                    >
+                      {exam.themeId ? exam.themeTitleNo || 'Tema' : '⚠ Uten tema'}
                     </span>
                     <span
                       style={{

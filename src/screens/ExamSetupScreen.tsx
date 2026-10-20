@@ -15,7 +15,7 @@ import { useAuth } from '../hooks/useAuth';
 import type {
   CefrLevel,
   CoCandidateMode,
-  ExamTopic,
+  ExamTheme,
   RootStackParamList,
 } from '../types/exam';
 import {
@@ -37,9 +37,9 @@ const MIN_REQUIRED_QUOTA_SECONDS = 180;
 export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [targetLevel, setTargetLevel] = useState<CefrLevel>('B1');
   const [practiceMode, setPracticeMode] = useState<CoCandidateMode>('AI_PEER');
-  const [selectedTopicId, setSelectedTopicId] = useState<string | null>('RANDOM');
+  const [selectedThemeId, setSelectedThemeId] = useState<string | null>('RANDOM');
 
-  const [topics, setTopics] = useState<ExamTopic[]>([]);
+  const [themes, setThemes] = useState<ExamTheme[]>([]);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isStarting, setIsStarting] = useState<boolean>(false);
@@ -49,7 +49,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const { user, dailyTestStatus, logout } = useAuth();
 
   /**
-   * Fetch topics catalog and remaining user audio quota from backend
+   * Fetch theme catalog and remaining user audio quota from backend
    */
   const loadExamCatalog = useCallback(async (isRefresh = false) => {
     if (isRefresh) {
@@ -61,7 +61,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
     try {
       const data = await fetchTopicsAndQuota();
-      setTopics(data.topics || []);
+      setThemes(data.themes || []);
 
       if (data.quota && typeof data.quota.remainingAudioSeconds === 'number') {
         setRemainingSeconds(data.quota.remainingAudioSeconds);
@@ -79,25 +79,25 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     loadExamCatalog();
   }, [loadExamCatalog]);
 
-  // Filter topics matching currently selected CEFR level (B1 or B2)
-  const filteredTopics = useMemo(() => {
-    return topics.filter((t) => t.level === targetLevel);
-  }, [topics, targetLevel]);
+  // Themes that have at least one question set for the selected CEFR level (B1 or B2)
+  const filteredThemes = useMemo(() => {
+    return themes.filter((t) => (t.setCounts?.[targetLevel] ?? 0) > 0);
+  }, [themes, targetLevel]);
 
-  // Keep 'RANDOM' selected by default; if a manual topic was chosen and no longer matches level, reset to 'RANDOM'
+  // Keep 'RANDOM' selected by default; if a manual theme was chosen and no longer matches level, reset to 'RANDOM'
   useEffect(() => {
-    if (filteredTopics.length > 0) {
-      if (selectedTopicId === 'RANDOM') {
+    if (filteredThemes.length > 0) {
+      if (selectedThemeId === 'RANDOM') {
         return;
       }
-      const existsInFiltered = filteredTopics.some((t) => t.id === selectedTopicId);
+      const existsInFiltered = filteredThemes.some((t) => t.id === selectedThemeId);
       if (!existsInFiltered) {
-        setSelectedTopicId('RANDOM');
+        setSelectedThemeId('RANDOM');
       }
     } else {
-      setSelectedTopicId(null);
+      setSelectedThemeId(null);
     }
-  }, [filteredTopics, selectedTopicId]);
+  }, [filteredThemes, selectedThemeId]);
 
   /**
    * Format audio quota seconds into user-friendly minutes & seconds
@@ -128,7 +128,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    if (!selectedTopicId || filteredTopics.length === 0) {
+    if (!selectedThemeId || filteredThemes.length === 0) {
       Alert.alert('Velg tema', 'Ingen tilgjengelige eksamenstemaer for valgt nivå.');
       return;
     }
@@ -141,25 +141,17 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       return;
     }
 
-    const manualTopic =
-      selectedTopicId !== 'RANDOM'
-        ? topics.find((t) => t.id === selectedTopicId)
-        : undefined;
-
     setIsStarting(true);
     try {
       const result = await startExamSession({
-        topicId: selectedTopicId === 'RANDOM' ? 'RANDOM' : selectedTopicId,
+        themeId: selectedThemeId,
         level: targetLevel,
         coCandidateMode: practiceMode,
       });
 
-      const resolvedTopicTitle =
-        result.topic?.titleNo || manualTopic?.titleNo || 'Muntlig prøve';
-      const resolvedMonologuePrompt =
-        result.topic?.monologuePromptNo || manualTopic?.monologuePromptNo;
-      const resolvedDiscussionPrompt =
-        result.topic?.discussionPromptNo || manualTopic?.discussionPromptNo;
+      const resolvedTopicTitle = result.topic?.titleNo || 'Muntlig prøve';
+      const resolvedMonologuePrompt = result.topic?.monologuePromptNo;
+      const resolvedDiscussionPrompt = result.topic?.discussionPromptNo;
 
       // Navigate to the Active Exam Room Screen
       navigation.navigate('ExamRoom', {
@@ -479,16 +471,16 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
               </Card>
             </View>
 
-            {/* Section 3: Topic Selection */}
+            {/* Section 3: Theme Selection */}
             <View style={styles.section}>
               <View style={styles.topicSectionHeader}>
-                <Text style={styles.sectionOverline}>3. VELG EKSAMENSTEMA</Text>
+                <Text style={styles.sectionOverline}>3. VELG TEMA</Text>
                 <Text style={styles.topicCounter}>
-                  {filteredTopics.length} temaer for {targetLevel}
+                  {filteredThemes.length} temaer for {targetLevel}
                 </Text>
               </View>
 
-              {filteredTopics.length === 0 ? (
+              {filteredThemes.length === 0 ? (
                 <Card style={styles.emptyTopicsBox}>
                   <Text style={styles.emptyTopicsText}>
                     Ingen temaer funnet for nivå {targetLevel}.
@@ -498,8 +490,8 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                 <>
                   {/* Random Exam Option (Default) */}
                   <Card
-                    selected={selectedTopicId === 'RANDOM'}
-                    onPress={() => setSelectedTopicId('RANDOM')}
+                    selected={selectedThemeId === 'RANDOM'}
+                    onPress={() => setSelectedThemeId('RANDOM')}
                     style={styles.topicCard}
                   >
                     <View style={styles.topicCardTop}>
@@ -507,39 +499,45 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                       <Text style={styles.topicCardTitle}>
                         Tilfeldig prøve (Anbefalt)
                       </Text>
-                      {selectedTopicId === 'RANDOM' && (
+                      {selectedThemeId === 'RANDOM' && (
                         <Icon name="checkmark-circle" size={22} color={colors.red} />
                       )}
                     </View>
 
                     <Text style={styles.topicCardPreview}>
-                      Som på den ekte Norskprøven trekkes eksamenstema og oppfølgingsspørsmål for nivå {targetLevel} tilfeldig fra databasen når du starter prøven ({filteredTopics.length} tilgjengelige prøver).
+                      Som på den ekte Norskprøven trekkes hver del av prøven tilfeldig fra ulike temaer for nivå {targetLevel} når du starter ({filteredThemes.length} tilgjengelige temaer).
                     </Text>
                   </Card>
 
-                  {filteredTopics.map((topic) => {
-                    const isSelected = selectedTopicId === topic.id;
+                  {filteredThemes.map((theme) => {
+                    const isSelected = selectedThemeId === theme.id;
+                    const setCount = theme.setCounts?.[targetLevel] ?? 0;
                     return (
                       <Card
-                        key={topic.id}
+                        key={theme.id}
                         selected={isSelected}
-                        onPress={() => setSelectedTopicId(topic.id)}
+                        onPress={() => setSelectedThemeId(theme.id)}
                         style={styles.topicCard}
                       >
                         <View style={styles.topicCardTop}>
-                          <Badge label={topic.level} tone="navy" />
-                          <Text style={styles.topicCardTitle}>{topic.titleNo}</Text>
+                          <Badge label={targetLevel} tone="navy" />
+                          <Text style={styles.topicCardTitle}>{theme.titleNo}</Text>
                           {isSelected && (
                             <Icon name="checkmark-circle" size={22} color={colors.red} />
                           )}
                         </View>
 
-                        <Text
-                          style={styles.topicCardPreview}
-                          numberOfLines={3}
-                          ellipsizeMode="tail"
-                        >
-                          {topic.monologuePromptNo || topic.discussionPromptNo}
+                        {!!theme.descriptionNo && (
+                          <Text
+                            style={styles.topicCardPreview}
+                            numberOfLines={3}
+                            ellipsizeMode="tail"
+                          >
+                            {theme.descriptionNo}
+                          </Text>
+                        )}
+                        <Text style={styles.topicCounter}>
+                          {setCount} oppgavesett · spørsmålene trekkes tilfeldig innen temaet
                         </Text>
                       </Card>
                     );
@@ -561,7 +559,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             icon="mic"
             fullWidth
             loading={isStarting}
-            disabled={isStarting || !selectedTopicId || hasInsufficientQuota}
+            disabled={isStarting || !selectedThemeId || hasInsufficientQuota}
             onPress={handleStartExam}
           />
         </View>

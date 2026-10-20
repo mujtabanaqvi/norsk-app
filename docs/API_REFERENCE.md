@@ -5,25 +5,44 @@ All route handlers are implemented using the **Next.js 16 App Router** with Type
 ---
 
 ## 1. `GET /api/exam/topics`
-Retrieves active HK-dir oral examination topics and fetches or initializes the user's practice audio quota (`1800` seconds for new users).
+Retrieves active exam themes (each with at least one active question set) and fetches or initializes the user's practice audio quota (`1800` seconds for new users). Prompts are not exposed before the exam starts.
+
+```json
+{
+  "themes": [
+    {
+      "id": "…",
+      "slug": "familie-og-barn",
+      "titleNo": "Familie og barn",
+      "descriptionNo": "Familieliv, oppvekst, barneoppdragelse og generasjoner.",
+      "setCounts": { "B1": 1, "B2": 1 }
+    }
+  ],
+  "quota": { "remainingAudioSeconds": 1800, "totalCostUsd": "0" }
+}
+```
 
 ### Query Parameters
 | Parameter | Type | Required | Description |
 | :--- | :--- | :--- | :--- |
-| `level` | `'B1' \| 'B2'` | No | Filter topics by CEFR level. |
+| `level` | `'B1' \| 'B2'` | No | Only count/return themes with sets at this CEFR level. |
 | `userId` | `string` | No (if Bearer/header present) | User identifier. |
 
 ---
 
 ## 2. `POST /api/exam/start`
-Validates candidate quota (`remainingAudioSeconds > 180`), selects a random active exam for the requested `level` when `topicId` is omitted or `"RANDOM"` (or looks up a specific `topicId`), randomly draws up to 3 Del 3 follow-up questions from the exam's question pool (`selectedFollowUpQuestionsNo`), creates a new `exam_sessions` row with initial `engineState` (`DEL1_MONOLOGUE`), and returns the opening Examiner greeting turn.
+Validates candidate quota (`remainingAudioSeconds > 180`), composes an exam for the requested `level`, creates a new `exam_sessions` row with initial `engineState` (`DEL1_MONOLOGUE`, plus `selectedPrompts` and `selectedFollowUpQuestionsNo`), and returns the opening Examiner greeting turn.
+
+- **`themeId` = theme id/slug**: Del 1 and Del 2 prompts are drawn from random sets in that theme (different sets when possible), and up to 3 Del 3 follow-ups are drawn from the pooled questions of all the theme's sets.
+- **`themeId` omitted or `"RANDOM"`**: like the real Norskprøven, Del 1, Del 2 and Del 3 are each drawn from a different random theme (themes are reused when fewer than 3 exist). If no sets have a theme yet, all active sets for the level are used.
+- **`topicId`** (legacy, older mobile builds): a specific question set id/slug is used for all parts.
 
 ### Request Body
 ```json
 {
   "level": "B1",
   "coCandidateMode": "AI_PEER",
-  "topicId": "RANDOM"
+  "themeId": "RANDOM"
 }
 ```
 
@@ -40,6 +59,7 @@ Validates candidate quota (`remainingAudioSeconds > 180`), selects a random acti
     "discussionPromptNo": "...",
     "followUpQuestionsNo": ["..."]
   },
+  "theme": null,
   "transcript": [
     {
       "speaker": "Sensor",
@@ -156,6 +176,13 @@ Protected by the `x-admin-secret` header (checked against `process.env.ADMIN_SEC
 - **`POST /api/admin/exams`**: Creates a new exam with `titleNo`, `level` (`'B1' | 'B2'`), `monologuePromptNo` (Del 1), `discussionPromptNo` (Del 2), `followUpQuestionsNo` (Del 3 question pool array), and `isActive`.
 - **`PATCH /api/admin/exams/[id]`**: Updates exam prompts, question pool, level, title, or `isActive` status.
 - **`DELETE /api/admin/exams/[id]`**: Unlinks historical sessions and deletes the exam topic row.
+- `POST`/`PATCH` accept an optional `themeId` (UUID or `null`) to assign a question set to a theme; `GET` includes `themeId` and `themeTitleNo`.
+
+### 10.1b Themes (`/api/admin/themes`)
+- **`GET /api/admin/themes`**: Lists all themes ordered by `sortOrder`, `titleNo`, with `setCounts` per level.
+- **`POST /api/admin/themes`**: Creates a theme with `titleNo`, optional `slug`, `descriptionNo`, `sortOrder`, `isActive`.
+- **`PATCH /api/admin/themes/[id]`**: Updates title, slug, description, sort order or `isActive`.
+- **`DELETE /api/admin/themes/[id]`**: Deletes the theme; its question sets and sessions keep existing with `theme_id = NULL`.
 
 ### 10.2 Configuration Management (`/api/admin/config`)
 - **`GET /api/admin/config`**: Returns current tier policies (`tiers`) and referral parameters (`referral: { bonusDailyTests, durationDays }`).

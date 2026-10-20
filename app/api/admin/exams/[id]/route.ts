@@ -12,6 +12,7 @@ export const updateExamSchema = z.object({
   titleNo: z.string().trim().min(3, 'Tittel må være minst 3 tegn.').optional(),
   slug: z.string().trim().min(2).optional(),
   level: z.enum(['B1', 'B2']).optional(),
+  themeId: z.string().uuid('Ugyldig tema-ID.').nullable().optional(),
   monologuePromptNo: z
     .string()
     .trim()
@@ -68,6 +69,7 @@ export async function PATCH(
       updates.slug = slugifyNorwegianTitle(parsed.data.slug);
     }
     if (parsed.data.level !== undefined) updates.level = parsed.data.level;
+    if (parsed.data.themeId !== undefined) updates.themeId = parsed.data.themeId;
     if (parsed.data.monologuePromptNo !== undefined) {
       updates.monologuePromptNo = parsed.data.monologuePromptNo;
     }

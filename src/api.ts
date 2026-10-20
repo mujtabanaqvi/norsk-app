@@ -173,7 +173,7 @@ export async function fetchTopicsAndQuota(): Promise<GetTopicsResponse> {
 }
 
 export async function startExamSession(params: {
-  topicId?: string;
+  themeId?: string;
   level: CefrLevel;
   coCandidateMode: CoCandidateMode;
 }): Promise<StartExamResponse> {
@@ -187,7 +187,7 @@ export async function startExamSession(params: {
     },
     body: JSON.stringify({
       userId,
-      topicId: params.topicId || 'RANDOM',
+      themeId: params.themeId || 'RANDOM',
       level: params.level,
       coCandidateMode: params.coCandidateMode,
     }),
