@@ -245,7 +245,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       {/* Compact header: brand + the few actions used most; the rest live in the overflow menu */}
       <View style={styles.header}>
         <View style={styles.brandBlock}>
-          <Logo size={30} withWordmark />
+          <Logo size={42} withWordmark />
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {t('setup.headerSubtitle')}{user ? ` · ${user.name || user.email.split('@')[0]}` : ''}
           </Text>
@@ -278,7 +278,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             accessibilityRole="button"
             accessibilityLabel={t('setup.more')}
           >
-            <Icon name="ellipsis-horizontal" size={19} color={colors.navy} />
+            <Icon name="ellipsis-horizontal" size={22} color={colors.navy} />
           </Pressable>
         </View>
       </View>
@@ -306,7 +306,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                 ]}
                 accessibilityRole="button"
               >
-                <Icon name={item.icon} size={18} color={item.color ?? colors.navy} />
+                <Icon name={item.icon} size={20} color={item.color ?? colors.navy} />
                 <Text style={[styles.menuItemText, item.color === colors.red && { color: colors.red }]}>
                   {item.label}
                 </Text>
@@ -371,7 +371,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                 {user && (
                   <View style={styles.seeProgressRow}>
                     <Text style={styles.seeProgressText}>{t('profile.seeProgress')}</Text>
-                    <Icon name="chevron-forward" size={14} color={colors.red} />
+                    <Icon name="chevron-forward" size={16} color={colors.red} />
                   </View>
                 )}
               </View>
@@ -401,7 +401,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                       />
                     </View>
                     <View style={styles.trendRow}>
-                      <Icon name={trend.name} size={14} color={trend.color} />
+                      <Icon name={trend.name} size={16} color={trend.color} />
                       <Text style={[styles.trendText, { color: trend.color }]}>
                         {t(TREND_LABEL_KEY[stats.overallTrend])}
                       </Text>
@@ -544,7 +544,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                     >
                       <Icon
                         name={opt.icon}
-                        size={17}
+                        size={20}
                         color={isSelected ? colors.white : colors.navy}
                       />
                       <Text
@@ -601,9 +601,9 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                       accessibilityLabel={t('setup.randomTitle')}
                     >
                       <View style={styles.themeChipTop}>
-                        <Icon name="shuffle" size={18} color={colors.red} />
+                        <Icon name="shuffle" size={21} color={colors.red} />
                         {selectedThemeId === 'RANDOM' && (
-                          <Icon name="checkmark-circle" size={18} color={colors.red} />
+                          <Icon name="checkmark-circle" size={20} color={colors.red} />
                         )}
                       </View>
                       <Text style={styles.themeChipTitle} numberOfLines={2}>
@@ -628,7 +628,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                           <View style={styles.themeChipTop}>
                             <Badge label={targetLevel} tone="navy" />
                             {isSelected && (
-                              <Icon name="checkmark-circle" size={18} color={colors.red} />
+                              <Icon name="checkmark-circle" size={20} color={colors.red} />
                             )}
                           </View>
                           <Text style={styles.themeChipTitle} numberOfLines={2}>
@@ -687,7 +687,7 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     flexShrink: 1,
-    minWidth: 120,
+    minWidth: 160,
   },
   headerSubtitle: {
     ...type.caption,
@@ -700,9 +700,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   iconBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
     borderColor: colors.border,

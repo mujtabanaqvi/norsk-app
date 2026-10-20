@@ -229,7 +229,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             accessibilityLabel={t('room.endExam')}
             hitSlop={6}
           >
-            <Icon name="flag-outline" size={14} color={colors.white} />
+            <Icon name="flag-outline" size={16} color={colors.white} />
             <Text style={styles.endButtonText}>{t('room.endShort')}</Text>
           </Pressable>
         </View>
@@ -271,7 +271,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
               <View style={styles.promptBannerHeader}>
                 <Icon
                   name={phase === 'speaking' ? 'volume-high-outline' : 'document-text-outline'}
-                  size={16}
+                  size={18}
                   color={colors.red}
                 />
                 <Text style={styles.promptBannerLabel}>
@@ -322,7 +322,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                     active={isExaminerSpeaking}
                     color={isExaminerSpeaking ? colors.navy : colors.borderStrong}
                     accentColor={isExaminerSpeaking ? colors.red : colors.borderStrong}
-                    height={16}
+                    height={20}
                     barWidth={3}
                   />
                 </View>
@@ -381,7 +381,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                           ? colors.navy
                           : colors.borderStrong
                       }
-                      height={16}
+                      height={20}
                       barWidth={3}
                     />
                   </View>
@@ -420,7 +420,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                       active={isLocalSpeaking}
                       color={isLocalSpeaking ? colors.red : colors.borderStrong}
                       accentColor={isLocalSpeaking ? colors.navy : colors.borderStrong}
-                      height={16}
+                      height={20}
                       barWidth={3}
                     />
                   </View>
@@ -445,7 +445,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                     >
                       <Icon
                         name="person-outline"
-                        size={15}
+                        size={17}
                         color={selected ? colors.white : colors.navy}
                       />
                       <Text
@@ -465,7 +465,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             {/* Hint / Retry Notification */}
             {hintMessage && (
               <View style={styles.hintBanner}>
-                <Icon name="information-circle" size={18} color={colors.navy} />
+                <Icon name="information-circle" size={20} color={colors.navy} />
                 <Text style={styles.hintBannerText}>{hintMessage}</Text>
               </View>
             )}
@@ -474,7 +474,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             {phase === 'error' && errorMessage && (
               <View style={styles.errorBanner}>
                 <View style={styles.errorHeaderRow}>
-                  <Icon name="alert-circle" size={18} color={colors.danger} />
+                  <Icon name="alert-circle" size={20} color={colors.danger} />
                   <Text style={styles.errorBannerTitle}>{t('room.errorTitle')}</Text>
                 </View>
                 <Text style={styles.errorBannerText} numberOfLines={3}>
@@ -561,7 +561,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
               accessibilityRole="button"
             >
               <View style={styles.transcriptTitleGroup}>
-                <Icon name="chatbubbles-outline" size={15} color={colors.navy} />
+                <Icon name="chatbubbles-outline" size={17} color={colors.navy} />
                 <Text style={styles.transcriptHeaderTitle}>
                   {t('room.transcriptCount', { count: transcripts.length })}
                 </Text>
@@ -572,7 +572,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 </Text>
                 <Icon
                   name={isDrawerExpanded ? 'chevron-down' : 'chevron-up'}
-                  size={15}
+                  size={17}
                   color={colors.red}
                 />
               </View>
@@ -618,7 +618,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                     pressed && styles.heroMicButtonPressed,
                   ]}
                 >
-                  <Icon name="mic" size={34} color={colors.white} />
+                  <Icon name="mic" size={38} color={colors.white} />
                 </Pressable>
                 <Text style={styles.micStatusTitle}>{t('room.yourTurn')}</Text>
                 <Text style={styles.micStatusSubtext} numberOfLines={2}>
@@ -686,7 +686,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             {coCandidateMode === 'HUMAN_LOCAL' && stage === 'DEL_2' && (
               <View style={styles.moderatorBox}>
                 <View style={styles.moderatorIconRow}>
-                  <Icon name="people" size={16} color={colors.navy} />
+                  <Icon name="people" size={18} color={colors.navy} />
                   <Text style={styles.moderatorTitle} numberOfLines={1}>
                     {t('room.moderatorTitle')}
                   </Text>
@@ -909,9 +909,9 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   avatar: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -928,12 +928,12 @@ const styles = StyleSheet.create({
   },
   avatarLetter: {
     color: colors.white,
-    fontSize: 14,
+    fontSize: 16,
     fontWeight: '800',
   },
   avatarLetterLocal: {
     color: colors.navy,
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '800',
   },
   participantMeta: {
@@ -1054,17 +1054,17 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
   },
   speakingBadgeCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 62,
+    height: 62,
+    borderRadius: 31,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
   },
   heroMicButton: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1075,24 +1075,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.redPressed,
   },
   recordingOrbWrapper: {
-    width: 88,
-    height: 88,
+    width: 96,
+    height: 96,
     alignItems: 'center',
     justifyContent: 'center',
   },
   recordingPulseRing: {
     position: 'absolute',
-    width: 84,
-    height: 84,
-    borderRadius: 42,
+    width: 92,
+    height: 92,
+    borderRadius: 46,
     backgroundColor: colors.redSoft,
     borderWidth: 2,
     borderColor: colors.red,
   },
   heroMicButtonRecording: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
+    width: 76,
+    height: 76,
+    borderRadius: 38,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',

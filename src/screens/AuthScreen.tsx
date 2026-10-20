@@ -226,11 +226,11 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   accessibilityRole="button"
                   accessibilityLabel={t('common.back')}
                 >
-                  <Icon name="chevron-back" size={20} color={colors.navy} />
+                  <Icon name="chevron-back" size={22} color={colors.navy} />
                   <Text style={styles.backButtonText}>{t('common.back')}</Text>
                 </Pressable>
               ) : (
-                <Logo size={36} withWordmark />
+                <Logo size={48} withWordmark />
               )}
               <LanguageToggle />
             </View>
@@ -355,7 +355,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                     style={styles.referralToggle}
                     accessibilityRole="button"
                   >
-                    <Icon name="gift-outline" size={15} color={colors.navy} />
+                    <Icon name="gift-outline" size={17} color={colors.navy} />
                     <Text style={styles.referralToggleText}>{t('auth.haveReferral')}</Text>
                   </Pressable>
                 ))}
@@ -430,7 +430,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
               {features.map((f) => (
                 <View key={f.title} style={styles.featureItem}>
                   <View style={[styles.featureIconCircle, { backgroundColor: f.tint }]}>
-                    <Icon name={f.icon} size={18} color={f.color} />
+                    <Icon name={f.icon} size={22} color={f.color} />
                   </View>
                   <Text style={styles.featureTitle} numberOfLines={2}>
                     {f.title}
@@ -445,7 +445,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                 onPress={() => navigation.navigate('HowTo')}
                 style={({ pressed }) => [styles.footerLinkBtn, pressed && styles.pressed]}
               >
-                <Icon name="book-outline" size={14} color={colors.navy} />
+                <Icon name="book-outline" size={16} color={colors.navy} />
                 <Text style={styles.footerLinkStrong}>{t('nav.howTo')}</Text>
               </Pressable>
               <Text style={styles.footerDot}>•</Text>
@@ -482,7 +482,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: space.md,
-    minHeight: 40,
+    minHeight: 52,
   },
   backButton: {
     flexDirection: 'row',
@@ -595,9 +595,9 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   featureIconCircle: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
   },
