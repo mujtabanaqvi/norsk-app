@@ -71,6 +71,10 @@ export const en: Translations = {
     confirmPasswordPlaceholder: 'Type the password again',
     referralLabel: 'Referral code (optional)',
     referralPlaceholder: 'E.g. A1B2C3D4',
+    haveReferral: 'Have a referral code?',
+    or: 'OR',
+    appleShort: 'Apple (soon)',
+    googleShort: 'Google',
     loginButton: 'Log in',
     registerButton: 'Create account',
     verifyNote: 'We will send a verification code to your email address.',
@@ -149,6 +153,13 @@ export const en: Translations = {
     setCount: '{count} question sets · questions are drawn at random within the theme',
     starting: 'Preparing exam room...',
     start: 'Start oral test',
+    more: 'More',
+    progressTitle: 'YOUR PROGRESS',
+    progressEmpty: 'Take your first test to see your progress here.',
+    aiPeerShort: 'Practise alone (AI)',
+    humanShort: 'With a friend',
+    randomShort: 'Random',
+    setCountShort: '{count} question sets',
   },
 
   room: {
@@ -203,6 +214,7 @@ export const en: Translations = {
     showTranscript: 'Show transcript',
     transcriptEmpty: 'The transcript will appear here as the participants speak...',
     endExam: 'End test and get assessment',
+    endShort: 'End',
     endConfirmTitle: 'End test',
     endConfirmBody:
       'Are you sure you want to end the test? The examiner will immediately generate your HK-dir assessment.',

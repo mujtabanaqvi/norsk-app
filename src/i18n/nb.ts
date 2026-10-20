@@ -77,6 +77,10 @@ export const nb = {
     confirmPasswordPlaceholder: 'Skriv passordet på nytt',
     referralLabel: 'Vervekode (valgfritt)',
     referralPlaceholder: 'F.eks. A1B2C3D4',
+    haveReferral: 'Har du en vervekode?',
+    or: 'ELLER',
+    appleShort: 'Apple (snart)',
+    googleShort: 'Google',
     loginButton: 'Logg inn',
     registerButton: 'Registrer konto',
     verifyNote: 'Vi sender en bekreftelseskode til e-postadressen din.',
@@ -156,6 +160,13 @@ export const nb = {
     setCount: '{count} oppgavesett · spørsmålene trekkes tilfeldig innen temaet',
     starting: 'Forbereder eksamensrom...',
     start: 'Start muntlig prøve',
+    more: 'Mer',
+    progressTitle: 'DIN FREMGANG',
+    progressEmpty: 'Ta din første prøve for å se fremgangen din her.',
+    aiPeerShort: 'Øv alene (AI)',
+    humanShort: 'Med en venn',
+    randomShort: 'Tilfeldig',
+    setCountShort: '{count} oppgavesett',
   },
 
   room: {
@@ -210,6 +221,7 @@ export const nb = {
     showTranscript: 'Vis transkripsjon',
     transcriptEmpty: 'Transkripsjon vises her etter hvert som deltakerne snakker...',
     endExam: 'Avslutt prøve og få vurdering',
+    endShort: 'Avslutt',
     endConfirmTitle: 'Avslutt prøve',
     endConfirmBody:
       'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere din HK-dir vurdering.',

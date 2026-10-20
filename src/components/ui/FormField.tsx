@@ -77,7 +77,7 @@ FormField.displayName = 'FormField';
 
 const styles = StyleSheet.create({
   group: {
-    marginBottom: space.md,
+    marginBottom: space.sm + 2,
   },
   label: {
     ...type.caption,

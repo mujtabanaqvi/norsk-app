@@ -221,6 +221,17 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.levelBadge}>
             <Text style={styles.levelBadgeText}>{level}</Text>
           </View>
+
+          <Pressable
+            onPress={handleConfirmEndExam}
+            style={({ pressed }) => [styles.endButton, pressed && styles.endButtonPressed]}
+            accessibilityRole="button"
+            accessibilityLabel={t('room.endExam')}
+            hitSlop={6}
+          >
+            <Icon name="flag-outline" size={14} color={colors.white} />
+            <Text style={styles.endButtonText}>{t('room.endShort')}</Text>
+          </Pressable>
         </View>
 
         {/* Phase Segmented Pills */}
@@ -241,6 +252,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 {isActive && <View style={styles.phaseDot} />}
                 <Text
                   style={[styles.phasePillText, isActive && styles.phasePillTextActive]}
+                  numberOfLines={1}
                 >
                   {label}
                 </Text>
@@ -250,15 +262,11 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
         </View>
       </View>
 
-      {/* Main Light Room Body */}
+      {/* Main Light Room Body: fixed layout, the mic dock is always on screen */}
       <View style={styles.roomBody}>
-        <ScrollView
-          style={styles.mainScroll}
-          contentContainerStyle={styles.mainScrollContent}
-          showsVerticalScrollIndicator={false}
-        >
+        <View style={styles.mainArea}>
           <View style={styles.contentWrapper}>
-            {/* Current Task / Active Speech Card */}
+            {/* Current Task / Active Speech Card — long prompts scroll inside the card */}
             <Card style={styles.promptBannerCard}>
               <View style={styles.promptBannerHeader}>
                 <Icon
@@ -274,177 +282,184 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                     : t('room.task', { part: t('room.part', { n: stageNumber }) })}
                 </Text>
               </View>
-              <Text style={styles.promptBannerText}>
-                {phase === 'speaking' && currentReplyText
-                  ? currentReplyText
-                  : currentTaskDescription}
-              </Text>
+              <ScrollView style={styles.promptScroll} showsVerticalScrollIndicator={true}>
+                <Text style={styles.promptBannerText}>
+                  {phase === 'speaking' && currentReplyText
+                    ? currentReplyText
+                    : currentTaskDescription}
+                </Text>
+              </ScrollView>
             </Card>
 
-            {/* Participant Card 1: Sensor (AI Examiner) */}
-            <Card
-              style={[
-                styles.participantCard,
-                isExaminerSpeaking && styles.participantCardActiveNavy,
-              ]}
-            >
-              <View style={styles.participantHeader}>
-                <View style={styles.participantAvatarExaminer}>
-                  <Text style={styles.avatarLetter}>S</Text>
-                </View>
-                <View style={styles.participantMeta}>
-                  <Text style={styles.participantName}>{t('room.examinerName')}</Text>
-                  <Text style={styles.participantRole}>{t('room.examinerRole')}</Text>
-                </View>
-                <Badge
-                  label={isExaminerSpeaking ? t('room.speakingNow') : t('room.listening')}
-                  tone={isExaminerSpeaking ? 'solidNavy' : 'neutral'}
-                />
-              </View>
-
-              <View style={styles.participantWaveRow}>
-                <Waveform
-                  active={isExaminerSpeaking}
-                  color={isExaminerSpeaking ? colors.navy : colors.borderStrong}
-                  accentColor={isExaminerSpeaking ? colors.red : colors.borderStrong}
-                  height={24}
-                  barWidth={4}
-                />
-              </View>
-            </Card>
-
-            {/* Participant Card 2: Co-Candidate or Candidate Card */}
-            {coCandidateMode === 'AI_PEER' ? (
+            {/* Participants side by side */}
+            <View style={styles.participantsRow}>
+              {/* Sensor (AI Examiner) */}
               <Card
                 style={[
-                  styles.participantCard,
-                  (isAiCoCandidateSpeaking || isLocalSpeaking) &&
-                    styles.participantCardActiveRed,
+                  styles.participantTile,
+                  isExaminerSpeaking && styles.participantCardActiveNavy,
                 ]}
               >
                 <View style={styles.participantHeader}>
-                  <View style={styles.participantAvatarPeer}>
-                    <Text style={styles.avatarLetter}>M</Text>
+                  <View style={[styles.avatar, styles.participantAvatarExaminer]}>
+                    <Text style={styles.avatarLetter}>S</Text>
                   </View>
                   <View style={styles.participantMeta}>
-                    <Text style={styles.participantName}>
-                      {stage === 'DEL_2' ? t('room.peerAndYou') : t('room.candidateYou')}
+                    <Text style={styles.participantName} numberOfLines={1}>
+                      {t('room.examinerName')}
                     </Text>
-                    <Text style={styles.participantRole}>
-                      {stage === 'DEL_2'
-                        ? t('room.peerRole', { level })
-                        : t('room.targetLevel', { level })}
+                    <Text style={styles.participantRole} numberOfLines={1}>
+                      {t('room.examinerRole')}
                     </Text>
                   </View>
-                  <Badge
-                    label={
-                      isAiCoCandidateSpeaking
-                        ? t('room.peerSpeaking')
-                        : isLocalSpeaking
-                          ? t('room.youSpeaking')
-                          : t('room.ready')
-                    }
-                    tone={
-                      isAiCoCandidateSpeaking
-                        ? 'navy'
-                        : isLocalSpeaking
-                          ? 'solidRed'
-                          : 'neutral'
-                    }
-                  />
                 </View>
-
-                <View style={styles.participantWaveRow}>
+                <View style={styles.participantFooter}>
+                  <Badge
+                    label={isExaminerSpeaking ? t('room.speakingNow') : t('room.listening')}
+                    tone={isExaminerSpeaking ? 'solidNavy' : 'neutral'}
+                  />
                   <Waveform
-                    active={isAiCoCandidateSpeaking || isLocalSpeaking}
-                    color={
-                      isAiCoCandidateSpeaking || isLocalSpeaking
-                        ? colors.red
-                        : colors.borderStrong
-                    }
-                    accentColor={
-                      isAiCoCandidateSpeaking || isLocalSpeaking
-                        ? colors.navy
-                        : colors.borderStrong
-                    }
-                    height={24}
-                    barWidth={4}
+                    active={isExaminerSpeaking}
+                    color={isExaminerSpeaking ? colors.navy : colors.borderStrong}
+                    accentColor={isExaminerSpeaking ? colors.red : colors.borderStrong}
+                    height={16}
+                    barWidth={3}
                   />
                 </View>
               </Card>
-            ) : (
-              /* HUMAN_LOCAL Card: Two Humans Sharing Microphone */
-              <Card
-                style={[
-                  styles.participantCard,
-                  isLocalSpeaking && styles.participantCardActiveRed,
-                ]}
-              >
-                <View style={styles.participantHeader}>
-                  <View style={styles.participantAvatarLocal}>
-                    <Text style={styles.avatarLetterLocal}>2x</Text>
-                  </View>
-                  <View style={styles.participantMeta}>
-                    <Text style={styles.participantName}>
-                      {t('room.sharedMicTitle')}
-                    </Text>
-                    <Text style={styles.participantRole}>
-                      {t('room.activeSpeaker', {
-                        name:
-                          candidateSpeaker === 'CANDIDATE_2'
-                            ? t('common.candidate2')
-                            : t('common.candidate1'),
-                      })}
-                    </Text>
-                  </View>
-                  <Badge
-                    label={isLocalSpeaking ? t('room.micActive') : t('room.ready')}
-                    tone={isLocalSpeaking ? 'solidRed' : 'neutral'}
-                  />
-                </View>
 
-                {/* Candidate 1 / Candidate 2 Selector for HUMAN_LOCAL */}
-                <View style={styles.speakerSelectorRow}>
-                  {(['CANDIDATE_1', 'CANDIDATE_2'] as const).map((cand) => {
-                    const selected = candidateSpeaker === cand;
-                    return (
-                      <Pressable
-                        key={cand}
+              {/* Co-Candidate or Shared-mic Candidates */}
+              {coCandidateMode === 'AI_PEER' ? (
+                <Card
+                  style={[
+                    styles.participantTile,
+                    (isAiCoCandidateSpeaking || isLocalSpeaking) &&
+                      styles.participantCardActiveRed,
+                  ]}
+                >
+                  <View style={styles.participantHeader}>
+                    <View style={[styles.avatar, styles.participantAvatarPeer]}>
+                      <Text style={styles.avatarLetter}>M</Text>
+                    </View>
+                    <View style={styles.participantMeta}>
+                      <Text style={styles.participantName} numberOfLines={1}>
+                        {stage === 'DEL_2' ? t('room.peerAndYou') : t('room.candidateYou')}
+                      </Text>
+                      <Text style={styles.participantRole} numberOfLines={1}>
+                        {stage === 'DEL_2'
+                          ? t('room.peerRole', { level })
+                          : t('room.targetLevel', { level })}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.participantFooter}>
+                    <Badge
+                      label={
+                        isAiCoCandidateSpeaking
+                          ? t('room.peerSpeaking')
+                          : isLocalSpeaking
+                            ? t('room.youSpeaking')
+                            : t('room.ready')
+                      }
+                      tone={
+                        isAiCoCandidateSpeaking
+                          ? 'navy'
+                          : isLocalSpeaking
+                            ? 'solidRed'
+                            : 'neutral'
+                      }
+                    />
+                    <Waveform
+                      active={isAiCoCandidateSpeaking || isLocalSpeaking}
+                      color={
+                        isAiCoCandidateSpeaking || isLocalSpeaking
+                          ? colors.red
+                          : colors.borderStrong
+                      }
+                      accentColor={
+                        isAiCoCandidateSpeaking || isLocalSpeaking
+                          ? colors.navy
+                          : colors.borderStrong
+                      }
+                      height={16}
+                      barWidth={3}
+                    />
+                  </View>
+                </Card>
+              ) : (
+                <Card
+                  style={[
+                    styles.participantTile,
+                    isLocalSpeaking && styles.participantCardActiveRed,
+                  ]}
+                >
+                  <View style={styles.participantHeader}>
+                    <View style={[styles.avatar, styles.participantAvatarLocal]}>
+                      <Text style={styles.avatarLetterLocal}>2x</Text>
+                    </View>
+                    <View style={styles.participantMeta}>
+                      <Text style={styles.participantName} numberOfLines={1}>
+                        {t('room.sharedMicTitle')}
+                      </Text>
+                      <Text style={styles.participantRole} numberOfLines={1}>
+                        {t('room.activeSpeaker', {
+                          name:
+                            candidateSpeaker === 'CANDIDATE_2'
+                              ? t('common.candidate2')
+                              : t('common.candidate1'),
+                        })}
+                      </Text>
+                    </View>
+                  </View>
+                  <View style={styles.participantFooter}>
+                    <Badge
+                      label={isLocalSpeaking ? t('room.micActive') : t('room.ready')}
+                      tone={isLocalSpeaking ? 'solidRed' : 'neutral'}
+                    />
+                    <Waveform
+                      active={isLocalSpeaking}
+                      color={isLocalSpeaking ? colors.red : colors.borderStrong}
+                      accentColor={isLocalSpeaking ? colors.navy : colors.borderStrong}
+                      height={16}
+                      barWidth={3}
+                    />
+                  </View>
+                </Card>
+              )}
+            </View>
+
+            {/* Candidate 1 / Candidate 2 Selector for HUMAN_LOCAL */}
+            {coCandidateMode === 'HUMAN_LOCAL' && (
+              <View style={styles.speakerSelectorRow}>
+                {(['CANDIDATE_1', 'CANDIDATE_2'] as const).map((cand) => {
+                  const selected = candidateSpeaker === cand;
+                  return (
+                    <Pressable
+                      key={cand}
+                      style={[
+                        styles.speakerSelectButton,
+                        selected && styles.speakerSelectButtonActive,
+                      ]}
+                      onPress={() => setCandidateSpeaker(cand)}
+                      disabled={phase === 'recording' || phase === 'thinking'}
+                    >
+                      <Icon
+                        name="person-outline"
+                        size={15}
+                        color={selected ? colors.white : colors.navy}
+                      />
+                      <Text
                         style={[
-                          styles.speakerSelectButton,
-                          selected && styles.speakerSelectButtonActive,
+                          styles.speakerSelectButtonText,
+                          selected && styles.speakerSelectButtonTextActive,
                         ]}
-                        onPress={() => setCandidateSpeaker(cand)}
-                        disabled={phase === 'recording' || phase === 'thinking'}
                       >
-                        <Icon
-                          name="person-outline"
-                          size={15}
-                          color={selected ? colors.white : colors.navy}
-                        />
-                        <Text
-                          style={[
-                            styles.speakerSelectButtonText,
-                            selected && styles.speakerSelectButtonTextActive,
-                          ]}
-                        >
-                          {cand === 'CANDIDATE_1' ? t('common.candidate1') : t('common.candidate2')}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                </View>
-
-                <View style={styles.participantWaveRow}>
-                  <Waveform
-                    active={isLocalSpeaking}
-                    color={isLocalSpeaking ? colors.red : colors.borderStrong}
-                    accentColor={isLocalSpeaking ? colors.navy : colors.borderStrong}
-                    height={24}
-                    barWidth={4}
-                  />
-                </View>
-              </Card>
+                        {cand === 'CANDIDATE_1' ? t('common.candidate1') : t('common.candidate2')}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
             )}
 
             {/* Hint / Retry Notification */}
@@ -462,7 +477,9 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                   <Icon name="alert-circle" size={18} color={colors.danger} />
                   <Text style={styles.errorBannerTitle}>{t('room.errorTitle')}</Text>
                 </View>
-                <Text style={styles.errorBannerText}>{errorMessage}</Text>
+                <Text style={styles.errorBannerText} numberOfLines={3}>
+                  {errorMessage}
+                </Text>
                 <Button
                   title={t('common.retry')}
                   variant="primary"
@@ -472,172 +489,79 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 />
               </View>
             )}
-
-            {/* Turn-Based Microphone Action Card (Hero) */}
-            <Card style={styles.micControlCard}>
-              {phase === 'speaking' && (
-                <View style={styles.micStateBox}>
-                  <View style={styles.speakingBadgeCircle}>
-                    <Waveform
-                      active={true}
-                      color={colors.white}
-                      accentColor={colors.navy}
-                      height={26}
-                      barWidth={4}
-                    />
-                  </View>
-                  <Text style={styles.micStatusTitle}>
-                    {activeAiSpeaker === 'co_candidate'
-                      ? t('room.peerTalking')
-                      : t('room.examinerTalking')}
-                  </Text>
-                  <Text style={styles.micStatusSubtext}>
-                    {t('room.listenHint')}
-                  </Text>
-                  <Button
-                    title={t('room.skipSpeech')}
-                    variant="outline"
-                    size="md"
-                    iconRight="arrow-forward"
-                    onPress={skipCurrentSpeech}
-                  />
-                </View>
-              )}
-
-              {phase === 'listening' && (
-                <View style={styles.micStateBox}>
-                  <Pressable
-                    onPress={startRecording}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('room.tapToSpeak')}
-                    style={({ pressed }) => [
-                      styles.heroMicButton,
-                      pressed && styles.heroMicButtonPressed,
-                    ]}
-                  >
-                    <Icon name="mic" size={34} color={colors.white} />
-                  </Pressable>
-                  <Text style={styles.micStatusTitle}>{t('room.yourTurn')}</Text>
-                  <Text style={styles.micStatusSubtext}>
-                    {t('room.tapHint')}
-                  </Text>
-                  <Button
-                    title={t('room.tapToSpeak')}
-                    variant="primary"
-                    size="lg"
-                    icon="mic"
-                    fullWidth
-                    onPress={startRecording}
-                  />
-                </View>
-              )}
-
-              {phase === 'recording' && (
-                <View style={styles.micStateBox}>
-                  <View style={styles.recordingOrbWrapper}>
-                    <Animated.View
-                      style={[
-                        styles.recordingPulseRing,
-                        { transform: [{ scale: pulseAnim }] },
-                      ]}
-                    />
-                    <Pressable
-                      onPress={stopRecordingAndSubmit}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('room.doneSpeaking')}
-                      style={styles.heroMicButtonRecording}
-                    >
-                      <Waveform
-                        active={true}
-                        color={colors.white}
-                        accentColor={colors.navy}
-                        height={28}
-                        barWidth={4}
-                      />
-                    </Pressable>
-                  </View>
-                  <Text style={styles.micStatusTitleRecording}>
-                    {t('room.recordingTime', { time: formattedRecordingTime })}
-                  </Text>
-                  <Text style={styles.micStatusSubtext}>
-                    {t('room.recordingHint')}
-                  </Text>
-                  <Button
-                    title={t('room.doneSpeaking')}
-                    variant="secondary"
-                    size="lg"
-                    icon="stop"
-                    fullWidth
-                    onPress={stopRecordingAndSubmit}
-                  />
-                </View>
-              )}
-
-              {phase === 'thinking' && (
-                <View style={styles.micStateBox}>
-                  <ActivityIndicator size="large" color={colors.red} />
-                  <Text style={[styles.micStatusTitle, { marginTop: space.sm }]}>
-                    {t('room.processing')}
-                  </Text>
-                  <Text style={styles.micStatusSubtext}>
-                    {t('room.processingHint')}
-                  </Text>
-                </View>
-              )}
-
-              {phase === 'done' && (
-                <View style={styles.micStateBox}>
-                  <ActivityIndicator size="small" color={colors.success} />
-                  <Text style={[styles.micStatusTitle, { marginTop: space.xs }]}>
-                    {t('room.doneFetching')}
-                  </Text>
-                </View>
-              )}
-            </Card>
-
-            {/* Local Duo Mode (HUMAN_LOCAL) Moderator Controls during Del 2 */}
-            {coCandidateMode === 'HUMAN_LOCAL' && stage === 'DEL_2' && (
-              <Card style={styles.moderatorBox}>
-                <View style={styles.moderatorIconRow}>
-                  <Icon name="people" size={20} color={colors.navy} />
-                  <Text style={styles.moderatorTitle}>
-                    {t('room.moderatorTitle')}
-                  </Text>
-                </View>
-
-                <Text style={styles.moderatorDescription}>
-                  {t('room.moderatorDesc')}
-                </Text>
-
-                <Button
-                  title={t('room.finishDiscussion')}
-                  variant="secondary"
-                  size="md"
-                  iconRight="arrow-forward"
-                  fullWidth
-                  disabled={phase === 'thinking'}
-                  onPress={endHumanDiscussion}
-                />
-              </Card>
-            )}
           </View>
-        </ScrollView>
 
-        {/* Live Transcript Drawer */}
-        <View
-          style={[
-            styles.transcriptDrawer,
-            isDrawerExpanded && styles.transcriptDrawerExpanded,
-          ]}
-        >
-          <Pressable
-            style={styles.transcriptDrawerHandle}
-            onPress={toggleDrawer}
-          >
-            <View style={styles.drawerHandleBar} />
-            <View style={styles.transcriptHeaderRow}>
+          {/* Live Transcript overlay (sits above the mic dock, never pushes it off screen) */}
+          {isDrawerExpanded && (
+            <View style={styles.transcriptOverlay}>
+              <ScrollView
+                ref={transcriptScrollRef}
+                style={styles.transcriptScroll}
+                contentContainerStyle={styles.transcriptScrollContent}
+                showsVerticalScrollIndicator={true}
+              >
+                {transcripts.length === 0 ? (
+                  <Text style={styles.emptyTranscriptText}>
+                    {t('room.transcriptEmpty')}
+                  </Text>
+                ) : (
+                  transcripts.map((turn, index) => {
+                    const isExaminer = turn.role === 'EXAMINER';
+                    const isPeer = turn.role === 'AI_COCANDIDATE';
+                    const isCandidate2 = turn.role === 'CANDIDATE_2';
+
+                    return (
+                      <View
+                        key={turn.id || index}
+                        style={[
+                          styles.turnCard,
+                          isExaminer
+                            ? styles.turnBubbleExaminer
+                            : isPeer
+                              ? styles.turnBubblePeer
+                              : styles.turnBubbleCandidate,
+                        ]}
+                      >
+                        <View style={styles.turnHeader}>
+                          <Badge
+                            label={
+                              isExaminer
+                                ? t('common.examiner')
+                                : isPeer
+                                  ? t('common.aiCoCandidate')
+                                  : isCandidate2
+                                    ? t('common.candidate2')
+                                    : t('common.candidate1')
+                            }
+                            tone={isExaminer ? 'solidNavy' : isPeer ? 'neutral' : 'solidRed'}
+                          />
+                          <Text style={styles.turnTimestamp}>
+                            {new Date(turn.timestamp).toLocaleTimeString([], {
+                              minute: '2-digit',
+                              second: '2-digit',
+                            })}
+                          </Text>
+                        </View>
+                        <Text style={styles.turnText}>{turn.text}</Text>
+                      </View>
+                    );
+                  })
+                )}
+              </ScrollView>
+            </View>
+          )}
+        </View>
+
+        {/* Docked Microphone Panel */}
+        <SafeAreaView edges={['bottom']} style={styles.dock}>
+          <View style={styles.dockInner}>
+            <Pressable
+              style={styles.transcriptToggle}
+              onPress={toggleDrawer}
+              accessibilityRole="button"
+            >
               <View style={styles.transcriptTitleGroup}>
-                <Icon name="chatbubbles-outline" size={16} color={colors.navy} />
+                <Icon name="chatbubbles-outline" size={15} color={colors.navy} />
                 <Text style={styles.transcriptHeaderTitle}>
                   {t('room.transcriptCount', { count: transcripts.length })}
                 </Text>
@@ -648,82 +572,139 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 </Text>
                 <Icon
                   name={isDrawerExpanded ? 'chevron-down' : 'chevron-up'}
-                  size={16}
+                  size={15}
                   color={colors.red}
                 />
               </View>
-            </View>
-          </Pressable>
+            </Pressable>
 
-          {isDrawerExpanded && (
-            <ScrollView
-              ref={transcriptScrollRef}
-              style={styles.transcriptScroll}
-              contentContainerStyle={styles.transcriptScrollContent}
-              showsVerticalScrollIndicator={true}
-            >
-              {transcripts.length === 0 ? (
-                <Text style={styles.emptyTranscriptText}>
-                  {t('room.transcriptEmpty')}
+            {phase === 'speaking' && (
+              <View style={styles.micStateBox}>
+                <View style={styles.speakingBadgeCircle}>
+                  <Waveform
+                    active={true}
+                    color={colors.white}
+                    accentColor={colors.navy}
+                    height={22}
+                    barWidth={4}
+                  />
+                </View>
+                <Text style={styles.micStatusTitle}>
+                  {activeAiSpeaker === 'co_candidate'
+                    ? t('room.peerTalking')
+                    : t('room.examinerTalking')}
                 </Text>
-              ) : (
-                transcripts.map((turn, index) => {
-                  const isExaminer = turn.role === 'EXAMINER';
-                  const isPeer = turn.role === 'AI_COCANDIDATE';
-                  const isCandidate2 = turn.role === 'CANDIDATE_2';
+                <Text style={styles.micStatusSubtext} numberOfLines={2}>
+                  {t('room.listenHint')}
+                </Text>
+                <Button
+                  title={t('room.skipSpeech')}
+                  variant="outline"
+                  size="sm"
+                  iconRight="arrow-forward"
+                  onPress={skipCurrentSpeech}
+                />
+              </View>
+            )}
 
-                  return (
-                    <View
-                      key={turn.id || index}
-                      style={[
-                        styles.turnCard,
-                        isExaminer
-                          ? styles.turnBubbleExaminer
-                          : isPeer
-                            ? styles.turnBubblePeer
-                            : styles.turnBubbleCandidate,
-                      ]}
-                    >
-                      <View style={styles.turnHeader}>
-                        <Badge
-                          label={
-                            isExaminer
-                              ? t('common.examiner')
-                              : isPeer
-                                ? t('common.aiCoCandidate')
-                                : isCandidate2
-                                  ? t('common.candidate2')
-                                  : t('common.candidate1')
-                          }
-                          tone={isExaminer ? 'solidNavy' : isPeer ? 'neutral' : 'solidRed'}
-                        />
-                        <Text style={styles.turnTimestamp}>
-                          {new Date(turn.timestamp).toLocaleTimeString([], {
-                            minute: '2-digit',
-                            second: '2-digit',
-                          })}
-                        </Text>
-                      </View>
-                      <Text style={styles.turnText}>{turn.text}</Text>
-                    </View>
-                  );
-                })
-              )}
-            </ScrollView>
-          )}
-        </View>
+            {phase === 'listening' && (
+              <View style={styles.micStateBox}>
+                <Pressable
+                  onPress={startRecording}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('room.tapToSpeak')}
+                  style={({ pressed }) => [
+                    styles.heroMicButton,
+                    pressed && styles.heroMicButtonPressed,
+                  ]}
+                >
+                  <Icon name="mic" size={34} color={colors.white} />
+                </Pressable>
+                <Text style={styles.micStatusTitle}>{t('room.yourTurn')}</Text>
+                <Text style={styles.micStatusSubtext} numberOfLines={2}>
+                  {t('room.tapHint')}
+                </Text>
+              </View>
+            )}
 
-        {/* Bottom Action Footer */}
-        <SafeAreaView edges={['bottom']} style={styles.bottomBar}>
-          <View style={styles.bottomBarInner}>
-            <Button
-              title={t('room.endExam')}
-              variant="outline"
-              size="md"
-              icon="flag-outline"
-              fullWidth
-              onPress={handleConfirmEndExam}
-            />
+            {phase === 'recording' && (
+              <View style={styles.micStateBox}>
+                <View style={styles.recordingOrbWrapper}>
+                  <Animated.View
+                    style={[
+                      styles.recordingPulseRing,
+                      { transform: [{ scale: pulseAnim }] },
+                    ]}
+                  />
+                  <Pressable
+                    onPress={stopRecordingAndSubmit}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('room.doneSpeaking')}
+                    style={styles.heroMicButtonRecording}
+                  >
+                    <Waveform
+                      active={true}
+                      color={colors.white}
+                      accentColor={colors.navy}
+                      height={26}
+                      barWidth={4}
+                    />
+                  </Pressable>
+                </View>
+                <Text style={styles.micStatusTitleRecording}>
+                  {t('room.recordingTime', { time: formattedRecordingTime })}
+                </Text>
+                <Button
+                  title={t('room.doneSpeaking')}
+                  variant="secondary"
+                  size="md"
+                  icon="stop"
+                  fullWidth
+                  onPress={stopRecordingAndSubmit}
+                />
+              </View>
+            )}
+
+            {phase === 'thinking' && (
+              <View style={[styles.micStateBox, styles.micStateBoxStatic]}>
+                <ActivityIndicator size="large" color={colors.red} />
+                <Text style={styles.micStatusTitle}>{t('room.processing')}</Text>
+                <Text style={styles.micStatusSubtext} numberOfLines={2}>
+                  {t('room.processingHint')}
+                </Text>
+              </View>
+            )}
+
+            {phase === 'done' && (
+              <View style={[styles.micStateBox, styles.micStateBoxStatic]}>
+                <ActivityIndicator size="small" color={colors.success} />
+                <Text style={styles.micStatusTitle}>{t('room.doneFetching')}</Text>
+              </View>
+            )}
+
+            {/* Local Duo Mode (HUMAN_LOCAL) Moderator Controls during Del 2 */}
+            {coCandidateMode === 'HUMAN_LOCAL' && stage === 'DEL_2' && (
+              <View style={styles.moderatorBox}>
+                <View style={styles.moderatorIconRow}>
+                  <Icon name="people" size={16} color={colors.navy} />
+                  <Text style={styles.moderatorTitle} numberOfLines={1}>
+                    {t('room.moderatorTitle')}
+                  </Text>
+                </View>
+                <Text style={styles.moderatorDescription} numberOfLines={2}>
+                  {t('room.moderatorDesc')}
+                </Text>
+                <Button
+                  title={t('room.finishDiscussion')}
+                  variant="secondary"
+                  size="sm"
+                  iconRight="arrow-forward"
+                  fullWidth
+                  disabled={phase === 'thinking'}
+                  onPress={endHumanDiscussion}
+                />
+              </View>
+            )}
           </View>
         </SafeAreaView>
       </View>
@@ -738,7 +719,7 @@ const styles = StyleSheet.create({
   },
   navyHeader: {
     backgroundColor: colors.navy,
-    paddingBottom: space.md,
+    paddingBottom: space.sm,
   },
   topBar: {
     flexDirection: 'row',
@@ -810,6 +791,23 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  endButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.navyLight,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: radius.pill,
+  },
+  endButtonPressed: {
+    backgroundColor: colors.redPressed,
+  },
+  endButtonText: {
+    color: colors.white,
+    fontSize: 12,
+    fontWeight: '700',
+  },
   phaseContainer: {
     flexDirection: 'row',
     paddingHorizontal: space.lg,
@@ -822,7 +820,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 5,
-    paddingVertical: 7,
+    paddingVertical: 5,
     paddingHorizontal: 6,
     borderRadius: radius.pill,
     backgroundColor: colors.navyLight,
@@ -849,28 +847,35 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.bg,
   },
-  mainScroll: {
+  mainArea: {
     flex: 1,
-  },
-  mainScrollContent: {
-    padding: space.lg,
-    paddingBottom: space.xl,
+    paddingHorizontal: space.lg,
+    paddingTop: space.md,
+    paddingBottom: space.sm,
   },
   contentWrapper: {
+    flex: 1,
     width: '100%',
     maxWidth: 680,
     alignSelf: 'center',
-    gap: space.md,
+    gap: space.sm,
   },
   promptBannerCard: {
     borderLeftWidth: 4,
     borderLeftColor: colors.red,
+    padding: space.md,
+    // Shrinks first when space is tight; text scrolls inside instead of the page.
+    flexShrink: 1,
+    minHeight: 72,
+  },
+  promptScroll: {
+    flexGrow: 0,
   },
   promptBannerHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    marginBottom: 6,
+    marginBottom: 4,
   },
   promptBannerLabel: {
     ...type.overline,
@@ -881,8 +886,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  participantCard: {
-    padding: space.lg,
+  participantsRow: {
+    flexDirection: 'row',
+    gap: space.sm,
+  },
+  participantTile: {
+    flex: 1,
+    padding: space.md,
+    gap: space.sm,
   },
   participantCardActiveNavy: {
     borderColor: colors.navy,
@@ -895,68 +906,60 @@ const styles = StyleSheet.create({
   participantHeader: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: space.sm,
+  },
+  avatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   participantAvatarExaminer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: colors.navy,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: space.md,
   },
   participantAvatarPeer: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: colors.red,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: space.md,
   },
   participantAvatarLocal: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
     backgroundColor: colors.surface,
     borderWidth: 2,
     borderColor: colors.navy,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: space.md,
   },
   avatarLetter: {
     color: colors.white,
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '800',
   },
   avatarLetterLocal: {
     color: colors.navy,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '800',
   },
   participantMeta: {
     flex: 1,
-    marginRight: space.sm,
+    minWidth: 0,
   },
   participantName: {
     ...type.bodyStrong,
+    fontSize: 13,
+    lineHeight: 18,
   },
   participantRole: {
     ...type.caption,
-    marginTop: 1,
+    fontSize: 11,
+    lineHeight: 15,
   },
-  participantWaveRow: {
-    marginTop: space.md,
-    paddingTop: space.sm,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  participantFooter: {
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.xs,
+    flexWrap: 'wrap',
   },
   speakerSelectorRow: {
     flexDirection: 'row',
     gap: space.sm,
-    marginTop: space.md,
   },
   speakerSelectButton: {
     flex: 1,
@@ -964,7 +967,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 6,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     backgroundColor: colors.surfaceMuted,
     borderWidth: 1,
@@ -988,7 +991,8 @@ const styles = StyleSheet.create({
     gap: space.sm,
     backgroundColor: colors.navySoft,
     borderRadius: radius.md,
-    padding: space.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
   },
   hintBannerText: {
     ...type.caption,
@@ -999,7 +1003,7 @@ const styles = StyleSheet.create({
   errorBanner: {
     backgroundColor: colors.dangerSoft,
     borderRadius: radius.lg,
-    padding: space.lg,
+    padding: space.md,
     borderWidth: 1,
     borderColor: colors.danger,
     gap: space.xs,
@@ -1018,21 +1022,44 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: space.xs,
   },
-  micControlCard: {
-    padding: space.xl,
+  dock: {
+    backgroundColor: colors.surface,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
+  },
+  dockInner: {
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+  },
+  transcriptToggle: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: space.sm,
+    marginBottom: space.xs,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   micStateBox: {
     alignItems: 'center',
-    gap: space.sm,
+    gap: space.xs,
+    paddingTop: space.xs,
+  },
+  micStateBoxStatic: {
+    paddingVertical: space.md,
   },
   speakingBadgeCircle: {
-    width: 68,
-    height: 68,
-    borderRadius: 34,
+    width: 56,
+    height: 56,
+    borderRadius: 28,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: space.xs,
   },
   heroMicButton: {
     width: 76,
@@ -1048,25 +1075,24 @@ const styles = StyleSheet.create({
     backgroundColor: colors.redPressed,
   },
   recordingOrbWrapper: {
-    width: 92,
-    height: 92,
+    width: 88,
+    height: 88,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: space.xs,
   },
   recordingPulseRing: {
     position: 'absolute',
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
     backgroundColor: colors.redSoft,
     borderWidth: 2,
     borderColor: colors.red,
   },
   heroMicButtonRecording: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 70,
+    height: 70,
+    borderRadius: 35,
     backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1080,6 +1106,7 @@ const styles = StyleSheet.create({
     ...type.heading,
     color: colors.red,
     textAlign: 'center',
+    marginBottom: space.xs,
   },
   micStatusSubtext: {
     ...type.caption,
@@ -1088,9 +1115,11 @@ const styles = StyleSheet.create({
     marginBottom: space.xs,
   },
   moderatorBox: {
+    marginTop: space.sm,
+    padding: space.md,
+    borderRadius: radius.md,
     backgroundColor: colors.navySoft,
-    borderColor: colors.navy,
-    gap: space.sm,
+    gap: space.xs,
   },
   moderatorIconRow: {
     flexDirection: 'row',
@@ -1099,43 +1128,26 @@ const styles = StyleSheet.create({
   },
   moderatorTitle: {
     ...type.bodyStrong,
+    fontSize: 14,
     flex: 1,
   },
   moderatorDescription: {
     ...type.caption,
     color: colors.textSecondary,
-    marginBottom: space.xs,
   },
-  transcriptDrawer: {
+  transcriptOverlay: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: space.md,
+    bottom: 0,
     backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
-    maxHeight: 56,
-  },
-  transcriptDrawerExpanded: {
-    maxHeight: 280,
-  },
-  transcriptDrawerHandle: {
-    paddingHorizontal: space.lg,
-    paddingTop: space.sm,
-    paddingBottom: space.md,
-    alignItems: 'center',
-  },
-  drawerHandleBar: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: colors.borderStrong,
-    marginBottom: space.xs,
-  },
-  transcriptHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    width: '100%',
-    maxWidth: 680,
+    borderWidth: 1,
+    borderBottomWidth: 0,
+    borderColor: colors.border,
+    ...shadow.raised,
   },
   transcriptTitleGroup: {
     flexDirection: 'row',
@@ -1161,7 +1173,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
   },
   transcriptScrollContent: {
-    paddingBottom: space.md,
+    paddingVertical: space.md,
     gap: space.sm,
     width: '100%',
     maxWidth: 680,
@@ -1199,17 +1211,5 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.text,
     fontSize: 14,
-  },
-  bottomBar: {
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
-    paddingHorizontal: space.lg,
-    paddingVertical: space.sm,
-  },
-  bottomBarInner: {
-    width: '100%',
-    maxWidth: 680,
-    alignSelf: 'center',
   },
 });

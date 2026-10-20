@@ -58,6 +58,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showReferral, setShowReferral] = useState<boolean>(false);
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -196,6 +197,13 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   const devGoogleEmail = emailSchema.safeParse(values.email);
+  const referralVisible = showReferral || !!values.referralCode || !!errors.referralCode;
+
+  const features = [
+    { icon: 'mic-outline', title: t('auth.feature1Title'), tint: colors.redSoft, color: colors.red },
+    { icon: 'people-outline', title: t('auth.feature2Title'), tint: colors.navySoft, color: colors.navy },
+    { icon: 'analytics-outline', title: t('auth.feature3Title'), tint: colors.redSoft, color: colors.red },
+  ] as const;
 
   return (
     <Screen>
@@ -209,6 +217,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.container}>
+            {/* Compact top bar: back (or logo) + language */}
             <View style={styles.topRow}>
               {navigation.canGoBack() ? (
                 <Pressable
@@ -221,70 +230,19 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text style={styles.backButtonText}>{t('common.back')}</Text>
                 </Pressable>
               ) : (
-                <View />
+                <Logo size={36} withWordmark />
               )}
               <LanguageToggle />
             </View>
 
-            {/* App Branding & Highlights Hero */}
-            <View style={styles.brandContainer}>
-              <Logo size={76} withWordmark />
-              <Badge
-                label={t('auth.badge')}
-                tone="red"
-                style={styles.brandBadge}
-              />
-              <Text style={styles.brandTitle}>{t('auth.brandTitle')}</Text>
-              <Text style={styles.brandSubtitle}>
-                {t('auth.brandSubtitle')}
-              </Text>
-            </View>
-
-            {/* Smart Feature Showcase Cards */}
-            <View style={styles.featuresGrid}>
-              <Card style={styles.featureCard}>
-                <View style={styles.featureIconCircle}>
-                  <Icon name="mic-outline" size={20} color={colors.red} />
-                </View>
-                <View style={styles.featureTextWrapper}>
-                  <Text style={styles.featureTitle}>{t('auth.feature1Title')}</Text>
-                  <Text style={styles.featureDesc}>
-                    {t('auth.feature1Desc')}
-                  </Text>
-                </View>
-              </Card>
-
-              <Card style={styles.featureCard}>
-                <View style={[styles.featureIconCircle, { backgroundColor: colors.navySoft }]}>
-                  <Icon name="people-outline" size={20} color={colors.navy} />
-                </View>
-                <View style={styles.featureTextWrapper}>
-                  <Text style={styles.featureTitle}>{t('auth.feature2Title')}</Text>
-                  <Text style={styles.featureDesc}>
-                    {t('auth.feature2Desc')}
-                  </Text>
-                </View>
-              </Card>
-
-              <Card style={styles.featureCard}>
-                <View style={styles.featureIconCircle}>
-                  <Icon name="analytics-outline" size={20} color={colors.red} />
-                </View>
-                <View style={styles.featureTextWrapper}>
-                  <Text style={styles.featureTitle}>{t('auth.feature3Title')}</Text>
-                  <Text style={styles.featureDesc}>
-                    {t('auth.feature3Desc')}
-                  </Text>
-                </View>
-              </Card>
-            </View>
-
+            {/* Short headline so the form is visible straight away */}
             <View style={styles.headerContainer}>
+              <Badge label={t('auth.badge')} tone="red" style={styles.brandBadge} />
               <Text style={styles.title}>
                 {isLoginMode ? t('auth.loginTitle') : t('auth.registerTitle')}
               </Text>
-              <Text style={styles.subtitle}>
-                {isLoginMode ? t('auth.loginSubtitle') : t('auth.registerSubtitle')}
+              <Text style={styles.subtitle} numberOfLines={2}>
+                {t('auth.brandTitle')}
               </Text>
             </View>
 
@@ -296,42 +254,6 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
             )}
 
             <Card style={styles.formCard}>
-              {/* Google Authentication — Google has already verified the email */}
-              <GoogleSignInButton
-                disabled={isBusy}
-                loading={isGoogleLoading}
-                onIdToken={handleGoogleIdToken}
-                onError={(message) => {
-                  setErrorMessage(message);
-                  setIsGoogleLoading(false);
-                }}
-                devIdentity={
-                  devGoogleEmail.success
-                    ? { email: devGoogleEmail.data, name: values.name.trim() || 'Google Bruker' }
-                    : undefined
-                }
-                style={styles.socialButton}
-              />
-
-              {/* Apple ID Placeholder */}
-              <Button
-                title={t('auth.appleButton')}
-                variant="outline"
-                size="lg"
-                icon="logo-apple"
-                fullWidth
-                disabled={true}
-                onPress={() =>
-                  Alert.alert(t('common.comingSoon'), t('auth.appleComingSoon'))
-                }
-              />
-
-              <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>{t('auth.dividerEmail')}</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
               {!isLoginMode && (
                 <FormField
                   label={t('auth.nameLabel')}
@@ -399,28 +321,44 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   autoCapitalize="none"
                   autoComplete="new-password"
                   textContentType="newPassword"
-                  returnKeyType="next"
-                  onSubmitEditing={() => referralRef.current?.focus()}
+                  returnKeyType={referralVisible ? 'next' : 'go'}
+                  onSubmitEditing={() =>
+                    referralVisible ? referralRef.current?.focus() : handleSubmit()
+                  }
                   editable={!isBusy}
                 />
               )}
 
-              {!isLoginMode && (
-                <FormField
-                  ref={referralRef}
-                  label={t('auth.referralLabel')}
-                  placeholder={t('auth.referralPlaceholder')}
-                  value={values.referralCode}
-                  onChangeText={(text) => setField('referralCode', text)}
-                  onBlur={() => handleBlur('referralCode')}
-                  error={errors.referralCode}
-                  autoCapitalize="characters"
-                  maxLength={8}
-                  returnKeyType="go"
-                  onSubmitEditing={handleSubmit}
-                  editable={!isBusy}
-                />
-              )}
+              {!isLoginMode &&
+                (referralVisible ? (
+                  <FormField
+                    ref={referralRef}
+                    label={t('auth.referralLabel')}
+                    placeholder={t('auth.referralPlaceholder')}
+                    value={values.referralCode}
+                    onChangeText={(text) => setField('referralCode', text)}
+                    onBlur={() => handleBlur('referralCode')}
+                    error={errors.referralCode}
+                    autoCapitalize="characters"
+                    maxLength={8}
+                    returnKeyType="go"
+                    onSubmitEditing={handleSubmit}
+                    editable={!isBusy}
+                  />
+                ) : (
+                  <Pressable
+                    onPress={() => {
+                      setShowReferral(true);
+                      setTimeout(() => referralRef.current?.focus(), 50);
+                    }}
+                    disabled={isBusy}
+                    style={styles.referralToggle}
+                    accessibilityRole="button"
+                  >
+                    <Icon name="gift-outline" size={15} color={colors.navy} />
+                    <Text style={styles.referralToggleText}>{t('auth.haveReferral')}</Text>
+                  </Pressable>
+                ))}
 
               <Button
                 title={isLoginMode ? t('auth.loginButton') : t('auth.registerButton')}
@@ -438,6 +376,47 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   {t('auth.verifyNote')}
                 </Text>
               )}
+
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>{t('auth.or')}</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {/* Social providers side by side — Google has already verified the email */}
+              <View style={styles.socialRow}>
+                <View style={styles.socialItem}>
+                  <GoogleSignInButton
+                    compact
+                    disabled={isBusy}
+                    loading={isGoogleLoading}
+                    onIdToken={handleGoogleIdToken}
+                    onError={(message) => {
+                      setErrorMessage(message);
+                      setIsGoogleLoading(false);
+                    }}
+                    devIdentity={
+                      devGoogleEmail.success
+                        ? { email: devGoogleEmail.data, name: values.name.trim() || 'Google Bruker' }
+                        : undefined
+                    }
+                  />
+                </View>
+                <View style={styles.socialItem}>
+                  <Button
+                    title={t('auth.appleShort')}
+                    variant="outline"
+                    size="md"
+                    icon="logo-apple"
+                    fullWidth
+                    disabled={true}
+                    accessibilityLabel={t('auth.appleButton')}
+                    onPress={() =>
+                      Alert.alert(t('common.comingSoon'), t('auth.appleComingSoon'))
+                    }
+                  />
+                </View>
+              </View>
             </Card>
 
             <Pressable style={styles.switchModeButton} onPress={switchMode} disabled={isBusy}>
@@ -446,25 +425,37 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </Pressable>
 
+            {/* Compact feature strip, below the form */}
+            <View style={styles.featuresRow}>
+              {features.map((f) => (
+                <View key={f.title} style={styles.featureItem}>
+                  <View style={[styles.featureIconCircle, { backgroundColor: f.tint }]}>
+                    <Icon name={f.icon} size={18} color={f.color} />
+                  </View>
+                  <Text style={styles.featureTitle} numberOfLines={2}>
+                    {f.title}
+                  </Text>
+                </View>
+              ))}
+            </View>
+
             {/* Public Legal & How-to Links */}
-            <View style={styles.publicLinksContainer}>
+            <View style={styles.footerLinkRow}>
               <Pressable
                 onPress={() => navigation.navigate('HowTo')}
-                style={({ pressed }) => [styles.publicLinkBtn, pressed && styles.pressed]}
+                style={({ pressed }) => [styles.footerLinkBtn, pressed && styles.pressed]}
               >
-                <Icon name="book-outline" size={16} color={colors.navy} />
-                <Text style={styles.publicLinkText}>{t('nav.howTo')}</Text>
+                <Icon name="book-outline" size={14} color={colors.navy} />
+                <Text style={styles.footerLinkStrong}>{t('nav.howTo')}</Text>
               </Pressable>
-
-              <View style={styles.footerLinkRow}>
-                <Pressable onPress={() => navigation.navigate('Terms')}>
-                  <Text style={styles.footerSubLink}>{t('nav.terms')}</Text>
-                </Pressable>
-                <Text style={styles.footerDot}>•</Text>
-                <Pressable onPress={() => navigation.navigate('PrivacyPolicy')}>
-                  <Text style={styles.footerSubLink}>{t('nav.privacy')}</Text>
-                </Pressable>
-              </View>
+              <Text style={styles.footerDot}>•</Text>
+              <Pressable onPress={() => navigation.navigate('Terms')}>
+                <Text style={styles.footerSubLink}>{t('nav.terms')}</Text>
+              </Pressable>
+              <Text style={styles.footerDot}>•</Text>
+              <Pressable onPress={() => navigation.navigate('PrivacyPolicy')}>
+                <Text style={styles.footerSubLink}>{t('nav.privacy')}</Text>
+              </Pressable>
             </View>
           </View>
         </ScrollView>
@@ -476,19 +467,22 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   scrollContent: {
-    padding: space.lg,
-    paddingBottom: space.xxxl,
+    flexGrow: 1,
+    paddingHorizontal: space.lg,
+    paddingTop: space.sm,
+    paddingBottom: space.xl,
   },
   container: {
     width: '100%',
-    maxWidth: 480,
+    maxWidth: 440,
     alignSelf: 'center',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: space.sm,
+    marginBottom: space.md,
+    minHeight: 40,
   },
   backButton: {
     flexDirection: 'row',
@@ -501,63 +495,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '600',
   },
-  brandContainer: {
-    alignItems: 'center',
-    marginTop: space.sm,
-    marginBottom: space.xl,
-  },
-  brandBadge: {
-    marginTop: space.md,
-    marginBottom: space.sm,
-    alignSelf: 'center',
-  },
-  brandTitle: {
-    ...type.title,
-    textAlign: 'center',
-    marginBottom: space.xs,
-  },
-  brandSubtitle: {
-    ...type.body,
-    textAlign: 'center',
-  },
-  featuresGrid: {
-    gap: space.sm,
-    marginBottom: space.xl,
-  },
-  featureCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.md,
-    padding: space.md,
-  },
-  featureIconCircle: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.redSoft,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureTextWrapper: {
-    flex: 1,
-  },
-  featureTitle: {
-    ...type.bodyStrong,
-  },
-  featureDesc: {
-    ...type.caption,
-    color: colors.textSecondary,
-    marginTop: 1,
-  },
   headerContainer: {
     marginBottom: space.md,
   },
+  brandBadge: {
+    alignSelf: 'flex-start',
+    marginBottom: space.sm,
+  },
   title: {
     ...type.title,
-    marginBottom: 4,
+    marginBottom: 2,
   },
   subtitle: {
-    ...type.body,
+    ...type.caption,
+    color: colors.textSecondary,
   },
   errorBox: {
     flexDirection: 'row',
@@ -577,7 +528,20 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   formCard: {
-    padding: space.xl,
+    padding: space.lg,
+  },
+  referralToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingVertical: space.xs,
+    marginBottom: space.md,
+  },
+  referralToggleText: {
+    color: colors.navy,
+    fontSize: 13,
+    fontWeight: '700',
   },
   submitButton: {
     marginTop: space.xs,
@@ -591,7 +555,7 @@ const styles = StyleSheet.create({
   dividerContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: space.lg,
+    marginVertical: space.md,
   },
   dividerLine: {
     flex: 1,
@@ -602,11 +566,15 @@ const styles = StyleSheet.create({
     ...type.overline,
     marginHorizontal: space.md,
   },
-  socialButton: {
-    marginBottom: space.sm,
+  socialRow: {
+    flexDirection: 'row',
+    gap: space.sm,
+  },
+  socialItem: {
+    flex: 1,
   },
   switchModeButton: {
-    marginTop: space.lg,
+    marginTop: space.md,
     alignItems: 'center',
     paddingVertical: space.sm,
   },
@@ -614,38 +582,56 @@ const styles = StyleSheet.create({
     color: colors.red,
     fontSize: 14,
     fontWeight: '700',
+    textAlign: 'center',
   },
-  publicLinksContainer: {
-    marginTop: space.xl,
-    paddingTop: space.lg,
+  featuresRow: {
+    flexDirection: 'row',
+    gap: space.sm,
+    marginTop: space.lg,
+  },
+  featureItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+  },
+  featureIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  featureTitle: {
+    ...type.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  footerLinkRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: space.sm,
+    marginTop: space.lg,
+    paddingTop: space.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    alignItems: 'center',
-    gap: space.md,
   },
-  publicLinkBtn: {
+  footerLinkBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.sm,
-    backgroundColor: colors.surface,
-    paddingHorizontal: space.lg,
-    paddingVertical: 10,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
+    gap: 4,
+    paddingVertical: 2,
+    borderRadius: radius.sm,
   },
   pressed: {
     backgroundColor: colors.surfaceMuted,
   },
-  publicLinkText: {
+  footerLinkStrong: {
     color: colors.navy,
     fontSize: 13,
     fontWeight: '700',
-  },
-  footerLinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space.sm,
   },
   footerSubLink: {
     ...type.caption,

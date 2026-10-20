@@ -8,9 +8,11 @@ import {
   ActivityIndicator,
   RefreshControl,
   Alert,
+  Modal,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { fetchTopicsAndQuota, startExamSession } from '../api';
+import { fetchLearningProfile, fetchTopicsAndQuota, startExamSession } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
 import type {
@@ -19,6 +21,8 @@ import type {
   ExamTheme,
   RootStackParamList,
 } from '../types/exam';
+import type { LearningInsight } from '../types/learning-profile';
+import { TREND_ICON, TREND_LABEL_KEY } from '../lib/learning-profile-ui';
 import {
   Screen,
   Logo,
@@ -28,8 +32,9 @@ import {
   Button,
   Icon,
   LanguageToggle,
+  type IconName,
 } from '../components/ui';
-import { colors, radius, space, type } from '../theme';
+import { colors, radius, shadow, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamSetup'>;
 
@@ -47,6 +52,9 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
   const [fetchError, setFetchError] = useState<string | null>(null);
+  const [learningInsight, setLearningInsight] = useState<LearningInsight | null>(null);
+  const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const insets = useSafeAreaInsets();
 
   const { user, dailyTestStatus, logout } = useAuth();
   const { t } = useLocale();
@@ -81,6 +89,28 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     loadExamCatalog();
   }, [loadExamCatalog]);
+
+  /**
+   * Small progress summary from the learning profile. Non-blocking: if it fails the card
+   * simply shows the empty hint. Re-fetched on focus so it updates after an exam.
+   */
+  const loadProgress = useCallback(async () => {
+    if (!user) {
+      setLearningInsight(null);
+      return;
+    }
+    try {
+      const res = await fetchLearningProfile();
+      setLearningInsight(res.insight);
+    } catch {
+      // Keep whatever we had; the full profile screen surfaces errors.
+    }
+  }, [user]);
+
+  useEffect(() => {
+    loadProgress();
+    return navigation.addListener('focus', loadProgress);
+  }, [navigation, loadProgress]);
 
   // Themes that have at least one question set for the selected CEFR level (B1 or B2)
   const filteredThemes = useMemo(() => {
@@ -184,13 +214,39 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     return used / dailyTestStatus.totalAllowedToday;
   }, [dailyTestStatus]);
 
+  const selectedTheme = useMemo(
+    () => filteredThemes.find((th) => th.id === selectedThemeId) ?? null,
+    [filteredThemes, selectedThemeId]
+  );
+
+  const selectedThemeDescription =
+    selectedThemeId === 'RANDOM'
+      ? t('setup.randomDesc', { level: targetLevel, count: filteredThemes.length })
+      : selectedTheme
+        ? [selectedTheme.descriptionNo, t('setup.setCount', { count: selectedTheme.setCounts?.[targetLevel] ?? 0 })]
+            .filter(Boolean)
+            .join(' · ')
+        : '';
+
+  const menuItems: { icon: IconName; label: string; color?: string; onPress: () => void }[] = [
+    { icon: 'help-circle-outline', label: t('nav.howTo'), onPress: () => navigation.navigate('HowTo') },
+    { icon: 'gift-outline', label: t('nav.referral'), onPress: () => navigation.navigate('Referral') },
+    { icon: 'star', label: t('setup.a11yUpgrade'), color: colors.gold, onPress: () => navigation.navigate('Subscription') },
+    ...(user
+      ? [{ icon: 'log-out-outline' as IconName, label: t('setup.a11yLogout'), color: colors.red, onPress: logout }]
+      : []),
+  ];
+
+  const stats = learningInsight?.stats;
+  const trend = stats ? TREND_ICON[stats.overallTrend] : null;
+
   return (
     <Screen>
-      {/* Clean Single Top Header */}
+      {/* Compact header: brand + the few actions used most; the rest live in the overflow menu */}
       <View style={styles.header}>
         <View style={styles.brandBlock}>
-          <Logo size={32} withWordmark />
-          <Text style={styles.headerSubtitle}>
+          <Logo size={30} withWordmark />
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
             {t('setup.headerSubtitle')}{user ? ` · ${user.name || user.email.split('@')[0]}` : ''}
           </Text>
         </View>
@@ -216,60 +272,49 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
           <LanguageToggle />
 
-          {user && (
-            <Pressable
-              onPress={() => navigation.navigate('LearningProfile')}
-              style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
-              accessibilityRole="button"
-              accessibilityLabel={t('nav.profile')}
-            >
-              <Icon name="stats-chart-outline" size={19} color={colors.navy} />
-            </Pressable>
-          )}
-
           <Pressable
-            onPress={() => navigation.navigate('HowTo')}
+            onPress={() => setIsMenuOpen(true)}
             style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
             accessibilityRole="button"
-            accessibilityLabel={t('setup.a11yGuide')}
+            accessibilityLabel={t('setup.more')}
           >
-            <Icon name="help-circle-outline" size={20} color={colors.navy} />
+            <Icon name="ellipsis-horizontal" size={19} color={colors.navy} />
           </Pressable>
-
-          <Pressable
-            onPress={() => navigation.navigate('Referral')}
-            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
-            accessibilityRole="button"
-            accessibilityLabel={t('nav.referral')}
-          >
-            <Icon name="gift-outline" size={19} color={colors.navy} />
-          </Pressable>
-
-          <Pressable
-            onPress={() => navigation.navigate('Subscription')}
-            style={({ pressed }) => [
-              styles.iconBtn,
-              { backgroundColor: colors.goldSoft, borderColor: colors.goldSoft },
-              pressed && styles.iconBtnPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={t('setup.a11yUpgrade')}
-          >
-            <Icon name="star" size={18} color={colors.gold} />
-          </Pressable>
-
-          {user && (
-            <Pressable
-              onPress={logout}
-              style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
-              accessibilityRole="button"
-              accessibilityLabel={t('setup.a11yLogout')}
-            >
-              <Icon name="log-out-outline" size={19} color={colors.red} />
-            </Pressable>
-          )}
         </View>
       </View>
+
+      {/* Overflow menu */}
+      <Modal
+        visible={isMenuOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setIsMenuOpen(false)}
+      >
+        <Pressable style={styles.menuBackdrop} onPress={() => setIsMenuOpen(false)}>
+          <View style={[styles.menuCard, { top: insets.top + 56 }]}>
+            {menuItems.map((item, index) => (
+              <Pressable
+                key={item.label}
+                onPress={() => {
+                  setIsMenuOpen(false);
+                  item.onPress();
+                }}
+                style={({ pressed }) => [
+                  styles.menuItem,
+                  index > 0 && styles.menuItemBorder,
+                  pressed && styles.menuItemPressed,
+                ]}
+                accessibilityRole="button"
+              >
+                <Icon name={item.icon} size={18} color={item.color ?? colors.navy} />
+                <Text style={[styles.menuItemText, item.color === colors.red && { color: colors.red }]}>
+                  {item.label}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+        </Pressable>
+      </Modal>
 
       {/* Insufficient Quota Warning Banner */}
       {hasInsufficientQuota && (
@@ -315,8 +360,62 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
           }
         >
           <View style={styles.contentWrapper}>
-            {/* Unified Quota & Daily Tests Stat Card */}
-            <Card style={styles.statsCard}>
+            {/* Progress + quota summary card (tap to open the full learning profile) */}
+            <Card
+              style={styles.statsCard}
+              onPress={user ? () => navigation.navigate('LearningProfile') : undefined}
+              accessibilityLabel={t('profile.seeProgress')}
+            >
+              <View style={styles.progressHeaderRow}>
+                <Text style={styles.statOverline}>{t('setup.progressTitle')}</Text>
+                {user && (
+                  <View style={styles.seeProgressRow}>
+                    <Text style={styles.seeProgressText}>{t('profile.seeProgress')}</Text>
+                    <Icon name="chevron-forward" size={14} color={colors.red} />
+                  </View>
+                )}
+              </View>
+
+              {stats && trend ? (
+                <View style={styles.progressBody}>
+                  <View style={styles.levelBlock}>
+                    <Text style={styles.levelValue}>{stats.currentLevel}</Text>
+                    <Text style={styles.statCaption}>{t('profile.currentLevel')}</Text>
+                  </View>
+                  <View style={styles.readinessBlock}>
+                    <View style={styles.readinessLabelRow}>
+                      <Text style={styles.readinessLabel} numberOfLines={1}>
+                        {t('profile.readiness', { level: stats.targetLevel })}
+                      </Text>
+                      <Text style={styles.readinessLabel}>{stats.readinessPct}%</Text>
+                    </View>
+                    <View style={styles.progressTrack}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          {
+                            width: `${Math.min(100, stats.readinessPct)}%`,
+                            backgroundColor: stats.readinessPct >= 100 ? colors.success : colors.red,
+                          },
+                        ]}
+                      />
+                    </View>
+                    <View style={styles.trendRow}>
+                      <Icon name={trend.name} size={14} color={trend.color} />
+                      <Text style={[styles.trendText, { color: trend.color }]}>
+                        {t(TREND_LABEL_KEY[stats.overallTrend])}
+                      </Text>
+                      <Text style={styles.statCaption}>
+                        {' · '}
+                        {t('profile.average')} {stats.recentAvg.toFixed(1)}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <Text style={styles.progressEmpty}>{t('setup.progressEmpty')}</Text>
+              )}
+
               <View style={styles.statsRow}>
                 <View style={styles.statColumn}>
                   <Text style={styles.statOverline}>{t('setup.quotaOverline')}</Text>
@@ -328,19 +427,30 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                   >
                     {formattedQuota}
                   </Text>
-                  <Text style={styles.statCaption}>{t('setup.quotaCaption')}</Text>
                 </View>
 
                 <View style={styles.statDivider} />
 
                 <View style={styles.statColumn}>
                   <Text style={styles.statOverline}>{t('setup.dailyOverline')}</Text>
-                  <Text style={styles.statValue}>
-                    {dailyTestStatus
-                      ? `${dailyTestStatus.testsUsedToday} / ${dailyTestStatus.totalAllowedToday}`
-                      : '--'}
-                  </Text>
-                  <Text style={styles.statCaption}>
+                  <View style={styles.dailyRow}>
+                    <Text style={styles.statValue}>
+                      {dailyTestStatus
+                        ? `${dailyTestStatus.testsUsedToday} / ${dailyTestStatus.totalAllowedToday}`
+                        : '--'}
+                    </Text>
+                    {dailyTestStatus && (
+                      <View style={[styles.progressTrack, styles.dailyTrack]}>
+                        <View
+                          style={[
+                            styles.progressFill,
+                            { width: `${Math.round(dailyProgressRatio * 100)}%` },
+                          ]}
+                        />
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.statCaption} numberOfLines={1}>
                     {dailyTestStatus
                       ? dailyTestStatus.remainingToday > 0
                         ? t('setup.remainingToday', { count: dailyTestStatus.remainingToday })
@@ -353,31 +463,16 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               </View>
 
-              {dailyTestStatus && (
-                <View style={styles.progressSection}>
-                  <View style={styles.progressTrack}>
-                    <View
-                      style={[
-                        styles.progressFill,
-                        { width: `${Math.round(dailyProgressRatio * 100)}%` },
-                      ]}
-                    />
-                  </View>
-
-                  {dailyTestStatus.remainingToday === 0 && (
-                    <View style={styles.unlockRow}>
-                      <Text style={styles.unlockHint}>
-                        {t('setup.limitReachedHint')}
-                      </Text>
-                      <Button
-                        title={t('setup.unlockMore')}
-                        variant="gold"
-                        size="sm"
-                        icon="star"
-                        onPress={() => navigation.navigate('Subscription')}
-                      />
-                    </View>
-                  )}
+              {dailyTestStatus && dailyTestStatus.remainingToday === 0 && (
+                <View style={styles.unlockRow}>
+                  <Text style={styles.unlockHint}>{t('setup.limitReachedHint')}</Text>
+                  <Button
+                    title={t('setup.unlockMore')}
+                    variant="gold"
+                    size="sm"
+                    icon="star"
+                    onPress={() => navigation.navigate('Subscription')}
+                  />
                 </View>
               )}
             </Card>
@@ -398,6 +493,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                       onPress={() => setTargetLevel(level)}
                       accessibilityRole="button"
                       accessibilityState={{ selected: isSelected }}
+                      accessibilityHint={level === 'B1' ? t('setup.levelB1Desc') : t('setup.levelB2Desc')}
                     >
                       <Text
                         style={[
@@ -412,6 +508,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                           styles.segmentSubtitle,
                           isSelected && styles.segmentSubtitleSelected,
                         ]}
+                        numberOfLines={1}
                       >
                         {level === 'B1' ? t('setup.levelB1Desc') : t('setup.levelB2Desc')}
                       </Text>
@@ -424,74 +521,60 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             {/* Section 2: Practice Mode Selector */}
             <View style={styles.section}>
               <Text style={styles.sectionOverline}>{t('setup.step2')}</Text>
-
-              {/* AI_PEER Card */}
-              <Card
-                selected={practiceMode === 'AI_PEER'}
-                onPress={() => setPracticeMode('AI_PEER')}
-                style={styles.modeCard}
-              >
-                <View style={styles.modeCardHeader}>
-                  <View
-                    style={[
-                      styles.radioOuter,
-                      practiceMode === 'AI_PEER' && styles.radioOuterSelected,
-                    ]}
-                  >
-                    {practiceMode === 'AI_PEER' && <View style={styles.radioInner} />}
-                  </View>
-                  <View style={styles.modeTitleContainer}>
-                    <Text style={styles.modeCardTitle}>
-                      {t('setup.aiPeerTitle')}
-                    </Text>
-                    <Badge
-                      label={t('setup.aiPeerBadge')}
-                      tone="red"
-                      style={styles.modeBadge}
-                    />
-                  </View>
-                </View>
-                <Text style={styles.modeCardDescription}>
-                  {t('setup.aiPeerDesc')}
-                </Text>
-              </Card>
-
-              {/* HUMAN_LOCAL Card */}
-              <Card
-                selected={practiceMode === 'HUMAN_LOCAL'}
-                onPress={() => setPracticeMode('HUMAN_LOCAL')}
-                style={styles.modeCard}
-              >
-                <View style={styles.modeCardHeader}>
-                  <View
-                    style={[
-                      styles.radioOuter,
-                      practiceMode === 'HUMAN_LOCAL' && styles.radioOuterSelected,
-                    ]}
-                  >
-                    {practiceMode === 'HUMAN_LOCAL' && <View style={styles.radioInner} />}
-                  </View>
-                  <View style={styles.modeTitleContainer}>
-                    <Text style={styles.modeCardTitle}>
-                      {t('setup.humanTitle')}
-                    </Text>
-                    <Badge
-                      label={t('setup.humanBadge')}
-                      tone="navy"
-                      style={styles.modeBadge}
-                    />
-                  </View>
-                </View>
-                <Text style={styles.modeCardDescription}>
-                  {t('setup.humanDesc')}
-                </Text>
-              </Card>
+              <View style={styles.segmentedControl}>
+                {(
+                  [
+                    { mode: 'AI_PEER', icon: 'sparkles-outline', label: t('setup.aiPeerShort'), a11y: t('setup.aiPeerTitle') },
+                    { mode: 'HUMAN_LOCAL', icon: 'people-outline', label: t('setup.humanShort'), a11y: t('setup.humanTitle') },
+                  ] as const
+                ).map((opt) => {
+                  const isSelected = practiceMode === opt.mode;
+                  return (
+                    <Pressable
+                      key={opt.mode}
+                      style={[
+                        styles.segmentOption,
+                        styles.segmentOptionRow,
+                        isSelected && styles.segmentOptionSelected,
+                      ]}
+                      onPress={() => setPracticeMode(opt.mode)}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: isSelected }}
+                      accessibilityLabel={opt.a11y}
+                    >
+                      <Icon
+                        name={opt.icon}
+                        size={17}
+                        color={isSelected ? colors.white : colors.navy}
+                      />
+                      <Text
+                        style={[
+                          styles.segmentModeTitle,
+                          isSelected && styles.segmentTitleSelected,
+                        ]}
+                        numberOfLines={1}
+                      >
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <View style={styles.modeHintRow}>
+                <Badge
+                  label={practiceMode === 'AI_PEER' ? t('setup.aiPeerBadge') : t('setup.humanBadge')}
+                  tone={practiceMode === 'AI_PEER' ? 'red' : 'navy'}
+                />
+              </View>
+              <Text style={styles.modeCardDescription} numberOfLines={3}>
+                {practiceMode === 'AI_PEER' ? t('setup.aiPeerDesc') : t('setup.humanDesc')}
+              </Text>
             </View>
 
-            {/* Section 3: Theme Selection */}
+            {/* Section 3: Theme Selection (horizontal carousel) */}
             <View style={styles.section}>
               <View style={styles.topicSectionHeader}>
-                <Text style={styles.sectionOverline}>{t('setup.step3')}</Text>
+                <Text style={[styles.sectionOverline, styles.noMargin]}>{t('setup.step3')}</Text>
                 <Text style={styles.topicCounter}>
                   {t('setup.themesForLevel', { count: filteredThemes.length, level: targetLevel })}
                 </Text>
@@ -505,60 +588,65 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                 </Card>
               ) : (
                 <>
-                  {/* Random Exam Option (Default) */}
-                  <Card
-                    selected={selectedThemeId === 'RANDOM'}
-                    onPress={() => setSelectedThemeId('RANDOM')}
-                    style={styles.topicCard}
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.themeScroller}
+                    contentContainerStyle={styles.themeRow}
                   >
-                    <View style={styles.topicCardTop}>
-                      <Badge label={t('setup.randomBadge')} tone="solidRed" icon="shuffle" />
-                      <Text style={styles.topicCardTitle}>
+                    <Card
+                      selected={selectedThemeId === 'RANDOM'}
+                      onPress={() => setSelectedThemeId('RANDOM')}
+                      style={styles.themeChip}
+                      accessibilityLabel={t('setup.randomTitle')}
+                    >
+                      <View style={styles.themeChipTop}>
+                        <Icon name="shuffle" size={18} color={colors.red} />
+                        {selectedThemeId === 'RANDOM' && (
+                          <Icon name="checkmark-circle" size={18} color={colors.red} />
+                        )}
+                      </View>
+                      <Text style={styles.themeChipTitle} numberOfLines={2}>
                         {t('setup.randomTitle')}
                       </Text>
-                      {selectedThemeId === 'RANDOM' && (
-                        <Icon name="checkmark-circle" size={22} color={colors.red} />
-                      )}
-                    </View>
+                      <Text style={styles.themeChipMeta} numberOfLines={1}>
+                        {t('setup.themesForLevel', { count: filteredThemes.length, level: targetLevel })}
+                      </Text>
+                    </Card>
 
-                    <Text style={styles.topicCardPreview}>
-                      {t('setup.randomDesc', { level: targetLevel, count: filteredThemes.length })}
-                    </Text>
-                  </Card>
-
-                  {filteredThemes.map((theme) => {
-                    const isSelected = selectedThemeId === theme.id;
-                    const setCount = theme.setCounts?.[targetLevel] ?? 0;
-                    return (
-                      <Card
-                        key={theme.id}
-                        selected={isSelected}
-                        onPress={() => setSelectedThemeId(theme.id)}
-                        style={styles.topicCard}
-                      >
-                        <View style={styles.topicCardTop}>
-                          <Badge label={targetLevel} tone="navy" />
-                          <Text style={styles.topicCardTitle}>{theme.titleNo}</Text>
-                          {isSelected && (
-                            <Icon name="checkmark-circle" size={22} color={colors.red} />
-                          )}
-                        </View>
-
-                        {!!theme.descriptionNo && (
-                          <Text
-                            style={styles.topicCardPreview}
-                            numberOfLines={3}
-                            ellipsizeMode="tail"
-                          >
-                            {theme.descriptionNo}
+                    {filteredThemes.map((theme) => {
+                      const isSelected = selectedThemeId === theme.id;
+                      const setCount = theme.setCounts?.[targetLevel] ?? 0;
+                      return (
+                        <Card
+                          key={theme.id}
+                          selected={isSelected}
+                          onPress={() => setSelectedThemeId(theme.id)}
+                          style={styles.themeChip}
+                          accessibilityLabel={theme.titleNo}
+                        >
+                          <View style={styles.themeChipTop}>
+                            <Badge label={targetLevel} tone="navy" />
+                            {isSelected && (
+                              <Icon name="checkmark-circle" size={18} color={colors.red} />
+                            )}
+                          </View>
+                          <Text style={styles.themeChipTitle} numberOfLines={2}>
+                            {theme.titleNo}
                           </Text>
-                        )}
-                        <Text style={styles.topicCounter}>
-                          {t('setup.setCount', { count: setCount })}
-                        </Text>
-                      </Card>
-                    );
-                  })}
+                          <Text style={styles.themeChipMeta} numberOfLines={1}>
+                            {t('setup.setCountShort', { count: setCount })}
+                          </Text>
+                        </Card>
+                      );
+                    })}
+                  </ScrollView>
+
+                  {!!selectedThemeDescription && (
+                    <Text style={styles.themeDescription} numberOfLines={3}>
+                      {selectedThemeDescription}
+                    </Text>
+                  )}
                 </>
               )}
             </View>
@@ -591,7 +679,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: space.lg,
-    paddingVertical: space.md,
+    paddingVertical: space.sm,
     backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
@@ -599,18 +687,15 @@ const styles = StyleSheet.create({
   },
   brandBlock: {
     flexShrink: 1,
-    minWidth: 128,
+    minWidth: 120,
   },
   headerSubtitle: {
     ...type.caption,
-    marginTop: 2,
+    marginTop: 1,
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    // Wrap onto a second row on narrow phones instead of squashing the logo.
-    flexShrink: 1,
-    flexWrap: 'wrap',
     justifyContent: 'flex-end',
     gap: 6,
   },
@@ -626,6 +711,38 @@ const styles = StyleSheet.create({
   },
   iconBtnPressed: {
     backgroundColor: colors.navySoft,
+  },
+  menuBackdrop: {
+    flex: 1,
+  },
+  menuCard: {
+    position: 'absolute',
+    right: space.lg,
+    minWidth: 220,
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingVertical: space.xs,
+    ...shadow.raised,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.md,
+  },
+  menuItemBorder: {
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  menuItemPressed: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  menuItemText: {
+    ...type.bodyStrong,
+    fontSize: 14,
   },
   warningBanner: {
     flexDirection: 'row',
@@ -648,7 +765,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: space.lg,
-    paddingBottom: space.xxl,
+    paddingBottom: space.lg,
   },
   contentWrapper: {
     width: '100%',
@@ -656,39 +773,100 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
   },
   statsCard: {
-    marginBottom: space.xl,
+    marginBottom: space.lg,
+    padding: space.md,
+    gap: space.sm,
+  },
+  progressHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  seeProgressRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 2,
+  },
+  seeProgressText: {
+    color: colors.red,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressBody: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  levelBlock: {
+    alignItems: 'center',
+    minWidth: 64,
+  },
+  levelValue: {
+    ...type.title,
+    fontWeight: '800',
+  },
+  readinessBlock: {
+    flex: 1,
+    gap: 4,
+  },
+  readinessLabelRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: space.sm,
+  },
+  readinessLabel: {
+    ...type.caption,
+    color: colors.text,
+    fontWeight: '700',
+  },
+  trendRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trendText: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  progressEmpty: {
+    ...type.caption,
+    color: colors.textSecondary,
   },
   statsRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    paddingTop: space.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
   },
   statColumn: {
     flex: 1,
   },
   statDivider: {
     width: 1,
-    height: 44,
+    height: 36,
     backgroundColor: colors.border,
-    marginHorizontal: space.lg,
+    marginHorizontal: space.md,
   },
   statOverline: {
     ...type.overline,
     marginBottom: 2,
   },
   statValue: {
-    ...type.title,
+    ...type.heading,
     fontWeight: '800',
   },
   statCaption: {
     ...type.caption,
-    marginTop: 2,
+    fontSize: 12,
   },
-  progressSection: {
-    marginTop: space.md,
-    paddingTop: space.md,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+  dailyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: space.sm,
+  },
+  dailyTrack: {
+    flex: 1,
   },
   progressTrack: {
     height: 6,
@@ -706,7 +884,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     gap: space.sm,
-    marginTop: 4,
   },
   unlockHint: {
     ...type.caption,
@@ -714,12 +891,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   section: {
-    marginBottom: space.xl,
+    marginBottom: space.lg,
   },
   sectionOverline: {
     ...type.overline,
     color: colors.navy,
     marginBottom: space.sm,
+  },
+  noMargin: {
+    marginBottom: 0,
   },
   segmentedControl: {
     flexDirection: 'row',
@@ -733,24 +913,35 @@ const styles = StyleSheet.create({
   segmentOption: {
     flex: 1,
     borderRadius: radius.md,
-    paddingVertical: 14,
-    paddingHorizontal: space.md,
+    paddingVertical: 8,
+    paddingHorizontal: space.sm,
     alignItems: 'center',
+    justifyContent: 'center',
+  },
+  segmentOptionRow: {
+    flexDirection: 'row',
+    gap: 6,
+    paddingVertical: 11,
   },
   segmentOptionSelected: {
     backgroundColor: colors.red,
   },
   segmentTitle: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '800',
     color: colors.text,
-    marginBottom: 2,
+  },
+  segmentModeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: colors.text,
+    flexShrink: 1,
   },
   segmentTitleSelected: {
     color: colors.white,
   },
   segmentSubtitle: {
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
     color: colors.textSecondary,
     textAlign: 'center',
@@ -758,49 +949,14 @@ const styles = StyleSheet.create({
   segmentSubtitleSelected: {
     color: colors.white,
   },
-  modeCard: {
-    marginBottom: space.md,
-  },
-  modeCardHeader: {
+  modeHintRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: space.xs,
-  },
-  radioOuter: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: colors.borderStrong,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
-    marginRight: 10,
-    backgroundColor: colors.surface,
-  },
-  radioOuterSelected: {
-    borderColor: colors.red,
-  },
-  radioInner: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.red,
-  },
-  modeTitleContainer: {
-    flex: 1,
-  },
-  modeCardTitle: {
-    ...type.bodyStrong,
-  },
-  modeBadge: {
-    marginTop: 6,
+    marginTop: space.sm,
   },
   modeCardDescription: {
     ...type.caption,
     color: colors.textSecondary,
-    paddingLeft: 30,
-    marginTop: 4,
+    marginTop: 6,
   },
   topicSectionHeader: {
     flexDirection: 'row',
@@ -818,23 +974,39 @@ const styles = StyleSheet.create({
   emptyTopicsText: {
     ...type.body,
   },
-  topicCard: {
-    marginBottom: space.md,
+  themeScroller: {
+    // Let the carousel run edge to edge inside the padded scroll view.
+    marginHorizontal: -space.lg,
   },
-  topicCardTop: {
+  themeRow: {
+    paddingHorizontal: space.lg,
+    gap: space.sm,
+  },
+  themeChip: {
+    width: 158,
+    padding: space.md,
+    gap: 6,
+  },
+  themeChipTop: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: space.sm,
-    marginBottom: space.xs,
+    justifyContent: 'space-between',
+    minHeight: 22,
   },
-  topicCardTitle: {
-    ...type.heading,
-    fontSize: 16,
-    flex: 1,
-  },
-  topicCardPreview: {
-    ...type.body,
+  themeChipTitle: {
+    ...type.bodyStrong,
     fontSize: 14,
+    lineHeight: 19,
+    minHeight: 38,
+  },
+  themeChipMeta: {
+    ...type.caption,
+    fontSize: 12,
+  },
+  themeDescription: {
+    ...type.caption,
+    color: colors.textSecondary,
+    marginTop: space.sm,
   },
   footer: {
     paddingHorizontal: space.lg,

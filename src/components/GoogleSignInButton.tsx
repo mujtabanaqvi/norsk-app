@@ -29,6 +29,8 @@ interface GoogleSignInButtonProps {
   onError: (message: string) => void;
   /** Dev-only: build an unsigned token when no client ID is configured. */
   devIdentity?: { email: string; name: string };
+  /** Short label and medium size, for placing next to another provider button. */
+  compact?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -37,6 +39,7 @@ const OAuthGoogleButton: React.FC<GoogleSignInButtonProps> = ({
   loading,
   onIdToken,
   onError,
+  compact,
   style,
 }) => {
   const { t } = useLocale();
@@ -59,9 +62,9 @@ const OAuthGoogleButton: React.FC<GoogleSignInButtonProps> = ({
 
   return (
     <Button
-      title={t('auth.googleButton')}
+      title={compact ? t('auth.googleShort') : t('auth.googleButton')}
       variant="outline"
-      size="lg"
+      size={compact ? 'md' : 'lg'}
       leading={<GoogleIcon size={20} />}
       fullWidth
       loading={loading}
@@ -82,9 +85,12 @@ export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = (props) => 
   // server accepts only when it has no Google client IDs configured either.
   return (
     <Button
-      title={__DEV__ ? `${t('auth.googleButton')} (dev)` : t('auth.googleButton')}
+      title={(() => {
+        const label = props.compact ? t('auth.googleShort') : t('auth.googleButton');
+        return __DEV__ ? `${label} (dev)` : label;
+      })()}
       variant="outline"
-      size="lg"
+      size={props.compact ? 'md' : 'lg'}
       leading={<GoogleIcon size={20} />}
       fullWidth
       loading={props.loading}

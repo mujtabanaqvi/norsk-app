@@ -1,18 +1,18 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import type { AssessedLevel, RootStackParamList } from '../types/exam';
+import type { RootStackParamList } from '../types/exam';
 import {
   CRITERION_KEYS,
   type ExamHistoryItem,
   type LearningInsight,
   type LearningProfileResponse,
-  type Trend,
 } from '../types/learning-profile';
 import { fetchLearningProfile } from '../api';
 import { useLocale } from '../hooks/useLocale';
 import { LOCALE_TAGS } from '../i18n';
-import { Screen, AppHeader, Card, Badge, Button, Icon, type IconName, type BadgeTone } from '../components/ui';
+import { Screen, AppHeader, Card, Badge, Button, Icon } from '../components/ui';
+import { LEVEL_TONE, TREND_ICON, TREND_LABEL_KEY } from '../lib/learning-profile-ui';
 import { colors, radius, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'LearningProfile'>;
@@ -20,19 +20,6 @@ type Props = NativeStackScreenProps<RootStackParamList, 'LearningProfile'>;
 /** While an exam is still being assessed, re-check so the new result and summary appear. */
 const PENDING_POLL_MS = 5_000;
 const PENDING_POLL_MAX = 36;
-
-const LEVEL_TONE: Record<AssessedLevel, BadgeTone> = {
-  'Under B1': 'warning',
-  B1: 'navy',
-  B2: 'success',
-  'Over B2': 'gold',
-};
-
-const TREND_ICON: Record<Trend, { name: IconName; color: string }> = {
-  up: { name: 'trending-up', color: colors.success },
-  down: { name: 'trending-down', color: colors.danger },
-  flat: { name: 'remove', color: colors.textMuted },
-};
 
 function scoreColor(score: number): string {
   if (score >= 8) return colors.success;
@@ -213,9 +200,7 @@ export const LearningProfileScreen: React.FC<Props> = ({ navigation }) => {
   function StatusHero({ insight }: { insight: LearningInsight }) {
     const { stats } = insight;
     const trend = TREND_ICON[stats.overallTrend];
-    const trendLabel = t(
-      stats.overallTrend === 'up' ? 'profile.trendUp' : stats.overallTrend === 'down' ? 'profile.trendDown' : 'profile.trendFlat'
-    );
+    const trendLabel = t(TREND_LABEL_KEY[stats.overallTrend]);
     return (
       <Card style={styles.hero}>
         <Text style={styles.overline}>{t('profile.standTitle')}</Text>
