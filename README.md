@@ -1,7 +1,7 @@
 # Norskprøven Muntlig B1/B2 Practice Simulator
 **Next.js 16 Turn-Based Voice Pipeline & Expo Go Mobile Client**
 
-This repository contains the full-stack infrastructure and cross-platform mobile client for the **Norskprøven Muntlig B1/B2 Oral Exam Simulator**. It simulates the official Norwegian Directorate for Higher Education and Skills (**HK-dir**) oral examination through a deterministic exam state machine (`DEL1_MONOLOGUE` → `DEL2_AI` / `DEL2_HUMAN` → `DEL3` → `DONE`), dual AI personas (Examiner Sensor + Peer Co-Candidate), OpenAI speech-to-text & conversational LLM, ElevenLabs text-to-speech, automated CEFR rubric grading, and an **Expo Go**-compatible mobile & web client.
+This repository contains the full-stack infrastructure and cross-platform mobile client for the **Norskprøven Muntlig B1/B2 Oral Exam Simulator**. It simulates the official Norwegian Directorate for Higher Education and Skills (**HK-dir**) oral examination through a deterministic exam state machine (`DEL1_MONOLOGUE` → `DEL2_AI` / `DEL2_HUMAN` → `DEL3` → `DONE`), dual AI personas (Examiner Sensor + Peer Co-Candidate), switchable AI providers (Azure AI Foundry: Azure OpenAI + Azure AI Speech, or OpenAI + ElevenLabs), automated CEFR rubric grading, and an **Expo Go**-compatible mobile & web client.
 
 ---
 
@@ -20,7 +20,18 @@ This repository contains the full-stack infrastructure and cross-platform mobile
 - **Deterministic Turn-Based Voice Pipeline (`src/server/*`)**:
   - `src/server/exam-engine.ts`: Pure deterministic state machine orchestrating `DEL1_MONOLOGUE`, `DEL2_AI` (5 debate turns with AI co-candidate), `DEL2_HUMAN` (local partner discussion), `DEL3` (follow-up questions from session question set), and `DONE`.
   - `src/server/personas.ts`: Builds Examiner and AI Co-Candidate system prompts tailored to B1/B2 CEFR targets and generates concise spoken Norwegian responses via `gpt-4.1-mini`.
-  - `src/server/speech.ts`: Transcribes candidate audio via OpenAI `/v1/audio/transcriptions` (`gpt-4o-transcribe`, `language: 'no'`) and streams synthesized speech via ElevenLabs (`eleven_multilingual_v2`) with automatic OpenAI `gpt-4o-mini-tts` fallback.
+  - `src/server/speech.ts`: Transcribes candidate audio with the provider selected by `STT_PROVIDER`: Azure AI Speech fast transcription (`nb-NO`), Azure OpenAI Whisper, or OpenAI `gpt-4o-transcribe`. 429/503 errors are retried with backoff. Streams synthesized speech via Azure AI Speech neural voices (`AI_PROVIDER=azure`) or ElevenLabs (`eleven_multilingual_v2`) with OpenAI `gpt-4o-mini-tts` fallback (`AI_PROVIDER=openai`).
+  - `src/server/ai-provider.ts`: Resolves models, deployments and endpoints for each provider. Azure AI Speech automatically uses the Foundry resource endpoint and key, so no region needs to be configured.
+
+### Provider Matrix
+| Workload | `AI_PROVIDER=azure` (Azure AI Foundry) | `AI_PROVIDER=openai` |
+|---|---|---|
+| Conversation LLM | Azure OpenAI deployment (`AZURE_OPENAI_CHAT_DEPLOYMENT`) | `OPENAI_CHAT_MODEL` |
+| Evaluation LLM | Azure OpenAI deployment (`AZURE_OPENAI_EVAL_DEPLOYMENT`) | `OPENAI_EVAL_MODEL` |
+| Text-to-speech | Azure AI Speech (`nb-NO-PernilleNeural` / `nb-NO-FinnNeural`) | ElevenLabs → OpenAI TTS fallback |
+| Speech-to-text | `STT_PROVIDER=azure-speech` (recommended, 600 RPM) or `azure-openai` (Whisper, 3 RPM). Unset → `azure-openai` | `openai` (default) |
+
+`STT_PROVIDER` can be combined freely with either `AI_PROVIDER`. See [docs/AZURE_AI_FOUNDRY_SETUP.md](docs/AZURE_AI_FOUNDRY_SETUP.md).
 - **Post-Exam CEFR Rubric Grading (`src/lib/evaluate-exam.ts`)**:
   - Scores candidate performance against 4 official HK-dir criteria (*Formidling & flyt*, *Uttale & forståelighet*, *Ordforråd*, *Grammatikk & setningsstruktur*) using OpenAI `gpt-4o` scheduled via Next.js `after()`, evaluating the candidate against the exact Del 1 monologue, Del 2 discussion, and randomly chosen Del 3 follow-up questions for their session.
 
@@ -48,8 +59,12 @@ OPENAI_API_KEY=sk-your-openai-api-key
 # AZURE_OPENAI_API_KEY=your-azure-api-key
 # AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4.1-mini
 # AZURE_OPENAI_EVAL_DEPLOYMENT=gpt-4.1
-# AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper
+# AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper   # only for STT_PROVIDER=azure-openai
 # AZURE_OPENAI_API_VERSION=2024-10-21
+
+# Speech-to-text switch ('azure-speech' | 'azure-openai' | 'openai'; unset follows AI_PROVIDER)
+# STT_PROVIDER=azure-speech
+# Azure AI Speech uses the Foundry key/resource above. AZURE_SPEECH_KEY / AZURE_SPEECH_REGION are optional overrides.
 
 ELEVEN_API_KEY=your-elevenlabs-api-key
 ELEVEN_EXAMINER_VOICE_ID=21m00Tcm4TlvDq8ikWAM
@@ -116,7 +131,8 @@ npm test
 │   ├── server/                                # Backend Exam Pipeline
 │   │   ├── exam-engine.ts                     # Deterministic DEL1 -> DEL2 -> DEL3 -> DONE engine
 │   │   ├── personas.ts                        # Examiner & Co-Candidate prompts & LLM generator
-│   │   └── speech.ts                          # OpenAI STT & ElevenLabs/OpenAI TTS streaming
+│   │   ├── ai-provider.ts                     # Provider switches (AI_PROVIDER, STT_PROVIDER) & endpoint resolution
+│   │   └── speech.ts                          # STT (Azure Speech / Whisper / OpenAI) & TTS (Azure Speech / ElevenLabs / OpenAI)
 │   ├── db/                                    # Database client & schema definitions
 │   │   ├── index.ts                           # Shared Neon PostgreSQL client
 │   │   ├── schema.ts                          # exam_topics, user_quotas, exam_sessions, usage_ledger

@@ -101,7 +101,7 @@ Processes a candidate turn during an active exam session. Accepts either:
 ---
 
 ## 4. `GET /api/exam/[sessionId]/speech/[turnIndex]`
-Streams synthesized `audio/mpeg` for the specified transcript entry index (`turnIndex`) using ElevenLabs (`eleven_multilingual_v2`) with automatic fallback to OpenAI `gpt-4o-mini-tts`. Uses role-specific voices (`EXAMINER` vs `AI_CO_CANDIDATE`).
+Streams synthesized `audio/mpeg` for the specified transcript entry index (`turnIndex`). With `AI_PROVIDER=azure` it uses Azure AI Speech neural voices (`nb-NO-PernilleNeural` / `nb-NO-FinnNeural`) through the Foundry resource endpoint, with no fallback. With `AI_PROVIDER=openai` it uses ElevenLabs (`eleven_multilingual_v2`) and falls back automatically to OpenAI `gpt-4o-mini-tts`. Uses role-specific voices (`EXAMINER` vs `AI_CO_CANDIDATE`).
 
 ---
 

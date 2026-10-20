@@ -15,10 +15,16 @@ Computed by [`lib/cost-calculator.ts`](../lib/cost-calculator.ts) during exam tu
 | :--- | :--- | :--- | :--- | :--- |
 | **OpenAI** | `gpt-4.1-mini` (Prompt) | 1 Token | **\$0.00000015** | `tokens * (0.15 / 1,000,000)` |
 | **OpenAI** | `gpt-4.1-mini` (Completion) | 1 Token | **\$0.00000060** | `tokens * (0.60 / 1,000,000)` |
-| **OpenAI** | `gpt-4o-transcribe` (Norwegian STT) | 1 Audio Second | **\$0.00010000** | `seconds * (0.006 / 60)` |
-| **ElevenLabs** | `eleven_multilingual_v2` (Norwegian TTS) | 1 Character | **\$0.00015000** | `characters * (0.15 / 1,000)` |
+| **OpenAI / Azure OpenAI Whisper** | `gpt-4o-transcribe` / `whisper` (Norwegian STT, `STT_PROVIDER=openai` or `azure-openai`) | 1 Audio Second | **\$0.00010000** | `seconds * (0.006 / 60)` |
+| **Azure AI Speech** | Fast transcription `nb-NO` (`STT_PROVIDER=azure-speech`) | 1 Audio Second | **\$0.00010000** | `seconds * (0.36 / 3,600)` ¹ |
+| **ElevenLabs** | `eleven_multilingual_v2` (Norwegian TTS) | 1 Character | **\$0.00007500** | `characters * (0.075 / 1,000)` ² |
 
-$$\text{Cost}_{\text{session}} = (T_{\text{prompt}} \times 0.00000015) + (T_{\text{comp}} \times 0.00000060) + (C_{\text{tts}} \times 0.00015) + (S_{\text{audio}} \times 0.00010)$$
+$$\text{Cost}_{\text{session}} = (T_{\text{prompt}} \times 0.00000015) + (T_{\text{comp}} \times 0.00000060) + (C_{\text{tts}} \times 0.000075) + (S_{\text{audio}} \times R_{\text{stt}})$$
+
+$R_{\text{stt}}$ is chosen at runtime from the active `STT_PROVIDER` (see `sttRatePerSecond()` in `lib/cost-calculator.ts`).
+
+¹ About \$0.36 per audio hour. Published figures vary, so check the [Azure Speech pricing page](https://azure.microsoft.com/pricing/details/speech/) and update `PRICING_RATES.AZURE_SPEECH_FAST_STT_PER_SECOND` if needed.
+² The calculator always uses the ElevenLabs character rate and the GPT-4.1-mini token rates, even with `AI_PROVIDER=azure`. Azure AI Speech neural TTS costs about \$15 per 1M characters, and Azure OpenAI pricing depends on the deployed model. Treat Azure session costs as estimates.
 
 ### 1.2 Post-Exam CEFR Rubric Evaluation (`POST_EXAM_RUBRIC_EVAL`)
 Computed by [`src/lib/evaluate-exam.ts`](../src/lib/evaluate-exam.ts) when grading the transcript with OpenAI `gpt-4o`:

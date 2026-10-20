@@ -1,158 +1,155 @@
 # Azure AI Foundry Setup & Configuration Guide
 
-This guide walks you through setting up an **Azure AI Foundry** project (formerly Azure AI Studio) to power all AI workloads for the Norwegian Oral Exam Simulator:
-- **Conversation LLM** (Sensor & AI Co-candidate dialogue)
-- **Rubric Evaluator** (Post-exam structured evaluation)
-- **Speech-to-Text (STT)** (Whisper audio transcription)
-- *(Optional)* **Azure AI Speech** (Norwegian neural TTS voices)
+This guide sets up an **Azure AI Foundry** resource to run every AI workload in the Norwegian Oral Exam Simulator. You only need one resource and one key:
+
+| Workload | Azure service | Selected by |
+|---|---|---|
+| Conversation LLM (Sensor & AI co-candidate) | Azure OpenAI deployment (e.g. `gpt-5.4-mini`) | `AI_PROVIDER=azure` |
+| Rubric evaluation | Azure OpenAI deployment (e.g. `gpt-5`) | `AI_PROVIDER=azure` |
+| Text-to-speech (Norwegian neural voices) | Azure AI Speech | `AI_PROVIDER=azure` |
+| Speech-to-text (candidate answers) | **Azure AI Speech fast transcription** (recommended) or an Azure OpenAI Whisper deployment | `STT_PROVIDER` |
+
+Azure AI Speech is part of Foundry Tools. A Foundry (AI Services) resource includes it automatically, so you don't need a separate Speech resource, key or region.
 
 ---
 
 ## 1. Prerequisites
-- An active **Microsoft Azure subscription** (free trial, pay-as-you-go, or enterprise/startup credits).
-- Appropriate permissions (`Contributor` or `Cognitive Services OpenAI Contributor`) on your target Azure Resource Group.
+- An active **Microsoft Azure subscription**.
+- `Contributor` or `Cognitive Services OpenAI Contributor` on the target resource group.
 
 ---
 
-## 2. Step 1: Create an Azure AI Foundry Project
+## 2. Step 1: Create an Azure AI Foundry Resource / Project
 
-1. Navigate to the **[Azure AI Foundry Portal](https://ai.azure.com/)** and sign in with your Azure account.
-2. In the top navigation, click **+ New project**.
-3. Configure project details:
-   - **Project name**: e.g., `norsk-app-foundry`
-   - **Hub**: Select an existing Hub or click **Create a new hub** (e.g., `norsk-app-hub`).
-   - **Subscription**: Select your Azure subscription.
-   - **Resource group**: Select or create a new resource group (e.g., `rg-norsk-app`).
-   - **Location / Region**: Choose a region supporting modern OpenAI models and Whisper (e.g., **Sweden Central**, **North Europe**, or **East US 2**). *Tip: Sweden Central and North Europe offer low latency to Norway/Nordics and comply with European data residency requirements.*
-4. Click **Create**. Azure will provision the underlying Azure OpenAI and AI Services resources.
+1. Open the **[Azure AI Foundry portal](https://ai.azure.com/)** and sign in.
+2. Click **+ New project** and create (or select) a Foundry resource:
+   - **Resource group**: e.g. `rg-norsk-app`
+   - **Region**: **Sweden Central** is recommended. It offers low latency to Norway, EU data residency, and support for both the GPT models and Norwegian Speech (`nb-NO`).
+3. Click **Create**. The resource is created on the Standard (S0) tier, which fast transcription requires.
 
 ---
 
-## 3. Step 2: Deploy Required AI Models in Azure AI Foundry
+## 3. Step 2: Deploy Models
 
-Once inside your project, go to the left sidebar and select **Deployments** (or **Models + endpoints**):
+In your project, open **Models + endpoints** and deploy the models below. The app refers to them by deployment name, so you can name them anything and map the names in `.env.local`.
 
-> [!IMPORTANT]
-> **Model Lifecycle & Deprecation Note**: `gpt-4o-mini` is deprecated and `gpt-4o` is nearing retirement. Deploy the newer **GPT-4.1 family** (e.g., `gpt-4.1-mini` and `gpt-4.1`) or `gpt-5-mini` / `gpt-5` in Azure AI Foundry. Because our application uses deployment names, you can name your deployments whatever you prefer and simply map the names in `.env.local`.
+### Deployment 1: Conversation model
+Drives the examiner and co-candidate dialogue in Del 1–3. It needs low latency.
+- **Model**: `gpt-5.4-mini` (or `gpt-4.1-mini` / `gpt-5-mini`)
+- **Deployment type**: `Global Standard`
+- **Env var**: `AZURE_OPENAI_CHAT_DEPLOYMENT`
+- **Capacity**: each exam turn uses a few thousand tokens. Give it enough TPM for your peak number of concurrent users. You can raise it later on the deployment's **Edit** page.
 
-### Deployment 1: Chat / Conversational Model (`gpt-4.1-mini`)
-This model drives real-time examiner questions and co-candidate dialogue in Del 1, 2, and 3. It provides low latency, conversational fluency in Norwegian, and cost efficiency.
-1. Click **+ Deploy model** -> **Deploy base model**.
-2. Search for and select **`gpt-4.1-mini`** (or `gpt-5-mini` if available in your region).
-3. Click **Confirm**.
-4. Configure deployment:
-   - **Deployment name**: `gpt-4.1-mini` *(or customize and match `AZURE_OPENAI_CHAT_DEPLOYMENT` in `.env.local`)*
-   - **Deployment type**: `Global Standard` or `Standard`
-   - **Model version**: Latest available (default)
-   - **Tokens Per Minute (TPM) limit**: Start with `30k` - `50k` TPM.
-5. Click **Deploy**.
+### Deployment 2: Evaluation model
+Grades the transcript against the HK-dir criteria and returns structured JSON.
+- **Model**: `gpt-5` (or `gpt-4.1`)
+- **Deployment type**: `Global Standard`
+- **Env var**: `AZURE_OPENAI_EVAL_DEPLOYMENT`
 
-### Deployment 2: Rubric Evaluation Model (`gpt-4.1` or `gpt-5`)
-This model evaluates candidate transcripts against official HK-dir criteria with structured JSON output. It requires strong grammatical reasoning and exact JSON schema adherence.
-1. Click **+ Deploy model** -> **Deploy base model**.
-2. Search for and select **`gpt-4.1`** (or `gpt-5`).
-3. Click **Confirm**.
-4. Configure deployment:
-   - **Deployment name**: `gpt-4.1` *(or customize and match `AZURE_OPENAI_EVAL_DEPLOYMENT` in `.env.local`)*
-   - **Deployment type**: `Global Standard` or `Standard`
-   - **Model version**: Latest available
-   - **Tokens Per Minute (TPM) limit**: `20k` - `40k` TPM.
-5. Click **Deploy**.
+### Speech-to-text: no deployment needed (Azure AI Speech)
+Fast transcription is built into the Foundry resource. Nothing needs to be deployed. Set `STT_PROVIDER=azure-speech` (see Step 4).
 
-### Deployment 3: Audio Transcription Model (`whisper`)
-This model transcribes the candidate's spoken Norwegian audio.
-1. Click **+ Deploy model** -> **Deploy base model**.
-2. Search for and select **`whisper`**.
-3. Click **Confirm**.
-4. Configure deployment:
-   - **Deployment name**: `whisper` *(or match `AZURE_OPENAI_WHISPER_DEPLOYMENT` in `.env.local`)*
-   - **Deployment type**: `Standard`
-   - **Model version**: `001` (default)
-5. Click **Deploy**.
-
-> ⚠️ **Scaling limit:** Azure OpenAI audio transcription has a default quota of **3 requests per minute**. That is enough for development but not for production. For more than a handful of concurrent users, use Azure AI Speech (below).
-
-### Recommended for production: Azure AI Speech fast transcription (`STT_PROVIDER=azure-speech`)
-Azure AI Speech is part of Foundry Tools, so a Foundry / AI Services resource already includes it. This is the same service the app uses for Norwegian TTS.
-
-| | Azure OpenAI Whisper | Azure AI Speech fast transcription |
+| | Azure AI Speech fast transcription | Azure OpenAI Whisper deployment |
 |---|---|---|
-| Default rate limit | 3 RPM | 600 RPM per resource (S0), adjustable |
+| `STT_PROVIDER` | `azure-speech` | `azure-openai` |
+| Default rate limit | **600 requests/min** per resource (adjustable) | **3 requests/min** |
 | `nb-NO` | ✅ | ✅ |
-| Transcription style | May silently "correct" grammar | More literal, which suits exam scoring |
+| Transcription style | Literal, which suits exam scoring. Numbers come back as digits ("tre" → "3"). | May silently "correct" learner grammar |
+| Setup | None | Deploy `whisper` and set `AZURE_OPENAI_WHISPER_DEPLOYMENT` |
 
-1. Make sure your Foundry resource (or a separate **Speech** resource) is on the **S0** tier. F0 doesn't support fast transcription.
-2. Copy its key and region (or its `https://<name>.cognitiveservices.azure.com` endpoint).
-3. In `.env.local`:
-   ```env
-   STT_PROVIDER=azure-speech
-   AZURE_SPEECH_KEY=...            # falls back to AZURE_OPENAI_API_KEY
-   AZURE_SPEECH_REGION=swedencentral
-   # AZURE_SPEECH_STT_ENDPOINT=https://<name>.cognitiveservices.azure.com
-   ```
-4. You can switch back at any time with `STT_PROVIDER=azure-openai` (Whisper) or `STT_PROVIDER=openai`. If you leave `STT_PROVIDER` unset, the app keeps the old behaviour and follows `AI_PROVIDER`.
+> Whisper on Azure OpenAI is fine for development, but at 3 requests/min it can't serve more than a couple of simultaneous users. Use Azure AI Speech in production.
 
-**Capacity:** 100 concurrent users produce roughly 100–200 transcriptions/min, which fits the 600 RPM default. For more headroom, request an increase through the [Foundry Tools quota form](https://aka.ms/foundry-tools-quota-increase) ("Maximum requests per minute for fast transcription"), or add a Speech resource in a second region. 429 and 503 responses are retried automatically with backoff.
+### Optional: Whisper deployment (`STT_PROVIDER=azure-openai`)
+1. **+ Deploy model** → `whisper` → deployment type `Standard`.
+2. Set `AZURE_OPENAI_WHISPER_DEPLOYMENT` to the deployment name.
 
 ---
 
-## 4. Step 3: Retrieve Azure Keys and Endpoint
+## 4. Step 3: Retrieve Keys and Endpoint
 
-1. In Azure AI Foundry, click **Overview** in the left menu (or open the linked Azure OpenAI service in the [Azure Portal](https://portal.azure.com)).
-2. Look for **Project details** or **Resource keys**:
-   - **Target URI / Endpoint**: Usually looks like `https://<your-resource-name>.openai.azure.com/`
-   - **Key**: Copy `Key 1` or `Key 2`.
-   - **Resource Name**: The `<your-resource-name>` prefix of the endpoint URL.
+In the Foundry portal (or the Azure Portal → your resource → **Keys and Endpoint**), copy:
+- **Key**: `Key 1` or `Key 2` → `AZURE_OPENAI_API_KEY`
+- **Resource name**: the `<name>` in `https://<name>.openai.azure.com/` → `AZURE_OPENAI_RESOURCE_NAME`
 
 ---
 
-## 5. Step 4: Configure `.env.local` in the Application
+## 5. Step 4: Configure `.env.local`
 
-In your project root, open `.env.local` and configure the following variables:
+Minimal all-Azure configuration:
 
 ```env
-# Switch AI provider to Azure
 AI_PROVIDER=azure
+STT_PROVIDER=azure-speech
 
-# Azure AI Foundry / Azure OpenAI Credentials
-AZURE_OPENAI_RESOURCE_NAME=your-azure-resource-name
-AZURE_OPENAI_API_KEY=your-azure-api-key
-
-# Deployment Names (must match what you named them in Step 2)
-AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4.1-mini
-AZURE_OPENAI_EVAL_DEPLOYMENT=gpt-4.1
-AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper
-
-# API Version (supported stable version)
+AZURE_OPENAI_RESOURCE_NAME=your-foundry-resource
+AZURE_OPENAI_API_KEY=your-foundry-key
+AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-5.4-mini
+AZURE_OPENAI_EVAL_DEPLOYMENT=gpt-5
 AZURE_OPENAI_API_VERSION=2024-10-21
 
-# Optional: Custom endpoint (if not using standard https://<resource>.openai.azure.com/)
-# AZURE_OPENAI_ENDPOINT=https://your-custom-hub.openai.azure.com/
+# Optional: use instead of / in addition to AZURE_OPENAI_RESOURCE_NAME
+# AZURE_OPENAI_ENDPOINT=https://your-foundry-resource.openai.azure.com/
 ```
 
-To switch back to direct OpenAI at any time, simply change:
-```env
-AI_PROVIDER=openai
-OPENAI_API_KEY=sk-...
-```
+You don't need `AZURE_SPEECH_KEY` or `AZURE_SPEECH_REGION`. Speech uses the Foundry key and the resource's own endpoint.
+
+### How the Azure Speech endpoint is resolved
+TTS and STT use the same rules, in this order:
+
+1. **`AZURE_SPEECH_REGION` is set** → regional endpoints:
+   `https://<region>.tts.speech.microsoft.com/cognitiveservices/v1` and `https://<region>.api.cognitive.microsoft.com/speechtotext/...`
+2. **No `AZURE_SPEECH_KEY`** (so the Foundry key is used) → the Foundry resource endpoint:
+   `https://<resource>.cognitiveservices.azure.com/tts/cognitiveservices/v1` and `https://<resource>.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe`.
+   The resource name comes from `AZURE_OPENAI_RESOURCE_NAME`, or else from the host of `AZURE_OPENAI_ENDPOINT` (`*.openai.azure.com`, `*.cognitiveservices.azure.com` or `*.services.ai.azure.com`).
+3. **Otherwise** → regional endpoints in `swedencentral`.
+
+### Optional Speech overrides
+| Variable | Purpose | Default |
+|---|---|---|
+| `AZURE_SPEECH_KEY` | Key of a separate Speech resource | `AZURE_OPENAI_API_KEY` |
+| `AZURE_SPEECH_REGION` | Force regional endpoints (e.g. a separate Speech resource) | resolved as above |
+| `AZURE_SPEECH_ENDPOINT` | Full TTS URL override | resolved as above |
+| `AZURE_SPEECH_STT_ENDPOINT` | STT base URL override | resolved as above |
+| `AZURE_SPEECH_STT_LOCALE` | Transcription locale | `nb-NO` |
+| `AZURE_SPEECH_STT_API_VERSION` | Fast transcription API version | `2025-10-15` |
+| `AZURE_SPEECH_EXAMINER_VOICE` / `AZURE_SPEECH_COCANDIDATE_VOICE` | Neural voices | `nb-NO-PernilleNeural` / `nb-NO-FinnNeural` |
+
+### Switching providers
+Each switch is independent:
+
+| Setting | Values | Effect |
+|---|---|---|
+| `AI_PROVIDER` | `azure` \| `openai` | LLMs. Also TTS (`azure` → Azure AI Speech, `openai` → ElevenLabs with OpenAI TTS fallback) |
+| `STT_PROVIDER` | `azure-speech` \| `azure-openai` \| `openai` | Speech-to-text. If unset, follows `AI_PROVIDER` (`azure` → `azure-openai`, `openai` → `openai`) |
 
 ---
 
-## 6. Verification Checklist
+## 6. Capacity & Scaling
 
-Run the automated test suite to verify configuration loading:
+Rough load for **100 concurrent users** (one candidate answer every 30–60 s):
+
+| Stage | Load | Default limit | Status |
+|---|---|---|---|
+| STT (Azure AI Speech) | ~100–200 requests/min | 600 requests/min | ✅ |
+| TTS (Azure AI Speech) | ~2–6 requests/s | 30 requests/s (adjustable to 1,000) | ✅ |
+| Conversation LLM | ~100–200 requests/min | Deployment TPM/RPM | Check the deployment's TPM |
+| Evaluation LLM | Bursts when exams finish | Deployment TPM | Check the deployment's TPM |
+
+- All STT providers retry automatically on `429` / `503` with exponential backoff (honouring `Retry-After`, up to 3 attempts). Azure can return 429 briefly while it scales up.
+- To go beyond 600 transcriptions/min, request an increase through the [Foundry Tools quota form](https://aka.ms/foundry-tools-quota-increase) ("Maximum requests per minute for fast transcription"; requires a work/organization email). You can also create a second resource in another region and spread load across both (this needs a small code change).
+
+---
+
+## 7. Verification Checklist
+
 ```bash
 npm test
-```
-
-Start the application with Azure active:
-```bash
 npm run dev
 ```
-1. Start an exam on the mobile client or web (`/`).
-2. Record an audio answer in Del 1.
-3. Check the backend terminal logs:
-   - STT sends audio to: `https://<resource>.openai.azure.com/openai/deployments/whisper/audio/transcriptions` (Whisper), or to `https://<region>.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe` when `STT_PROVIDER=azure-speech`
-   - Turn generation invokes Azure chat deployment via `@ai-sdk/azure`.
-   - Post-exam evaluation invokes Azure `gpt-4o` with JSON schema enforcement.
-
+1. Start an exam on web (`/`) or in Expo Go.
+2. Record an answer in Del 1. Your transcript should appear and the examiner should reply with audio.
+3. The requests go to:
+   - STT: `https://<resource>.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15`
+   - TTS: `https://<resource>.cognitiveservices.azure.com/tts/cognitiveservices/v1`
+   - LLM: `https://<resource>.openai.azure.com/openai/deployments/<deployment>/...` via `@ai-sdk/azure`
+4. Test on a real phone as well. iOS and Android record AAC in `.m4a`, while the web records WebM. If you speak clearly but always get "Beklager, jeg hørte ikke…", the phone's audio format is being rejected.

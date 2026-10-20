@@ -32,8 +32,13 @@ OPENAI_API_KEY=sk-your-openai-api-key
 # AZURE_OPENAI_API_KEY=your-azure-api-key
 # AZURE_OPENAI_CHAT_DEPLOYMENT=gpt-4.1-mini
 # AZURE_OPENAI_EVAL_DEPLOYMENT=gpt-4.1
-# AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper
+# AZURE_OPENAI_WHISPER_DEPLOYMENT=whisper   # only for STT_PROVIDER=azure-openai
 # AZURE_OPENAI_API_VERSION=2024-10-21
+
+# Speech-to-text switch ('azure-speech' | 'azure-openai' | 'openai'; unset follows AI_PROVIDER)
+# STT_PROVIDER=azure-speech
+# Azure AI Speech (TTS + STT) uses the Foundry key and resource above; no region needed.
+# Optional overrides: AZURE_SPEECH_KEY, AZURE_SPEECH_REGION, AZURE_SPEECH_ENDPOINT, AZURE_SPEECH_STT_ENDPOINT
 
 # ElevenLabs Speech Synthesis
 ELEVEN_API_KEY=your-elevenlabs-api-key

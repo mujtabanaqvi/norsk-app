@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   getActiveSttProvider,
+  getAzureSpeechBase,
+  getAzureSpeechConfig,
   getAzureSpeechSttConfig,
   getSttEndpointConfig,
 } from '../src/server/ai-provider';
@@ -12,10 +14,12 @@ const ENV_KEYS = [
   'STT_PROVIDER',
   'AZURE_SPEECH_KEY',
   'AZURE_SPEECH_REGION',
+  'AZURE_SPEECH_ENDPOINT',
   'AZURE_SPEECH_STT_ENDPOINT',
   'AZURE_SPEECH_STT_LOCALE',
   'AZURE_OPENAI_API_KEY',
   'AZURE_OPENAI_RESOURCE_NAME',
+  'AZURE_OPENAI_ENDPOINT',
 ] as const;
 
 function withEnv(vars: Partial<Record<(typeof ENV_KEYS)[number], string>>, fn: () => Promise<void> | void) {
@@ -86,6 +90,69 @@ test(
     assert.equal(cfg.apiKey, 'foundry-key');
     assert.equal(cfg.locale, 'nb-NO');
   })
+);
+
+test(
+  'Azure Speech: Foundry resource name → STT and TTS on resource endpoint, no region needed',
+  withEnv({ AZURE_OPENAI_API_KEY: 'foundry-key', AZURE_OPENAI_RESOURCE_NAME: 'my-foundry' }, () => {
+    assert.deepEqual(getAzureSpeechBase(), {
+      kind: 'resource',
+      baseUrl: 'https://my-foundry.cognitiveservices.azure.com',
+    });
+    assert.equal(
+      getAzureSpeechSttConfig().url,
+      'https://my-foundry.cognitiveservices.azure.com/speechtotext/transcriptions:transcribe?api-version=2025-10-15'
+    );
+    assert.equal(
+      getAzureSpeechConfig().ttsUrl,
+      'https://my-foundry.cognitiveservices.azure.com/tts/cognitiveservices/v1'
+    );
+  })
+);
+
+test(
+  'Azure Speech: resource name derived from AZURE_OPENAI_ENDPOINT',
+  withEnv({ AZURE_OPENAI_API_KEY: 'foundry-key', AZURE_OPENAI_ENDPOINT: 'https://foo.openai.azure.com/' }, () => {
+    assert.deepEqual(getAzureSpeechBase(), {
+      kind: 'resource',
+      baseUrl: 'https://foo.cognitiveservices.azure.com',
+    });
+  })
+);
+
+test(
+  'Azure Speech: explicit AZURE_SPEECH_REGION keeps regional endpoints (back-compat)',
+  withEnv(
+    { AZURE_OPENAI_API_KEY: 'foundry-key', AZURE_OPENAI_RESOURCE_NAME: 'my-foundry', AZURE_SPEECH_REGION: 'norwayeast' },
+    () => {
+      assert.equal(
+        getAzureSpeechConfig().ttsUrl,
+        'https://norwayeast.tts.speech.microsoft.com/cognitiveservices/v1'
+      );
+      assert.ok(getAzureSpeechSttConfig().url.startsWith('https://norwayeast.api.cognitive.microsoft.com/'));
+    }
+  )
+);
+
+test(
+  'Azure Speech: dedicated AZURE_SPEECH_KEY without region uses swedencentral, not the Foundry domain',
+  withEnv({ AZURE_SPEECH_KEY: 'speech-key', AZURE_OPENAI_RESOURCE_NAME: 'my-foundry' }, () => {
+    assert.deepEqual(getAzureSpeechBase(), { kind: 'region', region: 'swedencentral' });
+    assert.equal(
+      getAzureSpeechConfig().ttsUrl,
+      'https://swedencentral.tts.speech.microsoft.com/cognitiveservices/v1'
+    );
+  })
+);
+
+test(
+  'Azure Speech: AZURE_SPEECH_ENDPOINT overrides TTS URL',
+  withEnv(
+    { AZURE_OPENAI_API_KEY: 'foundry-key', AZURE_OPENAI_RESOURCE_NAME: 'my-foundry', AZURE_SPEECH_ENDPOINT: 'https://custom/tts' },
+    () => {
+      assert.equal(getAzureSpeechConfig().ttsUrl, 'https://custom/tts');
+    }
+  )
 );
 
 test(

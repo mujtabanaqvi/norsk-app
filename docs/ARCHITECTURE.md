@@ -35,12 +35,12 @@ This document describes the architectural topology, service interactions, and li
            ▼                               ▼
 ┌─────────────────────────────────────┐   ┌─────────────────────────────┐
 │ AI Provider Layer (ai-provider.ts)  │   │  Neon PostgreSQL (Drizzle)  │
-│  ├── OpenAI Direct OR Azure Foundry │   │  ├── exam_topics            │
-│  │   ├── STT: Whisper               │   │  ├── user_quotas            │
-│  │   ├── LLM: gpt-4o-mini / gpt-4.1 │   │  ├── exam_sessions          │
-│  │   └── Eval: gpt-4o (structured)  │   │  ├── usage_ledger           │
-│  └── ElevenLabs / OpenAI TTS Stream │   │  ├── user, session, account │
-│                                     │   │  ├── tier_configs           │
+│  ├── LLM/Eval: Azure OpenAI | OpenAI│   │  ├── exam_topics            │
+│  ├── STT (STT_PROVIDER):            │   │  ├── user_quotas            │
+│  │   Azure Speech | Whisper | OpenAI│   │  ├── exam_sessions          │
+│  └── TTS: Azure Speech | ElevenLabs │   │  ├── usage_ledger           │
+│      (+ OpenAI TTS fallback)        │   │  ├── user, session, account │
+│  429/503 retry with backoff         │   │  ├── tier_configs           │
 │                                     │   │  ├── referral_rewards       │
 │                                     │   │  └── system_configs         │
 └─────────────────────────────────────┘   └─────────────────────────────┘
@@ -71,7 +71,7 @@ sequenceDiagram
     actor Candidate as Mobile Client (Expo Go / Web)
     participant API as Next.js 16 API Routes
     participant Engine as Exam Engine & Personas
-    participant Speech as OpenAI STT / ElevenLabs TTS
+    participant Speech as Speech (Azure AI Speech / Whisper / OpenAI STT · Azure Speech / ElevenLabs TTS)
     participant DB as Neon PostgreSQL
 
     Candidate->>API: GET /api/exam/topics?level=B1&userId=...
@@ -84,11 +84,11 @@ sequenceDiagram
 
     loop Each Exam Turn (DEL1 -> DEL2 -> DEL3)
         Candidate->>API: GET /api/exam/[sessionId]/speech/[turnIndex]
-        API->>Speech: Synthesize turn text (ElevenLabs / OpenAI TTS fallback)
+        API->>Speech: Synthesize turn text (Azure AI Speech, or ElevenLabs → OpenAI TTS fallback)
         API-->>Candidate: audio/mpeg stream
         Note over Candidate: Candidate speaks (tap-to-talk + 2.6s silence auto-stop)
         Candidate->>API: POST /api/exam/[sessionId]/turn (multipart audio)
-        API->>Speech: OpenAI gpt-4o-transcribe (Norwegian)
+        API->>Speech: Transcribe nb-NO via STT_PROVIDER (Azure AI Speech fast transcription / Whisper / gpt-4o-transcribe)
         API->>Engine: advanceTurn(engineState, topic, mode)
         Engine->>Speech: Generate Examiner / Co-Candidate line (gpt-4.1-mini)
         API->>DB: UPDATE exam_sessions (transcriptJson, engineState) & deduct seconds

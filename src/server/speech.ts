@@ -172,8 +172,7 @@ async function synthesizeAzureStream(
 ): Promise<ReadableStream<Uint8Array>> {
   const config = getAzureSpeechConfig();
   const voiceName = persona === 'examiner' ? config.examinerVoice : config.coCandidateVoice;
-  const endpoint =
-    config.endpoint || `https://${config.region}.tts.speech.microsoft.com/cognitiveservices/v1`;
+  const endpoint = config.ttsUrl;
 
   // Escape XML characters for SSML safety
   const safeText = text

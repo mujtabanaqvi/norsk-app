@@ -144,17 +144,20 @@ export interface AzureSpeechSttConfig {
 
 /**
  * Builds Azure AI Speech fast transcription configuration (STT_PROVIDER=azure-speech).
- * Reuses the same Speech key/region as Azure TTS.
+ * Reuses the same Speech key and endpoint resolution as Azure TTS (see getAzureSpeechBase).
  */
 export function getAzureSpeechSttConfig(): AzureSpeechSttConfig {
-  const { apiKey, region } = getAzureSpeechConfig();
+  const { apiKey } = getAzureSpeechConfig();
   const customEndpoint = process.env.AZURE_SPEECH_STT_ENDPOINT;
   const apiVersion = process.env.AZURE_SPEECH_STT_API_VERSION || '2025-10-15';
   const locale = process.env.AZURE_SPEECH_STT_LOCALE || 'nb-NO';
 
+  const base = getAzureSpeechBase();
   const baseUrl = customEndpoint
     ? customEndpoint.replace(/\/+$/, '')
-    : `https://${region}.api.cognitive.microsoft.com`;
+    : base.kind === 'resource'
+      ? base.baseUrl
+      : `https://${base.region}.api.cognitive.microsoft.com`;
 
   return {
     url: `${baseUrl}/speechtotext/transcriptions:transcribe?api-version=${encodeURIComponent(apiVersion)}`,
@@ -233,8 +236,56 @@ export interface AzureSpeechConfig {
   apiKey: string;
   region: string;
   endpoint?: string;
+  /** Fully resolved TTS URL (AZURE_SPEECH_ENDPOINT override, Foundry resource, or regional). */
+  ttsUrl: string;
   examinerVoice: string;
   coCandidateVoice: string;
+}
+
+export type AzureSpeechBase =
+  | { kind: 'resource'; baseUrl: string }
+  | { kind: 'region'; region: string };
+
+const DEFAULT_SPEECH_REGION = 'swedencentral';
+const FOUNDRY_HOST_SUFFIXES = ['.openai.azure.com', '.cognitiveservices.azure.com', '.services.ai.azure.com'];
+
+/**
+ * Extracts the Foundry resource name from AZURE_OPENAI_RESOURCE_NAME or AZURE_OPENAI_ENDPOINT.
+ */
+function getFoundryResourceName(): string | undefined {
+  const name = process.env.AZURE_OPENAI_RESOURCE_NAME?.trim();
+  if (name) return name;
+
+  const endpoint = process.env.AZURE_OPENAI_ENDPOINT?.trim();
+  if (!endpoint) return undefined;
+  try {
+    const host = new URL(endpoint).hostname.toLowerCase();
+    if (FOUNDRY_HOST_SUFFIXES.some((suffix) => host.endsWith(suffix))) {
+      return host.split('.')[0];
+    }
+  } catch {
+    // Not a valid URL; fall through to regional endpoint.
+  }
+  return undefined;
+}
+
+/**
+ * Resolves where Azure AI Speech (TTS + STT) requests are sent:
+ * 1. AZURE_SPEECH_REGION set explicitly → regional endpoints.
+ * 2. Foundry key in use (no AZURE_SPEECH_KEY) → the Foundry resource's own
+ *    https://<resource>.cognitiveservices.azure.com endpoint (no region needed).
+ * 3. Otherwise → regional endpoints in swedencentral.
+ */
+export function getAzureSpeechBase(): AzureSpeechBase {
+  const region = process.env.AZURE_SPEECH_REGION?.trim();
+  if (region) return { kind: 'region', region };
+
+  const resourceName = !process.env.AZURE_SPEECH_KEY ? getFoundryResourceName() : undefined;
+  if (resourceName) {
+    return { kind: 'resource', baseUrl: `https://${resourceName}.cognitiveservices.azure.com` };
+  }
+
+  return { kind: 'region', region: DEFAULT_SPEECH_REGION };
 }
 
 /**
@@ -244,8 +295,14 @@ export function getAzureSpeechConfig(): AzureSpeechConfig {
   const apiKey = process.env.AZURE_SPEECH_KEY || process.env.AZURE_OPENAI_API_KEY;
   if (!apiKey) throw new Error('AZURE_SPEECH_KEY or AZURE_OPENAI_API_KEY is not configured');
 
-  const region = process.env.AZURE_SPEECH_REGION || 'swedencentral';
+  const base = getAzureSpeechBase();
+  const region = base.kind === 'region' ? base.region : DEFAULT_SPEECH_REGION;
   const endpoint = process.env.AZURE_SPEECH_ENDPOINT;
+  const ttsUrl =
+    endpoint ||
+    (base.kind === 'resource'
+      ? `${base.baseUrl}/tts/cognitiveservices/v1`
+      : `https://${base.region}.tts.speech.microsoft.com/cognitiveservices/v1`);
   const examinerVoice = process.env.AZURE_SPEECH_EXAMINER_VOICE || 'nb-NO-PernilleNeural';
   const coCandidateVoice = process.env.AZURE_SPEECH_COCANDIDATE_VOICE || 'nb-NO-FinnNeural';
 
@@ -253,6 +310,7 @@ export function getAzureSpeechConfig(): AzureSpeechConfig {
     apiKey,
     region,
     endpoint,
+    ttsUrl,
     examinerVoice,
     coCandidateVoice,
   };

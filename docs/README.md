@@ -16,7 +16,7 @@ Welcome to the documentation for the **Norskprøven Muntlig B1/B2 Practice Simul
 | **[3. Database Schema & Models](./DATABASE_SCHEMA.md)** | Drizzle ORM models (`exam_topics`, `user_quotas`, `exam_sessions`, `usage_ledger`), relations, and migration commands. |
 | **[4. API Reference Specification](./API_REFERENCE.md)** | Specification of all Next.js API routes (`topics`, `start`, `turn`, `speech`, `finish`, `results`, `quota`). |
 | **[5. User Module, Subscriptions & Configuration](./USER_MODULE_AND_CONFIGURATION.md)** | User authentication (Better Auth), Stripe subscriptions, daily test calendar quotas, referral reward engine, and how to update configurable limits. |
-| **[6. Billing, Costs & Quota Ledger](./BILLING_AND_USAGE.md)** | Pricing formulas for OpenAI GPT-4.1-mini, OpenAI STT, ElevenLabs TTS, and atomic quota transactions. |
+| **[6. Billing, Costs & Quota Ledger](./BILLING_AND_USAGE.md)** | Pricing formulas for the LLM, STT (OpenAI / Azure AI Speech), and TTS, plus atomic quota transactions. |
 | **[7. HK-dir B1/B2 Rubric Evaluation Engine](./EXAM_RUBRIC_EVALUATION.md)** | Official 4 HK-dir criteria (1–10 scale), bilingual feedback, concrete improvements, and GPT-4o execution lifecycle. |
 
 ---
@@ -26,9 +26,10 @@ Welcome to the documentation for the **Norskprøven Muntlig B1/B2 Practice Simul
 - **Framework**: Next.js 16 (App Router, Route Handlers, `proxy.ts` CORS, `after()` background tasks, TypeScript).
 - **Mobile Client**: React Native (Expo SDK 54) with `expo-audio`, `expo-constants`, `expo-secure-store`, and `@react-navigation/native-stack` — runs directly inside **Expo Go** and **Web**.
 - **Database & ORM**: PostgreSQL (Neon Serverless) with Drizzle ORM (`drizzle-orm`, `drizzle-kit`, `@neondatabase/serverless`).
-- **AI Providers**:
-  - **OpenAI**: `gpt-4o-transcribe` (Norwegian speech-to-text), `gpt-4.1-mini` (conversational Examiner and Co-Candidate turns), `gpt-4o` (post-exam CEFR rubric evaluation), and `gpt-4o-mini-tts` (automatic TTS fallback).
-  - **ElevenLabs**: `eleven_multilingual_v2` streaming TTS with distinct voices for the Examiner Sensor and Peer Co-Candidate.
+- **AI Providers** (switchable in `.env.local`; see [Azure AI Foundry Setup](./AZURE_AI_FOUNDRY_SETUP.md)):
+  - **Azure AI Foundry** (`AI_PROVIDER=azure`): Azure OpenAI deployments for conversation (e.g. `gpt-5.4-mini`) and evaluation (e.g. `gpt-5`), plus Azure AI Speech neural TTS (`nb-NO-PernilleNeural` / `nb-NO-FinnNeural`).
+  - **OpenAI + ElevenLabs** (`AI_PROVIDER=openai`): `gpt-4.1-mini` conversation, `gpt-4o` evaluation, ElevenLabs `eleven_multilingual_v2` TTS with OpenAI `gpt-4o-mini-tts` fallback.
+  - **Speech-to-text** (`STT_PROVIDER`, independent of `AI_PROVIDER`): `azure-speech` (Azure AI Speech fast transcription, `nb-NO`, 600 RPM, recommended), `azure-openai` (Whisper deployment, 3 RPM) or `openai` (`gpt-4o-transcribe`). When unset, it follows `AI_PROVIDER`.
 - **Validation**: Zod (strict runtime request & payload validation).
 - **Testing**: Node.js native test runner via `tsx --test tests/*.test.ts`.
 
