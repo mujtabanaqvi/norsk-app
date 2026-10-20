@@ -120,6 +120,49 @@ export function getEvaluationModel(): LanguageModel {
   return openai(modelName);
 }
 
+export type SttProviderType = 'azure-speech' | 'azure-openai' | 'openai';
+
+/**
+ * Returns the active speech-to-text provider.
+ * STT_PROVIDER overrides; when unset it follows AI_PROVIDER
+ * (azure → Azure OpenAI Whisper deployment, openai → OpenAI STT).
+ */
+export function getActiveSttProvider(): SttProviderType {
+  const raw = (process.env.STT_PROVIDER || '').trim().toLowerCase();
+  if (raw === 'azure-speech' || raw === 'azure-openai' || raw === 'openai') return raw;
+  return getActiveAiProvider() === 'azure' ? 'azure-openai' : 'openai';
+}
+
+/**
+ * Information needed to call Azure AI Speech fast transcription.
+ */
+export interface AzureSpeechSttConfig {
+  url: string;
+  apiKey: string;
+  locale: string;
+}
+
+/**
+ * Builds Azure AI Speech fast transcription configuration (STT_PROVIDER=azure-speech).
+ * Reuses the same Speech key/region as Azure TTS.
+ */
+export function getAzureSpeechSttConfig(): AzureSpeechSttConfig {
+  const { apiKey, region } = getAzureSpeechConfig();
+  const customEndpoint = process.env.AZURE_SPEECH_STT_ENDPOINT;
+  const apiVersion = process.env.AZURE_SPEECH_STT_API_VERSION || '2025-10-15';
+  const locale = process.env.AZURE_SPEECH_STT_LOCALE || 'nb-NO';
+
+  const baseUrl = customEndpoint
+    ? customEndpoint.replace(/\/+$/, '')
+    : `https://${region}.api.cognitive.microsoft.com`;
+
+  return {
+    url: `${baseUrl}/speechtotext/transcriptions:transcribe?api-version=${encodeURIComponent(apiVersion)}`,
+    apiKey,
+    locale,
+  };
+}
+
 /**
  * Information needed to execute speech-to-text (Whisper).
  */
@@ -134,7 +177,7 @@ export interface SttEndpointConfig {
  * Builds the STT endpoint URL, headers, and deployment/model parameters based on active provider.
  */
 export function getSttEndpointConfig(): SttEndpointConfig {
-  const provider = getActiveAiProvider();
+  const provider = getActiveSttProvider() === 'azure-openai' ? 'azure' : 'openai';
 
   if (provider === 'azure') {
     const apiKey = process.env.AZURE_OPENAI_API_KEY;

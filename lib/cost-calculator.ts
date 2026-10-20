@@ -1,3 +1,5 @@
+import { getActiveSttProvider } from '../src/server/ai-provider';
+
 export interface UsageInput {
   llmPromptTokens: number;
   llmCompletionTokens: number;
@@ -27,7 +29,16 @@ export const PRICING_RATES = {
 
   // OpenAI gpt-4o-transcribe ($0.006 / audio minute => $0.0001 / second)
   OPENAI_STT_PER_SECOND: 0.006 / 60,
+
+  // Azure AI Speech fast transcription (~$0.36 / audio hour; verify against Azure pricing page)
+  AZURE_SPEECH_FAST_STT_PER_SECOND: 0.36 / 3600,
 };
+
+function sttRatePerSecond(): number {
+  return getActiveSttProvider() === 'azure-speech'
+    ? PRICING_RATES.AZURE_SPEECH_FAST_STT_PER_SECOND
+    : PRICING_RATES.OPENAI_STT_PER_SECOND;
+}
 
 /**
  * Calculates estimated USD cost for an exam session across LLM, TTS, and STT providers.
@@ -44,7 +55,7 @@ export function calculateEstimatedCostUsd(usage: UsageInput): CostBreakdown {
   const totalLlmCostUsd = llmPromptCostUsd + llmCompletionCostUsd;
 
   const ttsCostUsd = ttsChars * PRICING_RATES.ELEVENLABS_TTS_PER_CHARACTER;
-  const sttCostUsd = audioSeconds * PRICING_RATES.OPENAI_STT_PER_SECOND;
+  const sttCostUsd = audioSeconds * sttRatePerSecond();
 
   const totalEstimatedCostUsd = totalLlmCostUsd + ttsCostUsd + sttCostUsd;
 

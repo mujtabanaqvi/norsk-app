@@ -70,6 +70,30 @@ This model transcribes the candidate's spoken Norwegian audio.
    - **Model version**: `001` (default)
 5. Click **Deploy**.
 
+> ⚠️ **Scaling limit:** Azure OpenAI audio transcription has a default quota of **3 requests per minute**. That is enough for development but not for production. For more than a handful of concurrent users, use Azure AI Speech (below).
+
+### Recommended for production: Azure AI Speech fast transcription (`STT_PROVIDER=azure-speech`)
+Azure AI Speech is part of Foundry Tools, so a Foundry / AI Services resource already includes it. This is the same service the app uses for Norwegian TTS.
+
+| | Azure OpenAI Whisper | Azure AI Speech fast transcription |
+|---|---|---|
+| Default rate limit | 3 RPM | 600 RPM per resource (S0), adjustable |
+| `nb-NO` | ✅ | ✅ |
+| Transcription style | May silently "correct" grammar | More literal, which suits exam scoring |
+
+1. Make sure your Foundry resource (or a separate **Speech** resource) is on the **S0** tier. F0 doesn't support fast transcription.
+2. Copy its key and region (or its `https://<name>.cognitiveservices.azure.com` endpoint).
+3. In `.env.local`:
+   ```env
+   STT_PROVIDER=azure-speech
+   AZURE_SPEECH_KEY=...            # falls back to AZURE_OPENAI_API_KEY
+   AZURE_SPEECH_REGION=swedencentral
+   # AZURE_SPEECH_STT_ENDPOINT=https://<name>.cognitiveservices.azure.com
+   ```
+4. You can switch back at any time with `STT_PROVIDER=azure-openai` (Whisper) or `STT_PROVIDER=openai`. If you leave `STT_PROVIDER` unset, the app keeps the old behaviour and follows `AI_PROVIDER`.
+
+**Capacity:** 100 concurrent users produce roughly 100–200 transcriptions/min, which fits the 600 RPM default. For more headroom, request an increase through the [Foundry Tools quota form](https://aka.ms/foundry-tools-quota-increase) ("Maximum requests per minute for fast transcription"), or add a Speech resource in a second region. 429 and 503 responses are retried automatically with backoff.
+
 ---
 
 ## 4. Step 3: Retrieve Azure Keys and Endpoint
@@ -128,7 +152,7 @@ npm run dev
 1. Start an exam on the mobile client or web (`/`).
 2. Record an audio answer in Del 1.
 3. Check the backend terminal logs:
-   - STT sends audio to: `https://<resource>.openai.azure.com/openai/deployments/whisper/audio/transcriptions`
+   - STT sends audio to: `https://<resource>.openai.azure.com/openai/deployments/whisper/audio/transcriptions` (Whisper), or to `https://<region>.api.cognitive.microsoft.com/speechtotext/transcriptions:transcribe` when `STT_PROVIDER=azure-speech`
    - Turn generation invokes Azure chat deployment via `@ai-sdk/azure`.
    - Post-exam evaluation invokes Azure `gpt-4o` with JSON schema enforcement.
 
