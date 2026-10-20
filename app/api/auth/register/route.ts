@@ -1,22 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { z } from 'zod';
 import crypto from 'crypto';
 import { auth } from '@/lib/better-auth';
 import { db } from '@/src/db';
-import { users, referralRewards, userQuotas } from '@/src/db/schema';
+import { users } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
-import { signUserToken } from '@/lib/auth';
-import { getReferralSettings } from '@/lib/tier-policy';
-
-const registerSchema = z.object({
-  email: z.string().email('Ugyldig e-postadresse'),
-  password: z.string().min(6, 'Passordet må ha minst 6 tegn'),
-  name: z.string().min(1, 'Navn er påkrevd').optional(),
-  referralCode: z.string().trim().optional(),
-});
+import { registerSchema } from '@/src/validation/auth';
+import { apiError, validationError, betterAuthErrorCode } from '@/lib/api-errors';
+import { issueVerification } from '@/lib/email-verification';
 
 function generateReferralCode(): string {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+function verificationPending(email: string, retryAfterSeconds?: number) {
+  return NextResponse.json({
+    success: true,
+    requiresVerification: true,
+    email,
+    ...(retryAfterSeconds ? { retryAfterSeconds } : {}),
+  });
 }
 
 export async function POST(req: NextRequest) {
@@ -25,37 +27,48 @@ export async function POST(req: NextRequest) {
     const parsed = registerSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Validation Error', details: parsed.error.flatten() },
-        { status: 400 }
-      );
+      return validationError(parsed.error);
     }
 
     const { email, password, name, referralCode } = parsed.data;
-    const normalizedEmail = email.toLowerCase().trim();
 
-    // Check referral code if provided
+    const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+    if (existingUser) {
+      // Let a user who never finished verification get a fresh code instead of a dead end.
+      if (!existingUser.emailVerified) {
+        const issued = await issueVerification(existingUser);
+        return verificationPending(email, issued.sent ? undefined : issued.retryAfterSeconds);
+      }
+      return apiError(409, 'EMAIL_TAKEN', 'En bruker med denne e-postadressen eksisterer allerede', {
+        fieldErrors: { email: 'E-postadressen er allerede registrert. Prøv å logge inn.' },
+      });
+    }
+
     let referrerUserId: string | null = null;
     if (referralCode) {
       const [referrer] = await db
-        .select()
+        .select({ id: users.id })
         .from(users)
-        .where(eq(users.referralCode, referralCode.toUpperCase()))
+        .where(eq(users.referralCode, referralCode))
         .limit(1);
 
-      if (referrer) {
-        referrerUserId = referrer.id;
+      if (!referrer) {
+        return apiError(400, 'INVALID_REFERRAL_CODE', 'Vervekoden finnes ikke', {
+          fieldErrors: { referralCode: 'Vervekoden finnes ikke' },
+        });
       }
+      referrerUserId = referrer.id;
     }
 
     const newReferralCode = generateReferralCode();
 
-    // Use Better Auth to register the user with password hashing & account creation
+    // Better Auth hashes the password and creates the credential account.
+    // requireEmailVerification is on, so no session is created here.
     const signUpRes = await auth.api.signUpEmail({
       body: {
-        email: normalizedEmail,
+        email,
         password,
-        name: name || normalizedEmail.split('@')[0],
+        name,
         referralCode: newReferralCode,
         referredByUserId: referrerUserId,
         role: 'USER',
@@ -64,15 +77,11 @@ export async function POST(req: NextRequest) {
     });
 
     if (!signUpRes || !signUpRes.user) {
-      return NextResponse.json(
-        { error: 'Registration Failed', message: 'Kunne ikke opprette brukerkonto' },
-        { status: 400 }
-      );
+      return apiError(400, 'REGISTRATION_FAILED', 'Kunne ikke opprette brukerkonto');
     }
 
-    const createdUserId = signUpRes.user.id;
+    const createdUser = signUpRes.user;
 
-    // Ensure referral code is saved
     await db
       .update(users)
       .set({
@@ -80,67 +89,35 @@ export async function POST(req: NextRequest) {
         referredByUserId: referrerUserId,
         subscriptionTier: 'FREE',
       })
-      .where(eq(users.id, createdUserId));
+      .where(eq(users.id, createdUser.id));
 
-    // Initialize default audio quota
-    await db
-      .insert(userQuotas)
-      .values({
-        userId: createdUserId,
-        remainingAudioSeconds: 1800,
-      })
-      .onConflictDoNothing();
-
-    // If referred by another user, award referral bonus tests to the referrer
-    if (referrerUserId) {
-      const referralSettings = await getReferralSettings();
-      const startsAt = new Date();
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + referralSettings.durationDays);
-
-      await db.insert(referralRewards).values({
-        referrerUserId,
-        referredUserId: createdUserId,
-        bonusTestsPerDay: referralSettings.bonusDailyTests,
-        startsAt,
-        expiresAt,
-      });
-    }
-
-    const token = signUserToken({
-      id: createdUserId,
-      email: signUpRes.user.email,
-      role: 'USER',
-    });
-
-    return NextResponse.json({
-      success: true,
-      token,
-      user: {
-        id: createdUserId,
-        email: signUpRes.user.email,
-        name: signUpRes.user.name,
-        role: 'USER',
-        subscriptionTier: 'FREE',
-        referralCode: newReferralCode,
-      },
-    });
-  } catch (error: any) {
-    const errorMsg = String(error?.body?.message || error?.message || '');
-    if (
-      errorMsg.includes('already exists') ||
-      errorMsg.includes('USER_ALREADY_EXISTS') ||
-      error?.code === '23505'
-    ) {
-      return NextResponse.json(
-        { error: 'Email Already Registered', message: 'En bruker med denne e-postadressen eksisterer allerede' },
-        { status: 409 }
+    // Quota and referral reward are granted once the email is verified (see onEmailVerified).
+    try {
+      await issueVerification({ id: createdUser.id, email, name }, { force: true });
+    } catch (emailError) {
+      console.error('Failed to send verification email:', emailError);
+      return apiError(
+        502,
+        'EMAIL_SEND_FAILED',
+        'Kontoen ble opprettet, men vi kunne ikke sende bekreftelses-e-post. Prøv «Send ny kode».',
+        { requiresVerification: true, email }
       );
     }
+
+    return verificationPending(email);
+  } catch (error: any) {
+    const code = betterAuthErrorCode(error);
+    if (code.includes('USER_ALREADY_EXISTS') || code.includes('already exists') || error?.code === '23505') {
+      return apiError(409, 'EMAIL_TAKEN', 'En bruker med denne e-postadressen eksisterer allerede', {
+        fieldErrors: { email: 'E-postadressen er allerede registrert. Prøv å logge inn.' },
+      });
+    }
+    if (code.includes('PASSWORD_TOO_SHORT') || code.includes('PASSWORD_TOO_LONG')) {
+      return apiError(400, 'VALIDATION_ERROR', 'Passordet oppfyller ikke kravene', {
+        fieldErrors: { password: 'Passordet oppfyller ikke kravene' },
+      });
+    }
     console.error('Registration error:', error);
-    return NextResponse.json(
-      { error: 'Registration Error', message: error?.body?.message || error?.message || 'Registrering mislyktes' },
-      { status: 500 }
-    );
+    return apiError(500, 'REGISTRATION_ERROR', 'Registrering mislyktes. Prøv igjen senere.');
   }
 }

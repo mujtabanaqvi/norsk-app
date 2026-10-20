@@ -9,7 +9,9 @@ This document details the architecture, authentication system, tiered subscripti
 The user module provides:
 1. **Authentication (Better Auth)**:
    - Email and password registration & login with secure hashing (`bcryptjs` / internal Better Auth crypto).
-   - Google OAuth authentication (`google-auth-library` server verification & automatic account linking).
+   - **Email verification** for email/password accounts: a 6-digit code *and* a link are sent in one email via [Resend](https://resend.com). Login is refused (`EMAIL_NOT_VERIFIED`) until verified. Codes/links expire after 15 minutes, allow 5 attempts, and can be re-sent every 60 seconds. Hashed codes are stored in the Better Auth `verification` table (`identifier = email-verify:<email>`). See `lib/email-verification.ts`.
+   - Google OAuth authentication (`expo-auth-session` in the app, `google-auth-library` server verification & automatic account linking). Google accounts skip email verification. Linking Google to an existing *unverified* password account does **not** mark it verified, so a pre-registered password can't be used to take over the address.
+   - Shared client/server form validation in `src/validation/auth.ts`.
    - Extensible Apple ID placeholder endpoint (`/api/auth/apple`) ready for future Apple Services ID configuration.
    - Session & token management supporting session cookies and Bearer JWTs.
 2. **Tiered Subscriptions & Stripe Billing**:
@@ -20,12 +22,28 @@ The user module provides:
    - Enforced on the server inside `POST /api/exam/start`.
 4. **Referral Reward Engine**:
    - Each registered user receives a unique referral code (e.g. `A1B2C3D4`).
-   - When a friend signs up with that code, the referrer receives extra bonus tests per day for a configurable number of days.
+   - When a friend signs up with that code **and verifies their email** (or signs up with Google), the referrer receives extra bonus tests per day for a configurable number of days.
 5. **Web Admin Configuration Portal**:
    - Web UI at `/admin` (under the **⚙️ Abonnement & Verveinnstillinger** tab) allowing administrators to modify daily test limits, monthly prices, feature bullet lists per tier, and referral bonus days without code changes or server redeployments.
 6. **Database Fallback & Seeding Strategy**:
    - `src/db/seed.ts` idempotently seeds default tier configurations (`FREE`, `STANDARD`, `PREMIUM`) and referral bonus parameters into Neon PostgreSQL.
    - If database rows are uninitialized, the application transparently falls back to in-code defaults defined in `lib/tier-policy.ts`.
+
+---
+
+## 1b. Email Verification & Google Sign-In Setup
+
+| Variable | Where | Purpose |
+|---|---|---|
+| `RESEND_API_KEY` | server | Resend API key. If unset in development, the code and link are logged to the server console instead of emailed. Required in production. |
+| `EMAIL_FROM` | server | Sender, e.g. `Snakkly <no-reply@yourdomain.no>`. The domain must be verified in Resend (`onboarding@resend.dev` only delivers to your own Resend account address). |
+| `NEXT_PUBLIC_APP_URL` / `BETTER_AUTH_URL` | server | Base URL used to build the verification link. |
+| `GOOGLE_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID` | server | Accepted audiences for Google ID tokens. If none are set (development only), unsigned dev tokens are accepted. |
+| `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | app | OAuth client IDs used by `expo-auth-session`. Without the ID for the current platform, the button falls back to a dev-only mock in `__DEV__` builds. |
+
+Google Cloud Console setup: create a **Web** OAuth client (authorised JavaScript origin + redirect URI = your web app URL, e.g. `http://localhost:8081`), an **Android** client (package `no.norskapp.muntlig` + SHA-1 of the signing key) and an **iOS** client (bundle ID `no.norskapp.muntlig`). Native sign-in requires a development build (`npx expo run:android` / `run:ios`); Expo Go can't receive the redirect. The app URL scheme is `snakkly` (see `app.json`).
+
+Migration `drizzle/0003_verify_existing_users.sql` marks all accounts that existed before verification was introduced as verified.
 
 ---
 

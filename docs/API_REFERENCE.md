@@ -152,9 +152,14 @@ Queries or tops up the candidate's remaining practice seconds (`remainingAudioSe
 ## 8. Authentication Endpoints (`/api/auth/*`)
 Authentication is built with Better Auth and JWT token support for web and mobile Expo clients.
 
-- **`POST /api/auth/register`**: Registers a new user with `email`, `password`, `name`, and optional `referralCode`. Issues an auth cookie / Bearer token and assigns a unique personal referral code.
-- **`POST /api/auth/login`**: Authenticates with `email` and `password`, returning user details, subscription tier, and auth token.
-- **`POST /api/auth/google`**: Verifies Google ID tokens via `google-auth-library` and signs in or registers the user.
+All auth errors share one shape: `{ "error": "<CODE>", "message": "<norsk tekst>", "fieldErrors"?: { "<field>": "<melding>" } }`. Validation rules live in `src/validation/auth.ts` and are shared with the app.
+
+- **`POST /api/auth/register`**: Body `{ name, email, password, confirmPassword, referralCode? }`. Password: 8–128 chars, at least one letter and one digit. Creates the account **unverified** and emails a 6-digit code plus a verification link (Resend). Returns `{ success, requiresVerification: true, email }` — **no token**. Errors: `VALIDATION_ERROR` (400), `INVALID_REFERRAL_CODE` (400), `EMAIL_TAKEN` (409), `EMAIL_SEND_FAILED` (502, account created; client should offer resend). Re-registering an existing *unverified* email re-sends the code instead of failing.
+- **`POST /api/auth/login`**: Body `{ email, password }`. Returns `{ token, user }`. Errors: `INVALID_CREDENTIALS` (401), `EMAIL_NOT_VERIFIED` (403, includes `email`; a fresh code is sent, subject to the 60 s cooldown — `retryAfterSeconds` if still cooling down).
+- **`POST /api/auth/verify-email`**: Body `{ email, code }`. Verifies the 6-digit code and logs the user in: returns `{ token, user }`. Errors (400): `INVALID_CODE` (with `attemptsLeft`), `EXPIRED`, `TOO_MANY_ATTEMPTS` (after 5 wrong codes the code is invalidated).
+- **`GET /api/auth/verify-email?email=&token=`**: Target of the link in the email. Verifies and renders a small HTML confirmation page; the user then logs in in the app.
+- **`POST /api/auth/resend-verification`**: Body `{ email }`. Sends a new code + link if the account is pending verification. Always answers `200 { success, retryAfterSeconds }` regardless of whether the account exists; `429 RESEND_COOLDOWN` with `retryAfterSeconds` inside the 60 s cooldown.
+- **`POST /api/auth/google`**: Body `{ idToken, referralCode? }`. Verifies the Google ID token against `GOOGLE_CLIENT_ID` / `GOOGLE_ANDROID_CLIENT_ID` / `GOOGLE_IOS_CLIENT_ID`, requires `email_verified`, then signs in or registers the user. New Google users are created with `email_verified = true` (no email verification step). Errors: `INVALID_GOOGLE_TOKEN` (401), `GOOGLE_EMAIL_NOT_VERIFIED` (403).
 - **`POST /api/auth/apple`**: Extensible Apple OAuth identity token verification endpoint.
 - **`GET /api/auth/me`**: Returns the profile, subscription tier, referral code, and earned referral statistics of the currently authenticated user.
 

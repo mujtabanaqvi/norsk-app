@@ -2,6 +2,7 @@
   "expo": {
     "name": "Snakkly",
     "slug": "norsk-app",
+    "scheme": "snakkly",
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
@@ -47,7 +48,8 @@
         }
       ],
       "expo-secure-store",
-      "expo-asset"
+      "expo-asset",
+      "expo-web-browser"
     ]
   }
 }

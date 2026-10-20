@@ -5,7 +5,9 @@ import {
   loginWithEmail,
   registerWithEmail,
   loginWithGoogleToken,
+  verifyEmailCode,
   logoutUser,
+  type RegisterResult,
 } from '../api';
 
 export interface UserProfile {
@@ -30,12 +32,21 @@ export interface DailyTestStatus {
   resetsAt: string;
 }
 
+export interface RegisterParams {
+  email: string;
+  password: string;
+  confirmPassword: string;
+  name: string;
+  referralCode?: string;
+}
+
 interface AuthContextType {
   user: UserProfile | null;
   dailyTestStatus: DailyTestStatus | null;
   isLoading: boolean;
   login: (params: { email: string; password: string }) => Promise<void>;
-  register: (params: { email: string; password: string; name?: string; referralCode?: string }) => Promise<void>;
+  register: (params: RegisterParams) => Promise<RegisterResult>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
   loginWithGoogle: (idToken: string, referralCode?: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshProfile: () => Promise<void>;
@@ -70,42 +81,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshProfile();
   }, [refreshProfile]);
 
+  // Note: these deliberately don't toggle the global `isLoading` — that flag swaps the whole
+  // navigator for a splash screen, which would unmount the auth form and lose its error state.
   const handleLogin = async (params: { email: string; password: string }) => {
-    setIsLoading(true);
-    try {
-      const res = await loginWithEmail(params);
-      setUser(res.user);
-      await refreshProfile();
-    } finally {
-      setIsLoading(false);
-    }
+    const res = await loginWithEmail(params);
+    setUser(res.user);
+    await refreshProfile();
   };
 
-  const handleRegister = async (params: {
-    email: string;
-    password: string;
-    name?: string;
-    referralCode?: string;
-  }) => {
-    setIsLoading(true);
-    try {
-      const res = await registerWithEmail(params);
-      setUser(res.user);
-      await refreshProfile();
-    } finally {
-      setIsLoading(false);
-    }
+  const handleRegister = (params: RegisterParams) => registerWithEmail(params);
+
+  const handleVerifyEmail = async (email: string, code: string) => {
+    const res = await verifyEmailCode(email, code);
+    setUser(res.user);
+    await refreshProfile();
   };
 
   const handleGoogleLogin = async (idToken: string, referralCode?: string) => {
-    setIsLoading(true);
-    try {
-      const res = await loginWithGoogleToken(idToken, referralCode);
-      setUser(res.user);
-      await refreshProfile();
-    } finally {
-      setIsLoading(false);
-    }
+    const res = await loginWithGoogleToken(idToken, referralCode);
+    setUser(res.user);
+    await refreshProfile();
   };
 
   const handleLogout = async () => {
@@ -127,6 +122,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login: handleLogin,
         register: handleRegister,
+        verifyEmail: handleVerifyEmail,
         loginWithGoogle: handleGoogleLogin,
         logout: handleLogout,
         refreshProfile,

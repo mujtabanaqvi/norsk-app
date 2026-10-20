@@ -20,6 +20,8 @@ interface ButtonProps {
   variant?: ButtonVariant;
   size?: ButtonSize;
   icon?: IconName;
+  /** Custom leading element (e.g. a multicolour brand mark) rendered instead of `icon`. */
+  leading?: React.ReactNode;
   iconRight?: IconName;
   loading?: boolean;
   disabled?: boolean;
@@ -48,6 +50,7 @@ export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
   icon,
+  leading,
   iconRight,
   loading = false,
   disabled = false,
@@ -84,7 +87,7 @@ export const Button: React.FC<ButtonProps> = ({
         <ActivityIndicator size="small" color={v.fg} />
       ) : (
         <View style={styles.content}>
-          {icon && <Icon name={icon} size={s.icon} color={v.fg} />}
+          {leading ?? (icon && <Icon name={icon} size={s.icon} color={v.fg} />)}
           <Text style={[styles.label, { color: v.fg, fontSize: s.font }]} numberOfLines={1}>
             {title}
           </Text>

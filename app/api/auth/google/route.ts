@@ -3,18 +3,71 @@ import { z } from 'zod';
 import { OAuth2Client } from 'google-auth-library';
 import crypto from 'crypto';
 import { db } from '@/src/db';
-import { users, account, userQuotas, referralRewards } from '@/src/db/schema';
+import { users, account, userQuotas } from '@/src/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { signUserToken } from '@/lib/auth';
-import { getReferralSettings } from '@/lib/tier-policy';
+import { referralCodeSchema } from '@/src/validation/auth';
+import { apiError, validationError } from '@/lib/api-errors';
+import { onEmailVerified } from '@/lib/email-verification';
 
 const googleAuthSchema = z.object({
   idToken: z.string().min(10, 'Google ID Token er påkrevd'),
-  referralCode: z.string().trim().optional(),
+  referralCode: referralCodeSchema,
 });
 
 function generateReferralCode(): string {
   return crypto.randomBytes(4).toString('hex').toUpperCase();
+}
+
+/** Every OAuth client ID (web / Android / iOS) whose ID tokens we accept. */
+function googleAudiences(): string[] {
+  return [
+    process.env.GOOGLE_CLIENT_ID,
+    process.env.GOOGLE_ANDROID_CLIENT_ID,
+    process.env.GOOGLE_IOS_CLIENT_ID,
+  ].filter((id): id is string => !!id && id !== 'placeholder-google-client-id');
+}
+
+interface GoogleIdentity {
+  sub: string;
+  email: string;
+  emailVerified: boolean;
+  name?: string;
+  picture?: string;
+}
+
+async function verifyGoogleIdToken(idToken: string): Promise<GoogleIdentity | null> {
+  const audiences = googleAudiences();
+
+  if (audiences.length > 0) {
+    const client = new OAuth2Client();
+    const ticket = await client.verifyIdToken({ idToken, audience: audiences });
+    const payload = ticket.getPayload();
+    if (!payload?.sub || !payload.email) return null;
+    return {
+      sub: payload.sub,
+      email: payload.email,
+      emailVerified: payload.email_verified === true,
+      name: payload.name,
+      picture: payload.picture,
+    };
+  }
+
+  // Local development only: no client IDs configured, accept an unsigned JWT payload.
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('Google client IDs are not configured');
+  }
+  const parts = idToken.split('.');
+  if (parts.length !== 3) return null;
+  const decoded = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
+  if (!decoded.sub || !decoded.email) return null;
+  return {
+    sub: decoded.sub,
+    email: decoded.email,
+    emailVerified: true,
+    name: decoded.name,
+    picture: decoded.picture,
+  };
 }
 
 export async function POST(req: NextRequest) {
@@ -23,160 +76,95 @@ export async function POST(req: NextRequest) {
     const parsed = googleAuthSchema.safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json(
-        { error: 'Validation Error', details: parsed.error.flatten() },
-        { status: 400 }
-      );
+      return validationError(parsed.error);
     }
 
     const { idToken, referralCode } = parsed.data;
-    const clientId = process.env.GOOGLE_CLIENT_ID;
 
-    let payload: { sub: string; email?: string; name?: string; picture?: string };
-
-    if (clientId && clientId !== 'placeholder-google-client-id') {
-      const client = new OAuth2Client(clientId);
-      const ticket = await client.verifyIdToken({
-        idToken,
-        audience: clientId,
-      });
-      const googlePayload = ticket.getPayload();
-      if (!googlePayload || !googlePayload.email) {
-        return NextResponse.json({ error: 'Invalid Google Token payload' }, { status: 401 });
-      }
-      payload = {
-        sub: googlePayload.sub,
-        email: googlePayload.email,
-        name: googlePayload.name,
-        picture: googlePayload.picture,
-      };
-    } else {
-      // Dev fallback: decode JWT payload
-      try {
-        const parts = idToken.split('.');
-        if (parts.length === 3) {
-          const decoded = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf-8'));
-          payload = {
-            sub: decoded.sub || `google_${Date.now()}`,
-            email: decoded.email || 'user@example.com',
-            name: decoded.name || 'Google Bruker',
-            picture: decoded.picture,
-          };
-        } else {
-          return NextResponse.json(
-            { error: 'Invalid token format', message: 'Ugyldig Google token format' },
-            { status: 400 }
-          );
-        }
-      } catch {
-        return NextResponse.json({ error: 'Failed to parse Google token' }, { status: 400 });
-      }
+    let identity: GoogleIdentity | null;
+    try {
+      identity = await verifyGoogleIdToken(idToken);
+    } catch (verifyError) {
+      console.warn('Google ID token verification failed:', verifyError);
+      return apiError(401, 'INVALID_GOOGLE_TOKEN', 'Google-innloggingen kunne ikke bekreftes. Prøv igjen.');
     }
 
-    const googleId = payload.sub;
-    const email = payload.email!.toLowerCase().trim();
-    const name = payload.name;
-    const avatarUrl = payload.picture;
+    if (!identity) {
+      return apiError(401, 'INVALID_GOOGLE_TOKEN', 'Google-innloggingen kunne ikke bekreftes. Prøv igjen.');
+    }
+    if (!identity.emailVerified) {
+      return apiError(403, 'GOOGLE_EMAIL_NOT_VERIFIED', 'Google-kontoen din har ikke en bekreftet e-postadresse.');
+    }
+
+    const googleId = identity.sub;
+    const email = identity.email.toLowerCase().trim();
 
     // 1. Check if OAuth account link already exists
     const [existingAccount] = await db
       .select()
       .from(account)
-      .where(
-        and(
-          eq(account.providerId, 'google'),
-          eq(account.accountId, googleId)
-        )
-      )
+      .where(and(eq(account.providerId, 'google'), eq(account.accountId, googleId)))
       .limit(1);
 
-    let userId: string;
-    let userRecord: any;
+    let userRecord: typeof users.$inferSelect | undefined;
 
     if (existingAccount) {
-      userId = existingAccount.userId;
-      const [u] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-      userRecord = u;
+      [userRecord] = await db.select().from(users).where(eq(users.id, existingAccount.userId)).limit(1);
     } else {
       // 2. Check if a user with this email exists
-      const [existingUser] = await db
-        .select()
-        .from(users)
-        .where(eq(users.email, email))
-        .limit(1);
+      const [existingUser] = await db.select().from(users).where(eq(users.email, email)).limit(1);
 
       if (existingUser) {
-        userId = existingUser.id;
+        // Link Google to the existing account. We deliberately do NOT flip email_verified for an
+        // unverified password account: whoever pre-registered this address with a password must
+        // still prove ownership via the email before password login works.
         userRecord = existingUser;
+        await db
+          .insert(userQuotas)
+          .values({ userId: existingUser.id, remainingAudioSeconds: 1800 })
+          .onConflictDoNothing();
       } else {
-        // 3. Create new user with referral tracking
+        // 3. Create new user — Google has already verified the email
         let referrerUserId: string | null = null;
         if (referralCode) {
           const [referrer] = await db
-            .select()
+            .select({ id: users.id })
             .from(users)
-            .where(eq(users.referralCode, referralCode.toUpperCase()))
+            .where(eq(users.referralCode, referralCode))
             .limit(1);
-
-          if (referrer) {
-            referrerUserId = referrer.id;
-          }
+          referrerUserId = referrer?.id ?? null;
         }
 
-        userId = `usr_${crypto.randomUUID()}`;
-        const newReferralCode = generateReferralCode();
-
-        const [createdUser] = await db
+        [userRecord] = await db
           .insert(users)
           .values({
-            id: userId,
+            id: `usr_${crypto.randomUUID()}`,
             email,
-            name: name || email.split('@')[0],
-            image: avatarUrl,
-            referralCode: newReferralCode,
+            emailVerified: true,
+            name: identity.name || email.split('@')[0],
+            image: identity.picture,
+            referralCode: generateReferralCode(),
             referredByUserId: referrerUserId,
             subscriptionTier: 'FREE',
           })
           .returning();
 
-        userRecord = createdUser;
-
-        // Initialize user audio quota
-        await db
-          .insert(userQuotas)
-          .values({
-            userId,
-            remainingAudioSeconds: 1800,
-          })
-          .onConflictDoNothing();
-
-        // Award referral bonus to referrer
-        if (referrerUserId) {
-          const referralSettings = await getReferralSettings();
-          const startsAt = new Date();
-          const expiresAt = new Date();
-          expiresAt.setDate(expiresAt.getDate() + referralSettings.durationDays);
-
-          await db.insert(referralRewards).values({
-            referrerUserId,
-            referredUserId: userId,
-            bonusTestsPerDay: referralSettings.bonusDailyTests,
-            startsAt,
-            expiresAt,
-          });
-        }
+        await onEmailVerified(userRecord.id);
       }
 
-      // Link Google account to the user
       await db
         .insert(account)
         .values({
           id: `acc_${crypto.randomUUID()}`,
-          userId,
+          userId: userRecord.id,
           providerId: 'google',
           accountId: googleId,
         })
         .onConflictDoNothing();
+    }
+
+    if (!userRecord) {
+      return apiError(404, 'USER_NOT_FOUND', 'Brukerkontoen finnes ikke');
     }
 
     const token = signUserToken({
@@ -200,6 +188,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.error('Google Auth Error:', error);
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+    return apiError(500, 'GOOGLE_AUTH_ERROR', 'Google-innlogging mislyktes. Prøv igjen senere.');
   }
 }

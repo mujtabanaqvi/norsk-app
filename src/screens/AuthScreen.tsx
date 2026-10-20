@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -13,74 +13,166 @@ import {
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { useAuth } from '../hooks/useAuth';
-import { Screen, Logo, Card, Badge, Button, Icon } from '../components/ui';
+import { ApiError } from '../api';
+import { Screen, Logo, Card, Badge, Button, Icon, FormField } from '../components/ui';
+import { GoogleSignInButton } from '../components/GoogleSignInButton';
 import { colors, radius, space, type } from '../theme';
+import {
+  loginSchema,
+  registerSchema,
+  fieldErrors as toFieldErrors,
+  validateField,
+  emailSchema,
+  PASSWORD_RULES_HINT,
+  type FieldErrors,
+} from '../validation/auth';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Auth'>;
 
-export const AuthScreen: React.FC<Props> = ({ navigation }) => {
+type FieldName = 'name' | 'email' | 'password' | 'confirmPassword' | 'referralCode';
+
+export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
   const { login, register, loginWithGoogle } = useAuth();
 
-  const [isLoginMode, setIsLoginMode] = useState<boolean>(true);
-  const [email, setEmail] = useState<string>('');
-  const [password, setPassword] = useState<string>('');
-  const [name, setName] = useState<string>('');
-  const [referralCode, setReferralCode] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoginMode, setIsLoginMode] = useState<boolean>(route.params?.mode !== 'register');
+  const [values, setValues] = useState<Record<FieldName, string>>({
+    name: '',
+    email: route.params?.email ?? '',
+    password: '',
+    confirmPassword: '',
+    referralCode: '',
+  });
+  const [errors, setErrors] = useState<FieldErrors>({});
+  const [touched, setTouched] = useState<Partial<Record<FieldName, boolean>>>({});
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [focusedField, setFocusedField] = useState<string | null>(null);
+
+  const emailRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmRef = useRef<TextInput>(null);
+  const referralRef = useRef<TextInput>(null);
+
+  // Returning from VerifyEmail ("logg inn" / "registrer på nytt") passes new params.
+  useEffect(() => {
+    const mode = route.params?.mode;
+    const email = route.params?.email;
+    if (mode) setIsLoginMode(mode !== 'register');
+    if (email !== undefined) {
+      setValues((v) => ({ ...v, email, password: '', confirmPassword: '' }));
+    }
+  }, [route.params?.mode, route.params?.email]);
+
+  const schema = isLoginMode ? loginSchema : registerSchema;
+  const isBusy = isSubmitting || isGoogleLoading;
+
+  const setField = (field: FieldName, value: string) => {
+    const next = { ...values, [field]: value };
+    setValues(next);
+    setErrorMessage(null);
+    // Once a field has been visited, re-validate as the user types so errors clear as soon as fixed.
+    if (touched[field] || errors[field]) {
+      setErrors((prev) => {
+        const updated = { ...prev };
+        const message = validateField(schema, next, field);
+        if (message) updated[field] = message;
+        else delete updated[field];
+        // Keep "confirm password" in sync when the password itself changes.
+        if (field === 'password' && (touched.confirmPassword || prev.confirmPassword)) {
+          const confirmMessage = validateField(schema, next, 'confirmPassword');
+          if (confirmMessage) updated.confirmPassword = confirmMessage;
+          else delete updated.confirmPassword;
+        }
+        return updated;
+      });
+    }
+  };
+
+  const handleBlur = (field: FieldName) => {
+    setTouched((t) => ({ ...t, [field]: true }));
+    // Don't flag a field that was merely tabbed past while still empty; submit catches that.
+    if (!values[field]) return;
+    const message = validateField(schema, values, field);
+    setErrors((prev) => {
+      const updated = { ...prev };
+      if (message) updated[field] = message;
+      else delete updated[field];
+      return updated;
+    });
+  };
+
+  const switchMode = () => {
+    setIsLoginMode((m) => !m);
+    setErrors({});
+    setTouched({});
+    setErrorMessage(null);
+    setValues((v) => ({ ...v, password: '', confirmPassword: '' }));
+  };
 
   const handleSubmit = async () => {
+    if (isBusy) return;
     setErrorMessage(null);
-    if (!email.trim() || !password.trim()) {
-      setErrorMessage('Vennligst fyll ut e-post og passord.');
+
+    const parsed = schema.safeParse(values);
+    if (!parsed.success) {
+      setErrors(toFieldErrors(parsed.error));
+      setTouched({ name: true, email: true, password: true, confirmPassword: true, referralCode: true });
       return;
     }
+    setErrors({});
 
-    setIsLoading(true);
+    setIsSubmitting(true);
     try {
       if (isLoginMode) {
-        await login({ email: email.trim(), password });
+        // On success App swaps to the authenticated stack.
+        await login({ email: values.email.trim(), password: values.password });
       } else {
-        await register({
-          email: email.trim(),
-          password,
-          name: name.trim() || undefined,
-          referralCode: referralCode.trim() || undefined,
+        const res = await register({
+          name: values.name.trim(),
+          email: values.email.trim(),
+          password: values.password,
+          confirmPassword: values.confirmPassword,
+          referralCode: values.referralCode.trim() || undefined,
+        });
+        navigation.navigate('VerifyEmail', {
+          email: res.email,
+          retryAfterSeconds: res.retryAfterSeconds,
         });
       }
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Det oppstod en feil.');
+      if (err instanceof ApiError) {
+        if (err.code === 'EMAIL_NOT_VERIFIED' || err.code === 'EMAIL_SEND_FAILED') {
+          navigation.navigate('VerifyEmail', {
+            email: err.email || values.email.trim().toLowerCase(),
+            // If sending failed, let the user hit "Send ny kode" immediately.
+            retryAfterSeconds: err.code === 'EMAIL_SEND_FAILED' ? 0 : err.retryAfterSeconds,
+          });
+          return;
+        }
+        if (err.fieldErrors && Object.keys(err.fieldErrors).length > 0) {
+          setErrors(err.fieldErrors);
+          return;
+        }
+      }
+      setErrorMessage(err?.message || 'Det oppstod en feil. Prøv igjen.');
     } finally {
-      setIsLoading(false);
+      setIsSubmitting(false);
     }
   };
 
-  const handleGoogleSignIn = async () => {
+  const handleGoogleIdToken = async (idToken: string) => {
     setErrorMessage(null);
-    setIsLoading(true);
+    setIsGoogleLoading(true);
     try {
-      const simulatedToken = `google_mock_token_${Date.now()}.${btoa(
-        JSON.stringify({
-          sub: `google_user_${Date.now()}`,
-          email: email.trim() || 'bruker@gmail.com',
-          name: name.trim() || 'Google Bruker',
-        })
-      )}.sig`;
-
-      await loginWithGoogle(simulatedToken, referralCode.trim() || undefined);
-      if (navigation.canGoBack()) {
-        navigation.goBack();
-      }
+      const referral = isLoginMode ? undefined : values.referralCode.trim() || undefined;
+      await loginWithGoogle(idToken, referral);
     } catch (err: any) {
-      setErrorMessage(err.message || 'Google-innlogging feilet');
-    } finally {
-      setIsLoading(false);
+      setErrorMessage(err?.message || 'Google-innlogging feilet');
+      setIsGoogleLoading(false);
     }
   };
+
+  const devGoogleEmail = emailSchema.safeParse(values.email);
 
   return (
     <Screen>
@@ -171,111 +263,27 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
             </View>
 
             {errorMessage && (
-              <View style={styles.errorBox}>
+              <View style={styles.errorBox} accessibilityLiveRegion="polite">
                 <Icon name="alert-circle" size={18} color={colors.danger} />
                 <Text style={styles.errorText}>{errorMessage}</Text>
               </View>
             )}
 
             <Card style={styles.formCard}>
-              {!isLoginMode && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Fullt navn</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      focusedField === 'name' && styles.inputFocused,
-                    ]}
-                    placeholder="Ola Nordmann"
-                    placeholderTextColor={colors.textMuted}
-                    value={name}
-                    onChangeText={setName}
-                    onFocus={() => setFocusedField('name')}
-                    onBlur={() => setFocusedField(null)}
-                    autoCapitalize="words"
-                  />
-                </View>
-              )}
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>E-postadresse</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    focusedField === 'email' && styles.inputFocused,
-                  ]}
-                  placeholder="ola@eksempel.no"
-                  placeholderTextColor={colors.textMuted}
-                  value={email}
-                  onChangeText={setEmail}
-                  onFocus={() => setFocusedField('email')}
-                  onBlur={() => setFocusedField(null)}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                />
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>Passord</Text>
-                <TextInput
-                  style={[
-                    styles.input,
-                    focusedField === 'password' && styles.inputFocused,
-                  ]}
-                  placeholder="Minst 6 tegn"
-                  placeholderTextColor={colors.textMuted}
-                  value={password}
-                  onChangeText={setPassword}
-                  onFocus={() => setFocusedField('password')}
-                  onBlur={() => setFocusedField(null)}
-                  secureTextEntry
-                />
-              </View>
-
-              {!isLoginMode && (
-                <View style={styles.inputGroup}>
-                  <Text style={styles.inputLabel}>Vervekode (valgfritt)</Text>
-                  <TextInput
-                    style={[
-                      styles.input,
-                      focusedField === 'referral' && styles.inputFocused,
-                    ]}
-                    placeholder="F.eks. A1B2C3D4"
-                    placeholderTextColor={colors.textMuted}
-                    value={referralCode}
-                    onChangeText={setReferralCode}
-                    onFocus={() => setFocusedField('referral')}
-                    onBlur={() => setFocusedField(null)}
-                    autoCapitalize="characters"
-                  />
-                </View>
-              )}
-
-              <Button
-                title={isLoginMode ? 'Logg inn' : 'Registrer konto'}
-                variant="primary"
-                size="lg"
-                fullWidth
-                loading={isLoading}
-                onPress={handleSubmit}
-                style={styles.submitButton}
-              />
-
-              <View style={styles.dividerContainer}>
-                <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>ELLER</Text>
-                <View style={styles.dividerLine} />
-              </View>
-
-              {/* Google Authentication */}
-              <Button
-                title="Fortsett med Google"
-                variant="outline"
-                size="lg"
-                icon="logo-google"
-                fullWidth
-                disabled={isLoading}
-                onPress={handleGoogleSignIn}
+              {/* Google Authentication — Google has already verified the email */}
+              <GoogleSignInButton
+                disabled={isBusy}
+                loading={isGoogleLoading}
+                onIdToken={handleGoogleIdToken}
+                onError={(message) => {
+                  setErrorMessage(message);
+                  setIsGoogleLoading(false);
+                }}
+                devIdentity={
+                  devGoogleEmail.success
+                    ? { email: devGoogleEmail.data, name: values.name.trim() || 'Google Bruker' }
+                    : undefined
+                }
                 style={styles.socialButton}
               />
 
@@ -291,15 +299,120 @@ export const AuthScreen: React.FC<Props> = ({ navigation }) => {
                   Alert.alert('Kommer snart', 'Apple ID-innlogging blir tilgjengelig snart.')
                 }
               />
+
+              <View style={styles.dividerContainer}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>ELLER MED E-POST</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              {!isLoginMode && (
+                <FormField
+                  label="Fullt navn"
+                  placeholder="Ola Nordmann"
+                  value={values.name}
+                  onChangeText={(t) => setField('name', t)}
+                  onBlur={() => handleBlur('name')}
+                  error={errors.name}
+                  autoCapitalize="words"
+                  autoComplete="name"
+                  textContentType="name"
+                  returnKeyType="next"
+                  onSubmitEditing={() => emailRef.current?.focus()}
+                  editable={!isBusy}
+                />
+              )}
+
+              <FormField
+                ref={emailRef}
+                label="E-postadresse"
+                placeholder="ola@eksempel.no"
+                value={values.email}
+                onChangeText={(t) => setField('email', t)}
+                onBlur={() => handleBlur('email')}
+                error={errors.email}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoComplete="email"
+                textContentType="emailAddress"
+                returnKeyType="next"
+                onSubmitEditing={() => passwordRef.current?.focus()}
+                editable={!isBusy}
+              />
+
+              <FormField
+                ref={passwordRef}
+                label="Passord"
+                placeholder={isLoginMode ? 'Ditt passord' : 'Velg et passord'}
+                value={values.password}
+                onChangeText={(t) => setField('password', t)}
+                onBlur={() => handleBlur('password')}
+                error={errors.password}
+                hint={isLoginMode ? undefined : PASSWORD_RULES_HINT}
+                password
+                autoCapitalize="none"
+                autoComplete={isLoginMode ? 'current-password' : 'new-password'}
+                textContentType={isLoginMode ? 'password' : 'newPassword'}
+                returnKeyType={isLoginMode ? 'go' : 'next'}
+                onSubmitEditing={() => (isLoginMode ? handleSubmit() : confirmRef.current?.focus())}
+                editable={!isBusy}
+              />
+
+              {!isLoginMode && (
+                <FormField
+                  ref={confirmRef}
+                  label="Bekreft passord"
+                  placeholder="Skriv passordet på nytt"
+                  value={values.confirmPassword}
+                  onChangeText={(t) => setField('confirmPassword', t)}
+                  onBlur={() => handleBlur('confirmPassword')}
+                  error={errors.confirmPassword}
+                  password
+                  autoCapitalize="none"
+                  autoComplete="new-password"
+                  textContentType="newPassword"
+                  returnKeyType="next"
+                  onSubmitEditing={() => referralRef.current?.focus()}
+                  editable={!isBusy}
+                />
+              )}
+
+              {!isLoginMode && (
+                <FormField
+                  ref={referralRef}
+                  label="Vervekode (valgfritt)"
+                  placeholder="F.eks. A1B2C3D4"
+                  value={values.referralCode}
+                  onChangeText={(t) => setField('referralCode', t)}
+                  onBlur={() => handleBlur('referralCode')}
+                  error={errors.referralCode}
+                  autoCapitalize="characters"
+                  maxLength={8}
+                  returnKeyType="go"
+                  onSubmitEditing={handleSubmit}
+                  editable={!isBusy}
+                />
+              )}
+
+              <Button
+                title={isLoginMode ? 'Logg inn' : 'Registrer konto'}
+                variant="primary"
+                size="lg"
+                fullWidth
+                loading={isSubmitting}
+                disabled={isGoogleLoading}
+                onPress={handleSubmit}
+                style={styles.submitButton}
+              />
+
+              {!isLoginMode && (
+                <Text style={styles.verifyNote}>
+                  Vi sender en bekreftelseskode til e-postadressen din.
+                </Text>
+              )}
             </Card>
 
-            <Pressable
-              style={styles.switchModeButton}
-              onPress={() => {
-                setIsLoginMode(!isLoginMode);
-                setErrorMessage(null);
-              }}
-            >
+            <Pressable style={styles.switchModeButton} onPress={switchMode} disabled={isBusy}>
               <Text style={styles.switchModeText}>
                 {isLoginMode
                   ? 'Har du ikke en konto? Registrer deg her'
@@ -436,31 +549,14 @@ const styles = StyleSheet.create({
   formCard: {
     padding: space.xl,
   },
-  inputGroup: {
-    marginBottom: space.md,
-  },
-  inputLabel: {
-    ...type.caption,
-    color: colors.text,
-    fontWeight: '600',
-    marginBottom: 6,
-  },
-  input: {
-    backgroundColor: colors.surfaceMuted,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingHorizontal: space.lg,
-    paddingVertical: 12,
-    fontSize: 15,
-    color: colors.text,
-  },
-  inputFocused: {
-    borderColor: colors.red,
-    backgroundColor: colors.surface,
-  },
   submitButton: {
     marginTop: space.xs,
+  },
+  verifyNote: {
+    ...type.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: space.sm,
   },
   dividerContainer: {
     flexDirection: 'row',

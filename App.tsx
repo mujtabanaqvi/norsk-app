@@ -8,6 +8,7 @@ import { ExamSetupScreen } from './src/screens/ExamSetupScreen';
 import { ExamRoomScreen } from './src/screens/ExamRoomScreen';
 import { ExamResultsScreen } from './src/screens/ExamResultsScreen';
 import { AuthScreen } from './src/screens/AuthScreen';
+import { VerifyEmailScreen } from './src/screens/VerifyEmailScreen';
 import { SubscriptionScreen } from './src/screens/SubscriptionScreen';
 import { ReferralScreen } from './src/screens/ReferralScreen';
 import { HowToScreen } from './src/screens/HowToScreen';
@@ -120,6 +121,11 @@ function AppNavigation() {
               name="Auth"
               component={AuthScreen}
               options={{ title: 'Innlogging & Registrering' }}
+            />
+            <Stack.Screen
+              name="VerifyEmail"
+              component={VerifyEmailScreen}
+              options={{ title: 'Bekreft e-post' }}
             />
             <Stack.Screen
               name="HowTo"

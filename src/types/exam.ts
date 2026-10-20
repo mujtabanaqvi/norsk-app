@@ -209,7 +209,8 @@ export type RootStackParamList = {
   ExamResults: {
     sessionId: string;
   };
-  Auth: undefined;
+  Auth: { email?: string; mode?: 'login' | 'register' } | undefined;
+  VerifyEmail: { email: string; retryAfterSeconds?: number };
   Subscription: undefined;
   Referral: undefined;
   HowTo: undefined;

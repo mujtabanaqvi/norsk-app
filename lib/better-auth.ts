@@ -15,6 +15,11 @@ export const auth = betterAuth({
   }),
   emailAndPassword: {
     enabled: true,
+    // Sign-in is refused until the address is verified (code/link flow in lib/email-verification.ts).
+    requireEmailVerification: true,
+    autoSignIn: false,
+    minPasswordLength: 8,
+    maxPasswordLength: 128,
   },
   socialProviders: {
     google: {

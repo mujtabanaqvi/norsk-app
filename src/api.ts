@@ -349,60 +349,71 @@ export async function fetchExamResults(sessionId: string): Promise<ExamResultsRe
  * Authentication & Subscription API methods
  */
 
+export class ApiError extends Error {
+  status: number;
+  code?: string;
+  fieldErrors?: Record<string, string>;
+  email?: string;
+  retryAfterSeconds?: number;
+
+  constructor(status: number, data: any, fallbackMessage: string) {
+    super(data?.message || fallbackMessage);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = data?.error;
+    this.fieldErrors = data?.fieldErrors;
+    this.email = data?.email;
+    this.retryAfterSeconds = data?.retryAfterSeconds;
+  }
+}
+
+async function postAuthJson(path: string, payload: unknown, fallbackMessage: string) {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(res.status, data, fallbackMessage);
+  }
+  if (data.token) {
+    await setAuthToken(data.token);
+    await setStoredUser(data.user);
+  }
+  return data;
+}
+
+export interface RegisterResult {
+  requiresVerification: true;
+  email: string;
+  retryAfterSeconds?: number;
+}
+
 export async function registerWithEmail(params: {
   email: string;
   password: string;
-  name?: string;
+  confirmPassword: string;
+  name: string;
   referralCode?: string;
-}) {
-  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.message || data.error || 'Registrering mislyktes');
-  }
-  if (data.token) {
-    await setAuthToken(data.token);
-    await setStoredUser(data.user);
-  }
-  return data;
+}): Promise<RegisterResult> {
+  return postAuthJson('/api/auth/register', params, 'Registrering mislyktes');
 }
 
 export async function loginWithEmail(params: { email: string; password: string }) {
-  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.message || data.error || 'Innlogging mislyktes');
-  }
-  if (data.token) {
-    await setAuthToken(data.token);
-    await setStoredUser(data.user);
-  }
-  return data;
+  return postAuthJson('/api/auth/login', params, 'Innlogging mislyktes');
+}
+
+export async function verifyEmailCode(email: string, code: string) {
+  return postAuthJson('/api/auth/verify-email', { email, code }, 'Bekreftelsen mislyktes');
+}
+
+export async function resendVerificationEmail(email: string): Promise<{ retryAfterSeconds?: number }> {
+  return postAuthJson('/api/auth/resend-verification', { email }, 'Kunne ikke sende ny kode');
 }
 
 export async function loginWithGoogleToken(idToken: string, referralCode?: string) {
-  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/google`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ idToken, referralCode }),
-  });
-  const data = await res.json();
-  if (!res.ok) {
-    throw new Error(data.message || data.error || 'Google-innlogging mislyktes');
-  }
-  if (data.token) {
-    await setAuthToken(data.token);
-    await setStoredUser(data.user);
-  }
-  return data;
+  return postAuthJson('/api/auth/google', { idToken, referralCode }, 'Google-innlogging mislyktes');
 }
 
 export async function logoutUser() {
