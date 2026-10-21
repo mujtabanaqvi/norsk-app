@@ -10,11 +10,14 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
 import { ApiError } from '../api';
+import { getPendingReferral, subscribePendingReferral } from '../lib/pending-referral';
+import { referralCodeFromPastedText } from '../lib/referral-link';
 import {
   Screen,
   Logo,
@@ -59,6 +62,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isGoogleLoading, setIsGoogleLoading] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showReferral, setShowReferral] = useState<boolean>(false);
+  const [referralApplied, setReferralApplied] = useState<boolean>(false);
 
   const emailRef = useRef<TextInput>(null);
   const passwordRef = useRef<TextInput>(null);
@@ -74,6 +78,20 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
       setValues((v) => ({ ...v, email, password: '', confirmPassword: '' }));
     }
   }, [route.params?.mode, route.params?.email]);
+
+  // A referral link (or the code recovered after installing from one) switches to sign-up with the code filled in.
+  useEffect(() => {
+    const applyCode = (code: string | null) => {
+      if (!code) return;
+      setIsLoginMode(false);
+      setShowReferral(true);
+      setReferralApplied(true);
+      setValues((v) => ({ ...v, referralCode: code }));
+      setErrors(({ referralCode: _ignored, ...rest }) => rest);
+    };
+    getPendingReferral().then(applyCode);
+    return subscribePendingReferral(applyCode);
+  }, []);
 
   const schema = isLoginMode ? loginSchema : registerSchema;
   const isBusy = isSubmitting || isGoogleLoading;
@@ -109,6 +127,20 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
         }
         return updated;
       });
+    }
+  };
+
+  const handlePasteReferral = async () => {
+    try {
+      const code = referralCodeFromPastedText(await Clipboard.getStringAsync());
+      if (!code) {
+        Alert.alert(t('auth.pasteEmpty'));
+        return;
+      }
+      setField('referralCode', code);
+      setErrors(({ referralCode: _ignored, ...rest }) => rest);
+    } catch {
+      Alert.alert(t('auth.pasteEmpty'));
     }
   };
 
@@ -336,9 +368,26 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                     label={t('auth.referralLabel')}
                     placeholder={t('auth.referralPlaceholder')}
                     value={values.referralCode}
-                    onChangeText={(text) => setField('referralCode', text)}
+                    onChangeText={(text) => {
+                      setReferralApplied(false);
+                      setField('referralCode', text);
+                    }}
                     onBlur={() => handleBlur('referralCode')}
                     error={errors.referralCode}
+                    hint={referralApplied ? t('auth.referralApplied') : undefined}
+                    trailing={
+                      <Pressable
+                        onPress={handlePasteReferral}
+                        disabled={isBusy}
+                        style={styles.pasteButton}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('auth.paste')}
+                        hitSlop={8}
+                      >
+                        <Icon name="clipboard-outline" size={16} color={colors.red} />
+                        <Text style={styles.pasteButtonText}>{t('auth.paste')}</Text>
+                      </Pressable>
+                    }
                     autoCapitalize="characters"
                     maxLength={8}
                     returnKeyType="go"
@@ -540,6 +589,18 @@ const styles = StyleSheet.create({
   },
   referralToggleText: {
     color: colors.navy,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  pasteButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: space.md,
+    paddingVertical: 10,
+  },
+  pasteButtonText: {
+    color: colors.red,
     fontSize: 13,
     fontWeight: '700',
   },

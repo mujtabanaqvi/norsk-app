@@ -5,6 +5,9 @@ import { eq, desc } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { getReferralSettings } from '@/lib/tier-policy';
 
+// Served by the marketing website (snakkly-frontend-website, app/r/[code]); opens the app via Universal/App Links.
+const REFERRAL_LINK_BASE_URL = (process.env.REFERRAL_LINK_BASE_URL || 'https://snakkly.no').replace(/\/+$/, '');
+
 export async function GET(req: NextRequest) {
   try {
     const auth = await authenticateUser(req);
@@ -45,6 +48,7 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({
       referralCode: user.referralCode,
+      referralLink: `${REFERRAL_LINK_BASE_URL}/r/${user.referralCode}`,
       referralSettings,
       stats: {
         totalReferredCount: rewards.length,

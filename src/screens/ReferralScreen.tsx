@@ -8,6 +8,7 @@ import {
   Share,
   Alert,
 } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { fetchReferrals } from '../api';
@@ -24,6 +25,7 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
   const { locale, t } = useLocale();
   const [data, setData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [copied, setCopied] = useState<'link' | 'code' | null>(null);
 
   useEffect(() => {
     async function loadData() {
@@ -48,11 +50,21 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
     if (!data?.referralCode) return;
     try {
       await Share.share({
-        message: t('referral.shareMessage', { code: data.referralCode }),
+        message: data.referralLink
+          ? t('referral.shareLinkMessage', { link: data.referralLink, code: data.referralCode })
+          : t('referral.shareMessage', { code: data.referralCode }),
       });
     } catch (err: any) {
       console.error('Share error:', err);
     }
+  };
+
+  const handleCopy = async (kind: 'link' | 'code') => {
+    const value = kind === 'link' ? data?.referralLink : data?.referralCode;
+    if (!value) return;
+    await Clipboard.setStringAsync(value);
+    setCopied(kind);
+    setTimeout(() => setCopied((current) => (current === kind ? null : current)), 2000);
   };
 
   if (!user) {
@@ -120,14 +132,42 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
                 <Text selectable style={styles.codeValue}>
                   {data?.referralCode || '------'}
                 </Text>
+                {data?.referralLink ? (
+                  <View style={styles.linkBox}>
+                    <Text style={styles.linkLabel}>{t('referral.linkLabel')}</Text>
+                    <Text selectable numberOfLines={1} style={styles.linkValue}>
+                      {data.referralLink}
+                    </Text>
+                  </View>
+                ) : null}
                 <Button
-                  title={t('referral.shareCode')}
+                  title={data?.referralLink ? t('referral.shareLink') : t('referral.shareCode')}
                   variant="primary"
                   size="lg"
                   icon="share-outline"
                   fullWidth
                   onPress={handleShare}
                 />
+                <View style={styles.copyRow}>
+                  {data?.referralLink ? (
+                    <Button
+                      title={copied === 'link' ? t('referral.copied') : t('referral.copyLink')}
+                      variant="outline"
+                      size="md"
+                      icon={copied === 'link' ? 'checkmark' : 'link-outline'}
+                      style={styles.copyButton}
+                      onPress={() => handleCopy('link')}
+                    />
+                  ) : null}
+                  <Button
+                    title={copied === 'code' ? t('referral.copied') : t('referral.copyCode')}
+                    variant="outline"
+                    size="md"
+                    icon={copied === 'code' ? 'checkmark' : 'copy-outline'}
+                    style={styles.copyButton}
+                    onPress={() => handleCopy('code')}
+                  />
+                </View>
               </View>
 
               {/* Stats Overview */}
@@ -267,6 +307,31 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 4,
     marginBottom: space.lg,
+  },
+  linkBox: {
+    width: '100%',
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    paddingHorizontal: space.md,
+    paddingVertical: space.sm,
+    marginBottom: space.lg,
+  },
+  linkLabel: {
+    ...type.caption,
+    marginBottom: 2,
+  },
+  linkValue: {
+    ...type.bodyStrong,
+    color: colors.navy,
+  },
+  copyRow: {
+    flexDirection: 'row',
+    gap: space.sm,
+    marginTop: space.sm,
+    width: '100%',
+  },
+  copyButton: {
+    flex: 1,
   },
   statsCard: {
     flexDirection: 'row',

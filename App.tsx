@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Alert, Platform, StatusBar, View, ActivityIndicator } from 'react-native';
+import { Alert, Linking, Platform, StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   NavigationContainer,
@@ -24,6 +24,11 @@ import { TermsScreen } from './src/screens/TermsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 import { PaymentResultScreen } from './src/screens/PaymentResultScreen';
 import { startIapListener } from './src/lib/iap';
+import {
+  captureReferralFromUrl,
+  captureReferralOnFirstLaunch,
+  clearPendingReferral,
+} from './src/lib/pending-referral';
 import { PurchaseVerificationError } from './src/api';
 import { Logo } from './src/components/ui';
 import { colors } from './src/theme';
@@ -31,6 +36,9 @@ import type { RootStackParamList } from './src/types/exam';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+// The launch URL only needs handling once, not again after every logout.
+let initialUrlHandled = false;
 
 // Web only: lets Stripe Checkout return into the app (`/payment/success?session_id=…`).
 const linking: LinkingOptions<RootStackParamList> | undefined =
@@ -89,6 +97,27 @@ function AppNavigation() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
+
+  // Referral links (https://snakkly.no/r/CODE) only matter before sign-up; AuthScreen prefills the code.
+  useEffect(() => {
+    if (isLoading) return;
+    if (userId) {
+      clearPendingReferral();
+      return;
+    }
+    const handleUrl = async (url: string | null) => {
+      if ((await captureReferralFromUrl(url)) && navigationRef.isReady()) {
+        navigationRef.navigate('Auth', { mode: 'register' });
+      }
+    };
+    if (!initialUrlHandled) {
+      initialUrlHandled = true;
+      Linking.getInitialURL().then(handleUrl).catch(() => {});
+      captureReferralOnFirstLaunch();
+    }
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => subscription.remove();
+  }, [userId, isLoading]);
 
   if (isLoading || isLocaleLoading) {
     return (

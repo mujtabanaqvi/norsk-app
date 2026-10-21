@@ -23,6 +23,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.snakkly.app",
+      "associatedDomains": ["applinks:snakkly.no", "applinks:www.snakkly.no"],
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Norskprøven muntlig simulator trenger tilgang til mikrofonen for å vurdere din muntlige uttale og flyt.",
         "ITSAppUsesNonExemptEncryption": false
@@ -30,6 +31,17 @@
     },
     "android": {
       "package": "com.snakkly.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            { "scheme": "https", "host": "snakkly.no", "pathPrefix": "/r/" },
+            { "scheme": "https", "host": "www.snakkly.no", "pathPrefix": "/r/" }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/snakkly-icon-512.png",
         "backgroundColor": "#FFFFFF"

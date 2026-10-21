@@ -10,11 +10,13 @@ interface FormFieldProps extends Omit<TextInputProps, 'style'> {
   hint?: string;
   /** Renders a show/hide toggle and masks the value. */
   password?: boolean;
+  /** Rendered inside the input row, after the text (e.g. a "Paste" action). */
+  trailing?: React.ReactNode;
 }
 
 /** Labelled text input with focus styling, inline error and optional hint. */
 export const FormField = React.forwardRef<TextInput, FormFieldProps>(
-  ({ label, error, hint, password = false, onFocus, onBlur, ...inputProps }, ref) => {
+  ({ label, error, hint, password = false, trailing, onFocus, onBlur, ...inputProps }, ref) => {
     const { t } = useLocale();
     const [focused, setFocused] = useState(false);
     const [revealed, setRevealed] = useState(false);
@@ -59,6 +61,7 @@ export const FormField = React.forwardRef<TextInput, FormFieldProps>(
               <Icon name={revealed ? 'eye-off-outline' : 'eye-outline'} size={20} color={colors.textMuted} />
             </Pressable>
           )}
+          {trailing}
         </View>
         {hasError ? (
           <View style={styles.messageRow} accessibilityLiveRegion="polite">
