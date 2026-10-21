@@ -14,9 +14,9 @@ The user module provides:
    - Shared client/server form validation in `src/validation/auth.ts`.
    - Extensible Apple ID placeholder endpoint (`/api/auth/apple`) ready for future Apple Services ID configuration.
    - Session & token management supporting session cookies and Bearer JWTs.
-2. **Tiered Subscriptions & Stripe Billing**:
+2. **Tiered Subscriptions (App Store, Google Play & Stripe)**:
    - Three tiers: **Free**, **Standard**, and **Premium**.
-   - Stripe Checkout Sessions and webhooks handling plan upgrades, downgrades, and cancellations.
+   - Native apps bill through App Store / Google Play in-app purchases; the web app uses Stripe Checkout. All purchases are verified server-side and the tier is recomputed from every provider's subscriptions. See [PAYMENTS.md](./PAYMENTS.md).
 3. **Daily Test Quotas (Calendar Day Reset)**:
    - Users are restricted to a configurable number of tests per calendar day (resetting at 00:00:00 Europe/Oslo time).
    - Enforced on the server inside `POST /api/exam/start`.
@@ -41,7 +41,7 @@ The user module provides:
 | `GOOGLE_CLIENT_ID`, `GOOGLE_ANDROID_CLIENT_ID`, `GOOGLE_IOS_CLIENT_ID` | server | Accepted audiences for Google ID tokens. If none are set (development only), unsigned dev tokens are accepted. |
 | `EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID`, `EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID` | app | OAuth client IDs used by `expo-auth-session`. Without the ID for the current platform, the button falls back to a dev-only mock in `__DEV__` builds. |
 
-Google Cloud Console setup: create a **Web** OAuth client (authorised JavaScript origin + redirect URI = your web app URL, e.g. `http://localhost:8081`), an **Android** client (package `no.norskapp.muntlig` + SHA-1 of the signing key) and an **iOS** client (bundle ID `no.norskapp.muntlig`). Native sign-in requires a development build (`npx expo run:android` / `run:ios`); Expo Go can't receive the redirect. The app URL scheme is `snakkly` (see `app.json`).
+Google Cloud Console setup: create a **Web** OAuth client (authorised JavaScript origin + redirect URI = your web app URL, e.g. `http://localhost:8081`), an **Android** client (package `com.snakkly.app` + SHA-1 of the signing key) and an **iOS** client (bundle ID `com.snakkly.app`). Native sign-in requires a development build (`npx expo run:android` / `run:ios`); Expo Go can't receive the redirect. The app URL scheme is `snakkly` (see `app.json`).
 
 Migration `drizzle/0003_verify_existing_users.sql` marks all accounts that existed before verification was introduced as verified.
 

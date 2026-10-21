@@ -161,14 +161,20 @@ All auth errors share one shape: `{ "error": "<CODE>", "message": "<norsk tekst>
 - **`POST /api/auth/resend-verification`**: Body `{ email }`. Sends a new code + link if the account is pending verification. Always answers `200 { success, retryAfterSeconds }` regardless of whether the account exists; `429 RESEND_COOLDOWN` with `retryAfterSeconds` inside the 60 s cooldown.
 - **`POST /api/auth/google`**: Body `{ idToken, referralCode? }`. Verifies the Google ID token against `GOOGLE_CLIENT_ID` / `GOOGLE_ANDROID_CLIENT_ID` / `GOOGLE_IOS_CLIENT_ID`, requires `email_verified`, then signs in or registers the user. New Google users are created with `email_verified = true` (no email verification step). Errors: `INVALID_GOOGLE_TOKEN` (401), `GOOGLE_EMAIL_NOT_VERIFIED` (403).
 - **`POST /api/auth/apple`**: Extensible Apple OAuth identity token verification endpoint.
-- **`GET /api/auth/me`**: Returns the profile, subscription tier, referral code, and earned referral statistics of the currently authenticated user.
+- **`GET /api/auth/me`**: Returns the profile, subscription tier, `iapAccountToken`, `activeSubscriptionProvider` (`STRIPE` | `APPLE` | `GOOGLE` | `null`), referral code, and earned referral statistics of the currently authenticated user.
 
 ---
 
 ## 9. Subscription & Tier Endpoints
 - **`GET /api/config/tiers`**: Public endpoint returning all tier policies (`FREE`, `STANDARD`, `PREMIUM`) including daily test limits, monthly pricing, and feature arrays.
-- **`POST /api/stripe/checkout`**: Initiates a Stripe Checkout session for subscription tier upgrade (`STANDARD` or `PREMIUM`).
-- **`POST /api/stripe/webhook`**: Handles Stripe lifecycle webhooks (`customer.subscription.created`, `updated`, `deleted`).
+See [PAYMENTS.md](./PAYMENTS.md) for the full flow per platform.
+- **`POST /api/stripe/checkout`** (web): Body `{ tier, successUrl?, cancelUrl?, locale? }`. Creates a Stripe Checkout session. Return URLs must be on the request origin or `NEXT_PUBLIC_APP_URL`. `409 MANAGED_BY_OTHER_PROVIDER` if the user already subscribes through the App Store / Play.
+- **`GET /api/stripe/checkout/session?session_id=`** (web): Returns `{ status: 'paid' | 'pending' | 'expired', tier }` for the caller's own session, fulfilling it immediately if paid.
+- **`POST /api/stripe/webhook`**: Stripe webhooks (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`). Signature required in production.
+- **`POST /api/iap/apple/verify`** (iOS): Body `{ signedTransaction }` (StoreKit 2 JWS). Verifies and stores the subscription, returns `{ tier }`. `403 OWNED_BY_OTHER_ACCOUNT` if it belongs to another account.
+- **`POST /api/iap/google/verify`** (Android): Body `{ purchaseToken }`. Verifies with the Play Developer API, acknowledges, returns `{ tier }`. `403 OWNED_BY_OTHER_ACCOUNT` as above.
+- **`POST /api/iap/apple/notifications`**: App Store Server Notifications V2 receiver.
+- **`POST /api/iap/google/rtdn`**: Google Play Real-Time Developer Notifications (Pub/Sub push, OIDC-authenticated).
 - **`GET /api/referrals`**: Returns the authenticated user's referral code, total friends referred, and active bonus days.
 
 ---

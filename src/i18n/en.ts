@@ -374,7 +374,7 @@ export const en: Translations = {
     accountRequiredTitle: 'Account required',
     accountRequiredBody: 'You need to log in or create an account to buy a subscription.',
     paymentErrorTitle: 'Payment error',
-    paymentErrorBody: 'Could not open Stripe checkout',
+    paymentErrorBody: 'Could not start the payment',
     free: 'Free',
     current: 'CURRENT',
     mostPopular: 'MOST POPULAR',
@@ -393,6 +393,34 @@ export const en: Translations = {
       'Full history & pronunciation analysis',
       '24/7 access',
     ],
+    restore: 'Restore purchases',
+    restoreDoneTitle: 'Purchases restored',
+    restoreDoneBody: 'Your subscription is active again.',
+    restoreNone: 'No active subscriptions were found to restore.',
+    manage: 'Manage subscription',
+    managedBy: 'Your subscription is managed through {store}. Change or cancel it there.',
+    storeWeb: 'the website',
+    storeApple: 'the App Store',
+    storeGoogle: 'Google Play',
+    storeUnavailable: 'The store is not available right now. Please try again later.',
+    ownedByOtherAccount: 'This subscription belongs to another Snakkly account. Log in with the account that bought it.',
+    disclosure:
+      'The subscription renews automatically every month at the current price unless you cancel at least 24 hours before the end of the period. You can manage or cancel it at any time in {store}.',
+    termsLink: 'Terms',
+    privacyLink: 'Privacy',
+  },
+
+  payment: {
+    confirmingTitle: 'Confirming your payment …',
+    confirmingBody: 'This usually only takes a few seconds.',
+    successTitle: 'Welcome to {tier}!',
+    successBody: 'Your subscription is active. You can now take {count} tests per day.',
+    pendingTitle: 'Payment is processing',
+    pendingBody: "We'll unlock your subscription as soon as the payment is confirmed. You can keep using the app in the meantime.",
+    canceledTitle: 'Payment canceled',
+    canceledBody: 'Nothing was charged. You can try again whenever you like.',
+    startTest: 'Start a test',
+    backToPlans: 'Back to plans',
   },
 
   referral: {
@@ -459,7 +487,7 @@ export const en: Translations = {
       },
       {
         title: '3. Subscriptions and quotas',
-        body: 'Free users can take 1 test per day. Standard and Premium subscriptions give an extended daily test quota and access to additional features. Payments are processed securely through Stripe.',
+        body: 'Free users can take 1 test per day. Standard and Premium subscriptions give an extended daily test quota and access to additional features. Payments are processed securely through the App Store, Google Play or Stripe (on the web).',
       },
       {
         title: '4. Disclaimer',
@@ -551,6 +579,8 @@ export const en: Translations = {
     fetchReferral: 'Could not load the referral code',
     fetchLearningProfile: 'Could not load your learning profile ({status})',
     checkout: 'Could not start the payment',
+    verifyPurchase: 'Could not confirm the purchase',
+    checkoutSession: 'Could not load the payment status',
   },
 
   web: {

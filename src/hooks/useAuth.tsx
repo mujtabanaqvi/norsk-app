@@ -18,6 +18,10 @@ export interface UserProfile {
   role: 'USER' | 'ADMIN';
   subscriptionTier: 'FREE' | 'STANDARD' | 'PREMIUM';
   referralCode: string;
+  /** Sent to the App Store / Play as appAccountToken / obfuscatedAccountId. */
+  iapAccountToken?: string;
+  /** Which payment provider the current paid tier comes from, if any. */
+  activeSubscriptionProvider?: 'STRIPE' | 'APPLE' | 'GOOGLE' | null;
 }
 
 export interface DailyTestStatus {

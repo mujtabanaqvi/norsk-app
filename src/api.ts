@@ -507,5 +507,50 @@ export async function createStripeCheckout(tier: 'STANDARD' | 'PREMIUM', success
   return data;
 }
 
+export type PaidTierResult = { tier: 'FREE' | 'STANDARD' | 'PREMIUM' };
 
+/** Error from a purchase verification call, with the server's machine-readable code (e.g. OWNED_BY_OTHER_ACCOUNT). */
+export class PurchaseVerificationError extends Error {
+  constructor(message: string, public code?: string, public status?: number) {
+    super(message);
+    this.name = 'PurchaseVerificationError';
+  }
+}
 
+async function postPurchaseVerification(path: string, body: object): Promise<PaidTierResult> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new PurchaseVerificationError(data.message || tr('network.verifyPurchase'), data.code, res.status);
+  }
+  return data;
+}
+
+/** iOS: send the StoreKit 2 JWS transaction for server-side verification. */
+export function verifyApplePurchase(signedTransaction: string) {
+  return postPurchaseVerification('/api/iap/apple/verify', { signedTransaction });
+}
+
+/** Android: send the Play purchase token for server-side verification and acknowledgement. */
+export function verifyGooglePurchase(purchaseToken: string) {
+  return postPurchaseVerification('/api/iap/google/verify', { purchaseToken });
+}
+
+/** Web: look up (and fulfil, if paid) the Stripe Checkout session we were redirected back from. */
+export async function fetchCheckoutSession(
+  sessionId: string
+): Promise<{ status: 'paid' | 'pending' | 'expired'; tier: 'FREE' | 'STANDARD' | 'PREMIUM' | null }> {
+  const res = await fetchWithTimeout(
+    `${activeApiBaseUrl}/api/stripe/checkout/session?session_id=${encodeURIComponent(sessionId)}`,
+    { method: 'GET', headers: { Accept: 'application/json' } }
+  );
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || tr('network.checkoutSession'));
+  }
+  return data;
+}

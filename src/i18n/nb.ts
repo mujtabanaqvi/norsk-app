@@ -381,7 +381,7 @@ export const nb = {
     accountRequiredTitle: 'Konto påkrevd',
     accountRequiredBody: 'Du må logge inn eller opprette en konto for å kjøpe et abonnement.',
     paymentErrorTitle: 'Feil under betaling',
-    paymentErrorBody: 'Kunne ikke åpne Stripe kasse',
+    paymentErrorBody: 'Kunne ikke starte betalingen',
     free: 'Gratis',
     current: 'NÅVÆRENDE',
     mostPopular: 'MEST POPULÆR',
@@ -400,6 +400,34 @@ export const nb = {
       'Full historikk & uttaleanalyse',
       '24/7 tilgang',
     ],
+    restore: 'Gjenopprett kjøp',
+    restoreDoneTitle: 'Kjøp gjenopprettet',
+    restoreDoneBody: 'Abonnementet ditt er aktivt igjen.',
+    restoreNone: 'Fant ingen aktive abonnementer å gjenopprette.',
+    manage: 'Administrer abonnement',
+    managedBy: 'Abonnementet ditt administreres via {store}. Endre eller avslutt det der.',
+    storeWeb: 'nettsiden',
+    storeApple: 'App Store',
+    storeGoogle: 'Google Play',
+    storeUnavailable: 'Butikken er ikke tilgjengelig akkurat nå. Prøv igjen senere.',
+    ownedByOtherAccount: 'Dette abonnementet tilhører en annen Snakkly-konto. Logg inn med kontoen som kjøpte det.',
+    disclosure:
+      'Abonnementet fornyes automatisk hver måned til gjeldende pris, med mindre du avslutter det senest 24 timer før periodens slutt. Du kan administrere og avslutte abonnementet når som helst i {store}.',
+    termsLink: 'Vilkår',
+    privacyLink: 'Personvern',
+  },
+
+  payment: {
+    confirmingTitle: 'Bekrefter betalingen …',
+    confirmingBody: 'Dette tar vanligvis bare noen sekunder.',
+    successTitle: 'Velkommen til {tier}!',
+    successBody: 'Abonnementet ditt er aktivt. Du kan nå ta {count} tester per dag.',
+    pendingTitle: 'Betalingen behandles',
+    pendingBody: 'Vi låser opp abonnementet ditt så snart betalingen er bekreftet. Du kan fortsette å bruke appen imens.',
+    canceledTitle: 'Betalingen ble avbrutt',
+    canceledBody: 'Ingenting ble belastet. Du kan prøve igjen når du vil.',
+    startTest: 'Start en test',
+    backToPlans: 'Tilbake til abonnementer',
   },
 
   referral: {
@@ -468,7 +496,7 @@ export const nb = {
       },
       {
         title: '3. Abonnement og kvoter',
-        body: 'Gratisbrukere har tilgang til 1 prøve per dag. Standard- og Premium-abonnement gir utvidet daglig testkvote og tilgang til ytterligere funksjoner. Betalinger behandles sikkert via Stripe.',
+        body: 'Gratisbrukere har tilgang til 1 prøve per dag. Standard- og Premium-abonnement gir utvidet daglig testkvote og tilgang til ytterligere funksjoner. Betalinger behandles sikkert via App Store, Google Play eller Stripe (på nett).',
       },
       {
         title: '4. Ansvarsfraskrivelse',
@@ -562,6 +590,8 @@ export const nb = {
     fetchReferral: 'Kunne ikke hente vervekode',
     fetchLearningProfile: 'Kunne ikke hente læringsprofil ({status})',
     checkout: 'Kunne ikke starte betaling',
+    verifyPurchase: 'Kunne ikke bekrefte kjøpet',
+    checkoutSession: 'Kunne ikke hente betalingsstatus',
   },
 
   /** Next.js web pages (Stripe return pages) and Stripe checkout labels. */

@@ -36,6 +36,13 @@
       "when": 1792525053161,
       "tag": "0004_minor_scarlet_spider",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792597957385,
+      "tag": "0005_multi_provider_subscriptions",
+      "breakpoints": true
     }
   ]
 }

@@ -7,3 +7,11 @@ export const stripe = new Stripe(stripeSecretKey, {
   typescript: true,
 });
 
+/** Only allow Checkout to return to our own origins, so this endpoint cannot be used as an open redirect. */
+export function isAllowedReturnUrl(url: string, allowedOrigins: string[]): boolean {
+  try {
+    return allowedOrigins.includes(new URL(url).origin);
+  } catch {
+    return false;
+  }
+}

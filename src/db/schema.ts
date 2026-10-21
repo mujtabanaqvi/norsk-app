@@ -11,6 +11,7 @@ import {
   timestamp,
   pgEnum,
   index,
+  uniqueIndex,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 import type { LearningInsight } from '../types/learning-profile';
@@ -34,6 +35,7 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'PAST_DUE',
   'CANCELED',
 ]);
+export const paymentProviderEnum = pgEnum('payment_provider', ['STRIPE', 'APPLE', 'GOOGLE']);
 
 // Transcript structure stored in JSONB
 export interface TranscriptEntry {
@@ -253,6 +255,8 @@ export const user = pgTable('user', {
   role: userRoleEnum('role').notNull().default('USER'),
   subscriptionTier: subscriptionTierEnum('subscription_tier').notNull().default('FREE'),
   stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
+  // Opaque id sent to the stores (Apple appAccountToken / Google obfuscatedAccountId) to tie purchases to this user
+  iapAccountToken: uuid('iap_account_token').defaultRandom().notNull().unique(),
   referralCode: varchar('referral_code', { length: 32 }).notNull().unique(),
   referredByUserId: varchar('referred_by_user_id', { length: 128 }),
 });
@@ -310,8 +314,13 @@ export const subscriptions = pgTable('subscriptions', {
   userId: varchar('user_id', { length: 128 })
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }).notNull().unique(),
-  stripePriceId: varchar('stripe_price_id', { length: 255 }).notNull(),
+  provider: paymentProviderEnum('provider').notNull().default('STRIPE'),
+  // Stripe subscription id / Apple originalTransactionId / Google purchaseToken
+  externalId: varchar('external_id', { length: 512 }).notNull(),
+  productId: varchar('product_id', { length: 255 }),
+  environment: varchar('environment', { length: 16 }).notNull().default('production'),
+  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }).unique(),
+  stripePriceId: varchar('stripe_price_id', { length: 255 }),
   tier: subscriptionTierEnum('tier').notNull(),
   status: subscriptionStatusEnum('status').notNull().default('ACTIVE'),
   currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
@@ -319,7 +328,10 @@ export const subscriptions = pgTable('subscriptions', {
   cancelAtPeriodEnd: boolean('cancel_at_period_end').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
-});
+}, (table) => [
+  uniqueIndex('uq_subscriptions_provider_external').on(table.provider, table.externalId),
+  index('idx_subscriptions_user_id').on(table.userId),
+]);
 
 /**
  * 8. tier_configs Table (Configurable limits and pricing)

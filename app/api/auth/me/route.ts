@@ -4,6 +4,7 @@ import { users } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { getUserDailyTestStatus } from '@/lib/tier-policy';
+import { getActiveSubscriptionProvider } from '@/lib/entitlements';
 
 export async function GET(req: NextRequest) {
   try {
@@ -17,6 +18,7 @@ export async function GET(req: NextRequest) {
         image: users.image,
         role: users.role,
         subscriptionTier: users.subscriptionTier,
+        iapAccountToken: users.iapAccountToken,
         referralCode: users.referralCode,
         referredByUserId: users.referredByUserId,
         createdAt: users.createdAt,
@@ -29,10 +31,13 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User Not Found' }, { status: 404 });
     }
 
-    const testQuota = await getUserDailyTestStatus(user.id);
+    const [testQuota, activeSubscriptionProvider] = await Promise.all([
+      getUserDailyTestStatus(user.id),
+      getActiveSubscriptionProvider(user.id),
+    ]);
 
     return NextResponse.json({
-      user,
+      user: { ...user, activeSubscriptionProvider },
       testQuota,
     });
   } catch (error) {

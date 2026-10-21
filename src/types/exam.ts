@@ -212,6 +212,14 @@ export type RootStackParamList = {
   Auth: { email?: string; mode?: 'login' | 'register' } | undefined;
   VerifyEmail: { email: string; retryAfterSeconds?: number };
   Subscription: undefined;
+  /** Post-purchase screen. Param names match the web return URL `/payment/:result?session_id=…`. */
+  PaymentResult:
+    | {
+        result?: 'success' | 'canceled' | 'pending';
+        session_id?: string;
+        tier?: 'FREE' | 'STANDARD' | 'PREMIUM';
+      }
+    | undefined;
   Referral: undefined;
   LearningProfile: undefined;
   HowTo: undefined;

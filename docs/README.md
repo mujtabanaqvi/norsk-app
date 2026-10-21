@@ -15,7 +15,7 @@ Welcome to the documentation for the **Norskprøven Muntlig B1/B2 Practice Simul
 | **[2. Local Development & Run Sequence Guide](./DEVELOPMENT_GUIDE.md)** | Local environment setup, 2-terminal startup sequence, Expo Go testing, seed data execution, and test commands. |
 | **[3. Database Schema & Models](./DATABASE_SCHEMA.md)** | Drizzle ORM models (`exam_topics`, `user_quotas`, `exam_sessions`, `usage_ledger`), relations, and migration commands. |
 | **[4. API Reference Specification](./API_REFERENCE.md)** | Specification of all Next.js API routes (`topics`, `start`, `turn`, `speech`, `finish`, `results`, `quota`). |
-| **[5. User Module, Subscriptions & Configuration](./USER_MODULE_AND_CONFIGURATION.md)** | User authentication (Better Auth), Stripe subscriptions, daily test calendar quotas, referral reward engine, and how to update configurable limits. |
+| **[5. User Module, Subscriptions & Configuration](./USER_MODULE_AND_CONFIGURATION.md)** | User authentication (Better Auth), subscriptions (App Store, Google Play, Stripe — see [PAYMENTS.md](./PAYMENTS.md)), daily test calendar quotas, referral reward engine, and how to update configurable limits. |
 | **[6. Billing, Costs & Quota Ledger](./BILLING_AND_USAGE.md)** | Pricing formulas for the LLM, STT (OpenAI / Azure AI Speech), and TTS, plus atomic quota transactions. |
 | **[7. HK-dir B1/B2 Rubric Evaluation Engine](./EXAM_RUBRIC_EVALUATION.md)** | Official 4 HK-dir criteria (1–10 scale), bilingual feedback, concrete improvements, and GPT-4o execution lifecycle. |
 

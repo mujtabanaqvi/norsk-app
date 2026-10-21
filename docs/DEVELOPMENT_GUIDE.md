@@ -138,4 +138,4 @@ Only app chrome is translated. Exam content (theme titles/descriptions, prompts,
 * **Outside React** (`src/api.ts`): `translate(getCurrentLocale(), key, params)`.
 * **Validation:** zod messages in `src/validation/auth.ts` are dictionary keys; read them through `fieldErrors(error, locale)` / `validateField(..., locale)`. The API calls these without a locale, so it still answers in Norwegian.
 * **API errors:** the client translates known `error` codes via `apiErrors.<CODE>`; other server messages are shown as sent (Norwegian).
-* **Web pages:** Stripe checkout receives the app's locale and returns to `/subscription/success?lang=en` / `/subscription/canceled?lang=en`.
+* **Web pages:** Stripe checkout receives the app's locale. The Expo web app passes its own return URLs (`/payment/success`, `/payment/canceled`), which open the in-app PaymentResult screen; the Next.js `/subscription/success?lang=en` / `/subscription/canceled?lang=en` pages remain as the fallback when no return URL is given.

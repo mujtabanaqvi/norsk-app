@@ -22,13 +22,14 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "no.norskapp.muntlig",
+      "bundleIdentifier": "com.snakkly.app",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Norskprøven muntlig simulator trenger tilgang til mikrofonen for å vurdere din muntlige uttale og flyt."
+        "NSMicrophoneUsageDescription": "Norskprøven muntlig simulator trenger tilgang til mikrofonen for å vurdere din muntlige uttale og flyt.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
-      "package": "no.norskapp.muntlig",
+      "package": "com.snakkly.app",
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/snakkly-icon-512.png",
         "backgroundColor": "#FFFFFF"
@@ -37,7 +38,9 @@
         "android.permission.RECORD_AUDIO",
         "android.permission.MODIFY_AUDIO_SETTINGS",
         "android.permission.INTERNET",
-        "android.permission.ACCESS_NETWORK_STATE"
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"
       ]
     },
     "plugins": [
@@ -49,7 +52,13 @@
       ],
       "expo-secure-store",
       "expo-asset",
-      "expo-web-browser"
-    ]
+      "expo-web-browser",
+      "expo-iap"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "d5e390c5-69b7-4798-b01d-15b3ecb57aab"
+      }
+    }
   }
 }

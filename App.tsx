@@ -1,7 +1,13 @@
-import React from 'react';
-import { StatusBar, View, ActivityIndicator } from 'react-native';
+import React, { useEffect } from 'react';
+import { Alert, Platform, StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { NavigationContainer, DefaultTheme, type Theme } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  DefaultTheme,
+  createNavigationContainerRef,
+  type LinkingOptions,
+  type Theme,
+} from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
 import { LocaleProvider, useLocale } from './src/hooks/useLocale';
@@ -16,11 +22,30 @@ import { LearningProfileScreen } from './src/screens/LearningProfileScreen';
 import { HowToScreen } from './src/screens/HowToScreen';
 import { TermsScreen } from './src/screens/TermsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
+import { PaymentResultScreen } from './src/screens/PaymentResultScreen';
+import { startIapListener } from './src/lib/iap';
+import { PurchaseVerificationError } from './src/api';
 import { Logo } from './src/components/ui';
 import { colors } from './src/theme';
 import type { RootStackParamList } from './src/types/exam';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
+// Web only: lets Stripe Checkout return into the app (`/payment/success?session_id=…`).
+const linking: LinkingOptions<RootStackParamList> | undefined =
+  Platform.OS === 'web'
+    ? {
+        prefixes: [typeof window !== 'undefined' ? window.location.origin : ''],
+        config: {
+          screens: {
+            ExamSetup: '',
+            Subscription: 'subscription',
+            PaymentResult: 'payment/:result',
+          },
+        },
+      }
+    : undefined;
 
 const navigationTheme: Theme = {
   ...DefaultTheme,
@@ -36,8 +61,34 @@ const navigationTheme: Theme = {
 };
 
 function AppNavigation() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, refreshProfile } = useAuth();
   const { t, isLoading: isLocaleLoading } = useLocale();
+  const userId = user?.id;
+
+  // Store purchases (iOS/Android) are delivered asynchronously, so the listener lives for the whole session.
+  useEffect(() => {
+    if (!userId) return;
+    return startIapListener({
+      onVerified: (result, userInitiated) => {
+        if (userInitiated && navigationRef.isReady()) {
+          navigationRef.navigate('PaymentResult', { result: 'success', tier: result.tier });
+        } else {
+          refreshProfile();
+        }
+      },
+      onPending: () => {
+        if (navigationRef.isReady()) navigationRef.navigate('PaymentResult', { result: 'pending' });
+      },
+      onError: (error) => {
+        const message =
+          error instanceof PurchaseVerificationError && error.code === 'OWNED_BY_OTHER_ACCOUNT'
+            ? t('subscription.ownedByOtherAccount')
+            : (error as any)?.message || t('subscription.paymentErrorBody');
+        Alert.alert(t('subscription.paymentErrorTitle'), message);
+      },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]);
 
   if (isLoading || isLocaleLoading) {
     return (
@@ -58,7 +109,7 @@ function AppNavigation() {
   }
 
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer ref={navigationRef} theme={navigationTheme} linking={linking}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
       <Stack.Navigator
         screenOptions={{
@@ -95,6 +146,11 @@ function AppNavigation() {
               name="Subscription"
               component={SubscriptionScreen}
               options={{ title: t('nav.subscription') }}
+            />
+            <Stack.Screen
+              name="PaymentResult"
+              component={PaymentResultScreen}
+              options={{ title: t('nav.subscription'), gestureEnabled: false }}
             />
             <Stack.Screen
               name="Referral"

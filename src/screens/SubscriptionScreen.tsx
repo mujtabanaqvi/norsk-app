@@ -6,11 +6,19 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
-  Linking,
+  Platform,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
-import { fetchTierConfigs, createStripeCheckout } from '../api';
+import { fetchTierConfigs, createStripeCheckout, PurchaseVerificationError } from '../api';
+import {
+  buySubscription,
+  getSubscriptionProducts,
+  isIapSupported,
+  openManageSubscriptions,
+  restorePurchases,
+} from '../lib/iap';
+import type { PaidTier } from '../lib/iap-products';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
 import { Screen, AppHeader, Card, Badge, Button, Icon } from '../components/ui';
@@ -19,11 +27,25 @@ import { colors, space, type } from '../theme';
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 
 export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
-  const { user } = useAuth();
+  const { user, refreshProfile } = useAuth();
   const { t, strings } = useLocale();
   const [plans, setPlans] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
+  const [storePrices, setStorePrices] = useState<Partial<Record<PaidTier, string>>>({});
+
+  // Native builds show the store's localized price, which is what the user is actually charged.
+  useEffect(() => {
+    if (!isIapSupported) return;
+    getSubscriptionProducts()
+      .then((products) =>
+        setStorePrices({
+          STANDARD: products.STANDARD?.displayPrice,
+          PREMIUM: products.PREMIUM?.displayPrice,
+        })
+      )
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     async function loadPlans() {
@@ -40,7 +62,17 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleSubscribe = async (tier: 'STANDARD' | 'PREMIUM') => {
+  const activeProvider = user?.activeSubscriptionProvider ?? null;
+  const thisPlatformProvider = Platform.OS === 'ios' ? 'APPLE' : Platform.OS === 'android' ? 'GOOGLE' : 'STRIPE';
+  const managedElsewhere = activeProvider !== null && activeProvider !== thisPlatformProvider;
+  const storeLabel = (provider: string) =>
+    provider === 'APPLE'
+      ? t('subscription.storeApple')
+      : provider === 'GOOGLE'
+        ? t('subscription.storeGoogle')
+        : t('subscription.storeWeb');
+
+  const handleSubscribe = async (tier: PaidTier) => {
     if (!user) {
       Alert.alert(t('subscription.accountRequiredTitle'), t('subscription.accountRequiredBody'), [
         { text: t('common.cancel'), style: 'cancel' },
@@ -51,16 +83,53 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsProcessing(true);
     try {
-      const res = await createStripeCheckout(tier);
-      if (res.url) {
-        await Linking.openURL(res.url);
+      if (isIapSupported) {
+        if (!user.iapAccountToken) throw new Error(t('subscription.storeUnavailable'));
+        // The outcome is delivered to the purchase listener in App.tsx, which opens PaymentResult.
+        await buySubscription(tier, user.iapAccountToken);
+      } else if (Platform.OS !== 'web') {
+        // Native app without the store module (e.g. Expo Go): purchases need a development build.
+        throw new Error(t('subscription.storeUnavailable'));
+      } else {
+        const origin = window.location.origin;
+        const res = await createStripeCheckout(
+          tier,
+          `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
+          `${origin}/payment/canceled`
+        );
+        if (res.url) {
+          window.location.assign(res.url);
+          return; // Keep the spinner while the browser navigates to Stripe.
+        }
       }
     } catch (err: any) {
       Alert.alert(t('subscription.paymentErrorTitle'), err.message || t('subscription.paymentErrorBody'));
+    }
+    setIsProcessing(false);
+  };
+
+  const handleRestore = async () => {
+    setIsProcessing(true);
+    try {
+      const result = await restorePurchases();
+      await refreshProfile();
+      if (result && result.tier !== 'FREE') {
+        Alert.alert(t('subscription.restoreDoneTitle'), t('subscription.restoreDoneBody'));
+      } else {
+        Alert.alert(t('subscription.restore'), t('subscription.restoreNone'));
+      }
+    } catch (err: any) {
+      const message =
+        err instanceof PurchaseVerificationError && err.code === 'OWNED_BY_OTHER_ACCOUNT'
+          ? t('subscription.ownedByOtherAccount')
+          : err.message || t('subscription.storeUnavailable');
+      Alert.alert(t('common.error'), message);
     } finally {
       setIsProcessing(false);
     }
   };
+
+  const priceLabel = (tier: PaidTier, priceCents: number) => storePrices[tier] ?? `${priceCents / 100} kr`;
 
   const freePlan = plans?.FREE || {
     priceCents: 0,
@@ -105,6 +174,15 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
             </View>
           ) : (
             <View style={styles.cardsContainer}>
+              {managedElsewhere && activeProvider && (
+                <Card style={styles.noticeCard}>
+                  <Icon name="information-circle-outline" size={20} color={colors.navy} />
+                  <Text style={styles.noticeText}>
+                    {t('subscription.managedBy', { store: storeLabel(activeProvider) })}
+                  </Text>
+                </Card>
+              )}
+
               {/* Free Plan */}
               <Card style={styles.planCard}>
                 <View style={styles.planHeader}>
@@ -146,7 +224,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                     )}
                   </View>
                   <Text style={styles.planPrice}>
-                    {standard.priceCents / 100} kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                    {priceLabel('STANDARD', standard.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
                   </Text>
                 </View>
 
@@ -171,7 +249,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   variant="secondary"
                   size="lg"
                   fullWidth
-                  disabled={isProcessing || currentTier === 'STANDARD'}
+                  disabled={isProcessing || managedElsewhere || currentTier === 'STANDARD'}
                   loading={isProcessing}
                   onPress={() => handleSubscribe('STANDARD')}
                 />
@@ -189,7 +267,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 <View style={styles.planHeader}>
                   <Text style={[styles.planName, { color: colors.gold }]}>Premium</Text>
                   <Text style={styles.planPrice}>
-                    {premium.priceCents / 100} kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                    {priceLabel('PREMIUM', premium.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
                   </Text>
                 </View>
 
@@ -215,11 +293,50 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   size="lg"
                   fullWidth
                   icon="star"
-                  disabled={isProcessing || currentTier === 'PREMIUM'}
+                  disabled={isProcessing || managedElsewhere || currentTier === 'PREMIUM'}
                   loading={isProcessing}
                   onPress={() => handleSubscribe('PREMIUM')}
                 />
               </Card>
+
+              <View style={styles.footer}>
+                {isIapSupported && (
+                  <View style={styles.footerActions}>
+                    <Button
+                      title={t('subscription.restore')}
+                      variant="ghost"
+                      size="sm"
+                      disabled={isProcessing}
+                      onPress={handleRestore}
+                    />
+                    {activeProvider === thisPlatformProvider && (
+                      <Button
+                        title={t('subscription.manage')}
+                        variant="ghost"
+                        size="sm"
+                        onPress={() => openManageSubscriptions(currentTier === 'FREE' ? undefined : currentTier)}
+                      />
+                    )}
+                  </View>
+                )}
+                <Text style={styles.disclosure}>
+                  {t('subscription.disclosure', { store: storeLabel(thisPlatformProvider) })}
+                </Text>
+                <View style={styles.footerActions}>
+                  <Button
+                    title={t('subscription.termsLink')}
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => navigation.navigate('Terms')}
+                  />
+                  <Button
+                    title={t('subscription.privacyLink')}
+                    variant="ghost"
+                    size="sm"
+                    onPress={() => navigation.navigate('PrivacyPolicy')}
+                  />
+                </View>
+              </View>
             </View>
           )}
         </View>
@@ -312,5 +429,31 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.text,
     flex: 1,
+  },
+  noticeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    padding: space.lg,
+    backgroundColor: colors.navySoft,
+  },
+  noticeText: {
+    ...type.body,
+    color: colors.navy,
+    flex: 1,
+  },
+  footer: {
+    alignItems: 'center',
+    gap: space.sm,
+  },
+  footerActions: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: space.sm,
+  },
+  disclosure: {
+    ...type.caption,
+    textAlign: 'center',
   },
 });

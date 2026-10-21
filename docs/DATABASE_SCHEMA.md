@@ -172,6 +172,7 @@ Core user profile, Better Auth account records, referral identities, and subscri
 | `role` | `user_role` | `NOT NULL`, `DEFAULT 'USER'` | `'USER'` or `'ADMIN'`. |
 | `subscription_tier` | `subscription_tier` | `NOT NULL`, `DEFAULT 'FREE'` | `'FREE'`, `'STANDARD'`, or `'PREMIUM'`. |
 | `stripe_customer_id` | `VARCHAR(255)` | `NULLABLE` | Stripe Customer ID. |
+| `iap_account_token` | `UUID` | `NOT NULL`, `UNIQUE`, `DEFAULT gen_random_uuid()` | Sent to the App Store (`appAccountToken`) and Google Play (`obfuscatedAccountId`) to link store purchases to the user. |
 | `referral_code` | `VARCHAR(32)` | `NOT NULL`, `UNIQUE` | Unique 8-char referral code. |
 | `referred_by_user_id`| `VARCHAR(128)` | `NULLABLE` | Referrer user ID if referred during signup. |
 

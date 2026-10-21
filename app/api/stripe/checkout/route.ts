@@ -4,8 +4,9 @@ import { db } from '@/src/db';
 import { users } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
-import { stripe } from '@/lib/stripe';
+import { stripe, isAllowedReturnUrl } from '@/lib/stripe';
 import { getTierConfigs } from '@/lib/tier-policy';
+import { getActiveSubscriptionProvider } from '@/lib/entitlements';
 import { DEFAULT_LOCALE, translate } from '@/src/i18n';
 
 const checkoutSchema = z.object({
@@ -31,6 +32,19 @@ export async function POST(req: NextRequest) {
 
     const { tier, successUrl, cancelUrl, locale = DEFAULT_LOCALE } = parsed.data;
 
+    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
+    const allowedOrigins = [origin, process.env.NEXT_PUBLIC_APP_URL]
+      .filter((o): o is string => Boolean(o))
+      .map((o) => new URL(o).origin);
+    for (const url of [successUrl, cancelUrl]) {
+      if (url && !isAllowedReturnUrl(url, allowedOrigins)) {
+        return NextResponse.json(
+          { error: 'Validation Error', message: 'Return URL must point to this app' },
+          { status: 400 }
+        );
+      }
+    }
+
     // Fetch user
     const [user] = await db
       .select()
@@ -40,6 +54,14 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    }
+
+    const activeProvider = await getActiveSubscriptionProvider(user.id);
+    if (activeProvider && activeProvider !== 'STRIPE') {
+      return NextResponse.json(
+        { error: 'Conflict', code: 'MANAGED_BY_OTHER_PROVIDER', provider: activeProvider },
+        { status: 409 }
+      );
     }
 
     const tierConfigs = await getTierConfigs();
@@ -63,7 +85,6 @@ export async function POST(req: NextRequest) {
         .where(eq(users.id, user.id));
     }
 
-    const origin = req.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000';
     const langQuery = locale === DEFAULT_LOCALE ? '' : `lang=${locale}`;
     const finalSuccessUrl =
       successUrl ||
