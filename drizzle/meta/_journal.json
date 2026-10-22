@@ -43,6 +43,13 @@
       "when": 1792597957385,
       "tag": "0005_multi_provider_subscriptions",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792667815978,
+      "tag": "0006_revenuecat",
+      "breakpoints": true
     }
   ]
 }

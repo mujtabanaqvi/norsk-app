@@ -254,9 +254,6 @@ export const user = pgTable('user', {
   // App-specific user attributes
   role: userRoleEnum('role').notNull().default('USER'),
   subscriptionTier: subscriptionTierEnum('subscription_tier').notNull().default('FREE'),
-  stripeCustomerId: varchar('stripe_customer_id', { length: 255 }),
-  // Opaque id sent to the stores (Apple appAccountToken / Google obfuscatedAccountId) to tie purchases to this user
-  iapAccountToken: uuid('iap_account_token').defaultRandom().notNull().unique(),
   referralCode: varchar('referral_code', { length: 32 }).notNull().unique(),
   referredByUserId: varchar('referred_by_user_id', { length: 128 }),
 });
@@ -314,13 +311,12 @@ export const subscriptions = pgTable('subscriptions', {
   userId: varchar('user_id', { length: 128 })
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
+  // Store the subscription was bought in (STRIPE = RevenueCat Web Billing); all of them are synced from RevenueCat
   provider: paymentProviderEnum('provider').notNull().default('STRIPE'),
-  // Stripe subscription id / Apple originalTransactionId / Google purchaseToken
+  // `rc:<userId>:<productId>`, one row per RevenueCat subscription
   externalId: varchar('external_id', { length: 512 }).notNull(),
   productId: varchar('product_id', { length: 255 }),
   environment: varchar('environment', { length: 16 }).notNull().default('production'),
-  stripeSubscriptionId: varchar('stripe_subscription_id', { length: 255 }).unique(),
-  stripePriceId: varchar('stripe_price_id', { length: 255 }),
   tier: subscriptionTierEnum('tier').notNull(),
   status: subscriptionStatusEnum('status').notNull().default('ACTIVE'),
   currentPeriodStart: timestamp('current_period_start', { withTimezone: true }).notNull(),
@@ -341,7 +337,6 @@ export const tierConfigs = pgTable('tier_configs', {
   dailyTestLimit: integer('daily_test_limit').notNull(),
   priceCents: integer('price_cents').notNull().default(0), // in NOK øre or EUR cents
   currency: varchar('currency', { length: 3 }).notNull().default('NOK'),
-  stripePriceId: varchar('stripe_price_id', { length: 255 }),
   featuresJson: jsonb('features_json').$type<string[]>(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });

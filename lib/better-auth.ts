@@ -39,10 +39,6 @@ export const auth = betterAuth({
         required: false,
         defaultValue: 'FREE',
       },
-      stripeCustomerId: {
-        type: 'string',
-        required: false,
-      },
       referralCode: {
         type: 'string',
         required: false,

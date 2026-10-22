@@ -161,21 +161,15 @@ All auth errors share one shape: `{ "error": "<CODE>", "message": "<norsk tekst>
 - **`POST /api/auth/resend-verification`**: Body `{ email }`. Sends a new code + link if the account is pending verification. Always answers `200 { success, retryAfterSeconds }` regardless of whether the account exists; `429 RESEND_COOLDOWN` with `retryAfterSeconds` inside the 60 s cooldown.
 - **`POST /api/auth/google`**: Body `{ idToken, referralCode? }`. Verifies the Google ID token against `GOOGLE_CLIENT_ID` / `GOOGLE_ANDROID_CLIENT_ID` / `GOOGLE_IOS_CLIENT_ID`, requires `email_verified`, then signs in or registers the user. New Google users are created with `email_verified = true` (no email verification step). Errors: `INVALID_GOOGLE_TOKEN` (401), `GOOGLE_EMAIL_NOT_VERIFIED` (403).
 - **`POST /api/auth/apple`**: Extensible Apple OAuth identity token verification endpoint.
-- **`GET /api/auth/me`**: Returns the profile, subscription tier, `iapAccountToken`, `activeSubscriptionProvider` (`STRIPE` | `APPLE` | `GOOGLE` | `null`), referral code, and earned referral statistics of the currently authenticated user.
+- **`GET /api/auth/me`**: Returns the profile, subscription tier, `activeSubscriptionProvider` (`STRIPE` (RevenueCat Web Billing) | `APPLE` | `GOOGLE` | `null`), referral code, and earned referral statistics of the currently authenticated user.
 
 ---
 
 ## 9. Subscription & Tier Endpoints
 - **`GET /api/config/tiers`**: Public endpoint returning all tier policies (`FREE`, `STANDARD`, `PREMIUM`) including daily test limits, monthly pricing, and feature arrays.
 See [PAYMENTS.md](./PAYMENTS.md) for the full flow per platform.
-- **`POST /api/stripe/checkout`** (web): Body `{ tier, successUrl?, cancelUrl?, locale? }`. Creates a Stripe Checkout session. Return URLs must be on the request origin or `NEXT_PUBLIC_APP_URL`. `409 MANAGED_BY_OTHER_PROVIDER` if the user already subscribes through the App Store / Play.
-- **`GET /api/stripe/checkout/session?session_id=`** (web): Returns `{ status: 'paid' | 'pending' | 'expired', tier }` for the caller's own session, fulfilling it immediately if paid.
-- **`POST /api/stripe/portal`** (web): Body `{ returnUrl?, locale? }`. Creates a Stripe Customer Portal session for the caller and returns `{ url }`. The return URL must be on the request origin or `NEXT_PUBLIC_APP_URL` (default `<origin>/subscription`). `404 NO_STRIPE_CUSTOMER` if the user has never started a Stripe checkout.
-- **`POST /api/stripe/webhook`**: Stripe webhooks (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`). Signature required in production.
-- **`POST /api/iap/apple/verify`** (iOS): Body `{ signedTransaction }` (StoreKit 2 JWS). Verifies and stores the subscription, returns `{ tier }`. `403 OWNED_BY_OTHER_ACCOUNT` if it belongs to another account.
-- **`POST /api/iap/google/verify`** (Android, currently unused: Play Billing is disabled in the app): Body `{ purchaseToken }`. Verifies with the Play Developer API, acknowledges, returns `{ tier }`. `403 OWNED_BY_OTHER_ACCOUNT` as above.
-- **`POST /api/iap/apple/notifications`**: App Store Server Notifications V2 receiver.
-- **`POST /api/iap/google/rtdn`**: Google Play Real-Time Developer Notifications (Pub/Sub push, OIDC-authenticated). Unused while Play Billing is disabled.
+- **`POST /api/revenuecat/sync`** (authenticated): Re-reads the caller's subscriptions from RevenueCat, stores them and returns `{ tier }`. The app calls it right after a purchase or restore. There is no request body, and it never syncs another user.
+- **`POST /api/revenuecat/webhook`**: RevenueCat webhook for all stores. Requires `Authorization` equal to `REVENUECAT_WEBHOOK_AUTH` (`401` otherwise). Re-syncs `event.app_user_id` (and `transferred_from` / `transferred_to`); anonymous ids are ignored. A non-2xx response makes RevenueCat retry.
 - **`GET /api/referrals`**: Returns the authenticated user's referral code, total friends referred, and active bonus days.
 
 ---
@@ -198,6 +192,6 @@ Protected by the `x-admin-secret` header (checked against `process.env.ADMIN_SEC
 
 ### 10.2 Configuration Management (`/api/admin/config`)
 - **`GET /api/admin/config`**: Returns current tier policies (`tiers`) and referral parameters (`referral: { bonusDailyTests, durationDays }`).
-- **`PUT /api/admin/config`**: Updates a tier limit, monthly price, and feature array (`tier`, `dailyTestLimit`, `priceCents`, `currency`, `features: string[]`), or updates referral bonus parameters (`bonusDailyTests`, `durationDays`). Saves directly to `tier_configs` and `system_configs`.
+- **`PUT /api/admin/config`**: Updates a tier limit, fallback price label (users are charged the store / Web Billing price), and feature array (`tier`, `dailyTestLimit`, `priceCents`, `currency`, `features: string[]`), or updates referral bonus parameters (`bonusDailyTests`, `durationDays`). Saves directly to `tier_configs` and `system_configs`.
 
 

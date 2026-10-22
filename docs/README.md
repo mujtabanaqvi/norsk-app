@@ -15,10 +15,11 @@ Welcome to the documentation for the **Norskprøven Muntlig B1/B2 Practice Simul
 | **[2. Local Development & Run Sequence Guide](./DEVELOPMENT_GUIDE.md)** | Local environment setup, 2-terminal startup sequence, Expo Go testing, seed data execution, and test commands. |
 | **[3. Database Schema & Models](./DATABASE_SCHEMA.md)** | Drizzle ORM models (`exam_topics`, `user_quotas`, `exam_sessions`, `usage_ledger`), relations, and migration commands. |
 | **[4. API Reference Specification](./API_REFERENCE.md)** | Specification of all Next.js API routes (`topics`, `start`, `turn`, `speech`, `finish`, `results`, `quota`). |
-| **[5. User Module, Subscriptions & Configuration](./USER_MODULE_AND_CONFIGURATION.md)** | User authentication (Better Auth), subscriptions (App Store on iOS, Stripe on web; Android users subscribe on the web — see [PAYMENTS.md](./PAYMENTS.md)), daily test calendar quotas, referral reward engine, and how to update configurable limits. |
+| **[5. User Module, Subscriptions & Configuration](./USER_MODULE_AND_CONFIGURATION.md)** | User authentication (Better Auth), subscriptions (RevenueCat: App Store, Google Play and Web Billing/Stripe — see [PAYMENTS.md](./PAYMENTS.md)), daily test calendar quotas, referral reward engine, and how to update configurable limits. |
 | **[6. Billing, Costs & Quota Ledger](./BILLING_AND_USAGE.md)** | Pricing formulas for the LLM, STT (OpenAI / Azure AI Speech), and TTS, plus atomic quota transactions. |
 | **[7. HK-dir B1/B2 Rubric Evaluation Engine](./EXAM_RUBRIC_EVALUATION.md)** | Official 4 HK-dir criteria (1–10 scale), bilingual feedback, concrete improvements, and GPT-4o execution lifecycle. |
-| **[8. Publishing to Google Play](./GOOGLE_PLAY_RELEASE.md)** | From-scratch release checklist: developer account, app signing, Stripe live setup, store listing, data safety, testing and review. Android sells nothing in-app (Play Billing steps kept for reference). |
+| **[Payments & Subscriptions (RevenueCat)](./PAYMENTS.md)** | Step-by-step setup of the Standard/Premium products in the App Store, Google Play and RevenueCat Web Billing (Stripe), RevenueCat wiring, env vars, testing, and how the payment code works. |
+| **[8. Publishing to Google Play](./GOOGLE_PLAY_RELEASE.md)** | From-scratch release checklist: developer account, app signing, Play subscriptions and RevenueCat, store listing, data safety, testing and review. |
 
 ---
 

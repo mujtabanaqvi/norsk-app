@@ -15,7 +15,7 @@
       "backgroundColor": "#FFFFFF"
     },
     "web": {
-      "favicon": "./assets/brand/favicon.ico",
+      "favicon": "./assets/brand/snakkly-icon-192.png",
       "name": "Snakkly · Norskprøven Muntlig",
       "themeColor": "#BA0C2F",
       "backgroundColor": "#F6F7FA"
@@ -64,8 +64,7 @@
       ],
       "expo-secure-store",
       "expo-asset",
-      "expo-web-browser",
-      "expo-iap"
+      "expo-web-browser"
     ],
     "extra": {
       "eas": {

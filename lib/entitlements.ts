@@ -1,13 +1,10 @@
 import { db } from '@/src/db';
 import { users, subscriptions } from '@/src/db/schema';
-import { and, eq } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 
 export type Tier = 'FREE' | 'STANDARD' | 'PREMIUM';
 export type PaymentProvider = 'STRIPE' | 'APPLE' | 'GOOGLE';
 export type SubscriptionStatus = 'INACTIVE' | 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED';
-
-/** A store purchase was verified, but it is tied to a different Snakkly account than the caller. */
-export class IapOwnershipError extends Error {}
 
 const TIER_RANK: Record<Tier, number> = { FREE: 0, STANDARD: 1, PREMIUM: 2 };
 
@@ -52,10 +49,9 @@ export interface UpsertSubscriptionInput {
   currentPeriodEnd: Date;
   cancelAtPeriodEnd: boolean;
   environment?: 'sandbox' | 'production';
-  stripePriceId?: string | null;
 }
 
-/** Idempotent: safe to call from webhooks, store notifications and client-triggered verification alike. */
+/** Idempotent: safe to call from the RevenueCat webhook and client-triggered syncs alike. */
 export async function upsertSubscription(input: UpsertSubscriptionInput) {
   const values = {
     userId: input.userId,
@@ -63,8 +59,6 @@ export async function upsertSubscription(input: UpsertSubscriptionInput) {
     externalId: input.externalId,
     productId: input.productId ?? null,
     environment: input.environment ?? 'production',
-    stripeSubscriptionId: input.provider === 'STRIPE' ? input.externalId : null,
-    stripePriceId: input.stripePriceId ?? null,
     tier: input.tier,
     status: input.status,
     currentPeriodStart: input.currentPeriodStart,
@@ -79,20 +73,6 @@ export async function upsertSubscription(input: UpsertSubscriptionInput) {
       target: [subscriptions.provider, subscriptions.externalId],
       set: { ...values, updatedAt: new Date() },
     });
-}
-
-/** Patch an existing subscription found by provider + external id. Returns the owning userId, if found. */
-export async function updateSubscriptionByExternalId(
-  provider: PaymentProvider,
-  externalId: string,
-  patch: Partial<Pick<UpsertSubscriptionInput, 'status' | 'currentPeriodStart' | 'currentPeriodEnd' | 'cancelAtPeriodEnd'>>
-): Promise<string | null> {
-  const [row] = await db
-    .update(subscriptions)
-    .set({ ...patch, updatedAt: new Date() })
-    .where(and(eq(subscriptions.provider, provider), eq(subscriptions.externalId, externalId)))
-    .returning({ userId: subscriptions.userId });
-  return row?.userId ?? null;
 }
 
 async function loadEntitlementRows(userId: string): Promise<EntitlementRow[]> {
@@ -120,23 +100,4 @@ export async function recomputeUserTier(userId: string): Promise<Tier> {
 
 export async function getActiveSubscriptionProvider(userId: string): Promise<PaymentProvider | null> {
   return pickActiveProvider(await loadEntitlementRows(userId));
-}
-
-export async function findUserIdByIapAccountToken(token: string | null | undefined): Promise<string | null> {
-  if (!token) return null;
-  const [row] = await db
-    .select({ id: users.id })
-    .from(users)
-    .where(eq(users.iapAccountToken, token.toLowerCase()))
-    .limit(1);
-  return row?.id ?? null;
-}
-
-export async function findSubscriptionOwner(provider: PaymentProvider, externalId: string): Promise<string | null> {
-  const [row] = await db
-    .select({ userId: subscriptions.userId })
-    .from(subscriptions)
-    .where(and(eq(subscriptions.provider, provider), eq(subscriptions.externalId, externalId)))
-    .limit(1);
-  return row?.userId ?? null;
 }

@@ -156,5 +156,6 @@ For detailed specifications, consult the documents in [`docs/`](./docs/README.md
 - [3. Database Schema & Models](./docs/DATABASE_SCHEMA.md)
 - [4. API Reference Specification](./docs/API_REFERENCE.md)
 - [5. User Module, Subscriptions & Configuration](./docs/USER_MODULE_AND_CONFIGURATION.md)
+- [Payments & Subscriptions (RevenueCat setup for App Store, Google Play and web)](./docs/PAYMENTS.md)
 - [6. Billing, Costs & Quota Ledger](./docs/BILLING_AND_USAGE.md)
 - [7. HK-dir B1/B2 Rubric Evaluation Engine](./docs/EXAM_RUBRIC_EVALUATION.md)

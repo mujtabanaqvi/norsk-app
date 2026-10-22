@@ -14,9 +14,9 @@ The user module provides:
    - Shared client/server form validation in `src/validation/auth.ts`.
    - Extensible Apple ID placeholder endpoint (`/api/auth/apple`) ready for future Apple Services ID configuration.
    - Session & token management supporting session cookies and Bearer JWTs.
-2. **Tiered Subscriptions (App Store & Stripe)**:
+2. **Tiered Subscriptions (RevenueCat)**:
    - Three tiers: **Free**, **Standard**, and **Premium**.
-   - The iOS app bills through App Store in-app purchases and the web app uses Stripe Checkout. The Android app sells nothing in-app: Android users subscribe on the web, and the app shows their tier (it re-reads the profile when it returns to the foreground). All purchases are verified server-side and the tier is recomputed from every provider's subscriptions. See [PAYMENTS.md](./PAYMENTS.md).
+   - All platforms buy through RevenueCat: App Store in-app purchases on iOS, Google Play Billing on Android, and RevenueCat Web Billing (Stripe) on the web. The server re-reads every purchase from RevenueCat's API (webhook + post-purchase sync) and recomputes the tier from the stored subscriptions. See [PAYMENTS.md](./PAYMENTS.md).
 3. **Daily Test Quotas (Calendar Day Reset)**:
    - Users are restricted to a configurable number of tests per calendar day (resetting at 00:00:00 Europe/Oslo time).
    - Enforced on the server inside `POST /api/exam/start`.
@@ -24,7 +24,7 @@ The user module provides:
    - Each registered user receives a unique referral code (e.g. `A1B2C3D4`).
    - When a friend signs up with that code **and verifies their email** (or signs up with Google), the referrer receives extra bonus tests per day for a configurable number of days.
 5. **Web Admin Configuration Portal**:
-   - Web UI at `/admin` (under the **⚙️ Abonnement & Verveinnstillinger** tab) allowing administrators to modify daily test limits, monthly prices, feature bullet lists per tier, and referral bonus days without code changes or server redeployments.
+   - Web UI at `/admin` (under the **⚙️ Abonnement & Verveinnstillinger** tab) allowing administrators to modify daily test limits, the fallback price labels, feature bullet lists per tier, and referral bonus days without code changes or server redeployments.
 6. **Database Fallback & Seeding Strategy**:
    - `src/db/seed.ts` idempotently seeds default tier configurations (`FREE`, `STANDARD`, `PREMIUM`) and referral bonus parameters into Neon PostgreSQL.
    - If database rows are uninitialized, the application transparently falls back to in-code defaults defined in `lib/tier-policy.ts`.
@@ -54,10 +54,10 @@ Migration `drizzle/0003_verify_existing_users.sql` marks all accounts that exist
 | **Free Tier Limit** | `tier_configs.daily_test_limit` (`FREE`) | **1 test/day** | Allowed tests per calendar day for free users |
 | **Free Tier Features** | `tier_configs.features_json` (`FREE`) | `['1 test per dag', 'B1 og B2 temaer', 'Full AI evaluering']` | In-app feature list displayed to Free users |
 | **Standard Tier Limit**| `tier_configs.daily_test_limit` (`STANDARD`) | **5 tests/day** | Allowed tests per calendar day for Standard subscribers |
-| **Standard Tier Price**| `tier_configs.price_cents` (`STANDARD`) | **14900 øre** (149 kr) | Monthly price for Standard plan |
+| **Standard Tier Price**| `tier_configs.price_cents` (`STANDARD`) | **14900 øre** (149 kr) | Price label for Standard (fallback label only: the charged price is set in App Store Connect, Play Console and RevenueCat Web Billing) |
 | **Standard Tier Features**| `tier_configs.features_json` (`STANDARD`) | `['5 tester per dag', 'B1 og B2 temaer', 'Prioritert AI stemme', 'Detaljert tilbakemelding']` | In-app feature list displayed to Standard subscribers |
 | **Premium Tier Limit** | `tier_configs.daily_test_limit` (`PREMIUM`) | **20 tests/day** | Allowed tests per calendar day for Premium subscribers |
-| **Premium Tier Price** | `tier_configs.price_cents` (`PREMIUM`) | **29900 øre** (299 kr) | Monthly price for Premium plan |
+| **Premium Tier Price** | `tier_configs.price_cents` (`PREMIUM`) | **29900 øre** (299 kr) | Price label for Premium (fallback label only: the charged price is set in App Store Connect, Play Console and RevenueCat Web Billing) |
 | **Premium Tier Features**| `tier_configs.features_json` (`PREMIUM`) | `['Ubegrenset/20 tester per dag', 'Alt i Standard', 'Full historikk og uttaleanalyse', '24/7 tilgang']` | In-app feature list displayed to Premium subscribers |
 | **Referral Bonus Tests** | `system_configs` (`REFERRAL_BONUS_DAILY_TESTS`) | **2 tests/day** | Extra daily tests awarded to referrer for each registered friend |
 | **Referral Bonus Duration**| `system_configs` (`REFERRAL_BONUS_DURATION_DAYS`) | **7 days** | Number of days the referral bonus stays active |
@@ -94,8 +94,8 @@ You have **three methods** to update test limits, pricing, feature lists, and re
 4. Click on the tab **⚙️ Abonnement & Verveinnstillinger**.
 5. In the form cards:
    - **Gratis Nivå (Free)**: Change the daily tests per day, and dynamically add, edit, or remove planned feature bullet points, then click **Lagre FREE plan**.
-   - **Standard Nivå**: Adjust daily test limit, monthly price in NOK, and included features, then click **Lagre STANDARD plan**.
-   - **Premium Nivå**: Adjust daily test limit, monthly price in NOK, and included features, then click **Lagre PREMIUM plan**.
+   - **Standard Nivå**: Adjust daily test limit, fallback price label in NOK, and included features, then click **Lagre STANDARD plan**. Changing the price here does **not** change what users pay; see [PAYMENTS.md](./PAYMENTS.md).
+   - **Premium Nivå**: Adjust daily test limit, fallback price label in NOK, and included features, then click **Lagre PREMIUM plan**.
    - **Verveprogram Innstillinger**: Change the bonus tests per day (e.g. +2) and bonus duration (e.g. 7 days), then click **Lagre Verveinnstillinger**.
    - **Oppfrisk**: Click **↻ Oppfrisk** at any time to reload the latest values directly from the database.
 6. The changes take effect **immediately** for all users without restarting the application.

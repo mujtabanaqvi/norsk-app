@@ -171,8 +171,6 @@ Core user profile, Better Auth account records, referral identities, and subscri
 | `image` | `TEXT` | `NULLABLE` | Profile avatar URL. |
 | `role` | `user_role` | `NOT NULL`, `DEFAULT 'USER'` | `'USER'` or `'ADMIN'`. |
 | `subscription_tier` | `subscription_tier` | `NOT NULL`, `DEFAULT 'FREE'` | `'FREE'`, `'STANDARD'`, or `'PREMIUM'`. |
-| `stripe_customer_id` | `VARCHAR(255)` | `NULLABLE` | Stripe Customer ID. |
-| `iap_account_token` | `UUID` | `NOT NULL`, `UNIQUE`, `DEFAULT gen_random_uuid()` | Sent to the App Store (`appAccountToken`) and Google Play (`obfuscatedAccountId`) to link store purchases to the user. |
 | `referral_code` | `VARCHAR(32)` | `NOT NULL`, `UNIQUE` | Unique 8-char referral code. |
 | `referred_by_user_id`| `VARCHAR(128)` | `NULLABLE` | Referrer user ID if referred during signup. |
 
@@ -183,7 +181,7 @@ Configurable subscription limits, monthly pricing, and feature bullets.
 | :--- | :--- | :--- | :--- |
 | `tier` | `subscription_tier` | `PRIMARY KEY` | Plan tier (`'FREE'`, `'STANDARD'`, `'PREMIUM'`). |
 | `daily_test_limit` | `INTEGER` | `NOT NULL` | Tests allowed per calendar day. |
-| `price_cents` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Monthly price in NOK øre. |
+| `price_cents` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Fallback price label in NOK øre, shown only when RevenueCat prices can't be loaded. Users are charged the App Store / Google Play / Web Billing price. |
 | `currency` | `VARCHAR(3)` | `NOT NULL`, `DEFAULT 'NOK'` | ISO currency code. |
 | `features_json` | `JSONB` | `NULLABLE`, `$type<string[]>` | List of features and perks for marketing and app UI. |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Timestamp of last admin update. |
@@ -209,6 +207,22 @@ Key-value store for global system settings such as referral bonus defaults.
 | `value` | `TEXT` | `NOT NULL` | Value stored as string. |
 | `description` | `TEXT` | `NULLABLE` | Human-readable explanation. |
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Last update timestamp. |
+
+### 2.9 `subscriptions`
+Paid subscriptions synced from RevenueCat (`lib/revenuecat.ts`). `user.subscription_tier` is recomputed from these rows. See [PAYMENTS.md](./PAYMENTS.md).
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY` | Row id. |
+| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)`, cascade delete | Owner (= RevenueCat App User ID). |
+| `provider` | `payment_provider` | `NOT NULL` | Store that sold it: `'APPLE'`, `'GOOGLE'` or `'STRIPE'` (RevenueCat Web Billing). |
+| `external_id` | `VARCHAR(512)` | `NOT NULL`, unique with `provider` | `rc:<userId>:<productId>`. |
+| `product_id` | `VARCHAR(255)` | `NULLABLE` | Store product id, e.g. `snakkly.premium.monthly`. |
+| `environment` | `VARCHAR(16)` | `NOT NULL`, `DEFAULT 'production'` | `'production'` or `'sandbox'`. |
+| `tier` | `subscription_tier` | `NOT NULL` | `'STANDARD'` or `'PREMIUM'`. |
+| `status` | `subscription_status` | `NOT NULL` | `ACTIVE`, `TRIALING`, `PAST_DUE`, `CANCELED` or `INACTIVE`. |
+| `current_period_start` / `current_period_end` | `TIMESTAMPTZ` | `NOT NULL` | Paid period; the tier applies only while `current_period_end` is in the future. |
+| `cancel_at_period_end` | `BOOLEAN` | `NOT NULL`, `DEFAULT false` | Auto-renew turned off. |
 
 ---
 

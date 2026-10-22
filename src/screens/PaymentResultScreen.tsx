@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ActivityIndicator } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
-import { fetchCheckoutSession, fetchCurrentUser } from '../api';
+import { fetchCurrentUser } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
 import { Screen, Card, Button, Icon, type IconName } from '../components/ui';
@@ -18,12 +18,12 @@ const POLL_ATTEMPTS = 10;
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Landing screen after a purchase: Stripe Checkout redirects here on web (`/payment/success?session_id=…`),
- * and the native IAP listener navigates here once the server has verified a store purchase.
+ * Landing screen after a purchase on any platform: SubscriptionScreen navigates here once RevenueCat
+ * has completed the purchase and the server has synced it.
  * The server is the source of truth — this screen only waits until the profile reflects the new tier.
  */
 export const PaymentResultScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { result, session_id: sessionId, tier: verifiedTier } = route.params ?? {};
+  const { result, tier: verifiedTier } = route.params ?? {};
   const { refreshProfile, dailyTestStatus } = useAuth();
   const { t } = useLocale();
   const [state, setState] = useState<ViewState>(
@@ -38,13 +38,6 @@ export const PaymentResultScreen: React.FC<Props> = ({ navigation, route }) => {
     async function confirm() {
       for (let attempt = 0; attempt < POLL_ATTEMPTS && !cancelled; attempt++) {
         try {
-          if (sessionId) {
-            const session = await fetchCheckoutSession(sessionId);
-            if (session.status === 'expired') {
-              setState('canceled');
-              return;
-            }
-          }
           const me = await fetchCurrentUser();
           const currentTier: Tier = me?.user?.subscriptionTier ?? 'FREE';
           if (currentTier !== 'FREE' && (!verifiedTier || currentTier === verifiedTier)) {
@@ -71,7 +64,7 @@ export const PaymentResultScreen: React.FC<Props> = ({ navigation, route }) => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [result, sessionId, verifiedTier]);
+  }, [result, verifiedTier]);
 
   const goHome = () => navigation.reset({ index: 0, routes: [{ name: 'ExamSetup' }] });
   const goToPlans = () =>

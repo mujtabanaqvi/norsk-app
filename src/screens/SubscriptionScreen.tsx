@@ -10,20 +10,16 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
-import {
-  fetchTierConfigs,
-  createStripeCheckout,
-  createStripePortalSession,
-  PurchaseVerificationError,
-} from '../api';
+import { fetchTierConfigs } from '../api';
 import {
   buySubscription,
-  canPurchaseInApp,
-  getSubscriptionProducts,
-  isIapSupported,
+  getSubscriptionPackages,
+  isPurchasingSupported,
   openManageSubscriptions,
+  OwnedByOtherAccountError,
+  PaymentPendingError,
   restorePurchases,
-} from '../lib/iap';
+} from '../lib/purchases';
 import type { PaidTier } from '../lib/iap-products';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
@@ -40,18 +36,19 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [storePrices, setStorePrices] = useState<Partial<Record<PaidTier, string>>>({});
 
-  // Native builds show the store's localized price, which is what the user is actually charged.
+  // Show RevenueCat's localized store / Web Billing price, which is what the user is actually charged.
+  // Packages are only available once App.tsx has identified the logged-in user to RevenueCat.
   useEffect(() => {
-    if (!isIapSupported) return;
-    getSubscriptionProducts()
-      .then((products) =>
+    if (!isPurchasingSupported || !user) return;
+    getSubscriptionPackages()
+      .then((packages) =>
         setStorePrices({
-          STANDARD: products.STANDARD?.displayPrice,
-          PREMIUM: products.PREMIUM?.displayPrice,
+          STANDARD: packages.STANDARD?.product.priceString,
+          PREMIUM: packages.PREMIUM?.product.priceString,
         })
       )
       .catch(() => {});
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     async function loadPlans() {
@@ -68,15 +65,9 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Web: returning from the Stripe portal reloads this screen, so pick up a cancellation made there.
-  useEffect(() => {
-    if (Platform.OS === 'web' && user) refreshProfile();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const activeProvider = user?.activeSubscriptionProvider ?? null;
-  // Android sells nothing in-app (subscriptions are bought on the web), so every active subscription is managed elsewhere.
-  const thisPlatformProvider = !canPurchaseInApp ? null : Platform.OS === 'ios' ? 'APPLE' : 'STRIPE';
+  // RevenueCat unifies entitlements, but a subscription can still only be changed in the store that sold it.
+  const thisPlatformProvider = Platform.OS === 'ios' ? 'APPLE' : Platform.OS === 'android' ? 'GOOGLE' : 'STRIPE';
   const managedElsewhere = activeProvider !== null && activeProvider !== thisPlatformProvider;
   const storeLabel = (provider: string) =>
     provider === 'APPLE'
@@ -96,41 +87,32 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 
     setIsProcessing(true);
     try {
-      if (isIapSupported) {
-        if (!user.iapAccountToken) throw new Error(t('subscription.storeUnavailable'));
-        // The outcome is delivered to the purchase listener in App.tsx, which opens PaymentResult.
-        await buySubscription(tier, user.iapAccountToken);
-      } else if (Platform.OS !== 'web') {
-        // Native app without the store module (e.g. Expo Go): purchases need a development build.
-        throw new Error(t('subscription.storeUnavailable'));
-      } else {
-        const origin = window.location.origin;
-        const res = await createStripeCheckout(
-          tier,
-          `${origin}/payment/success?session_id={CHECKOUT_SESSION_ID}`,
-          `${origin}/payment/canceled`
-        );
-        if (res.url) {
-          window.location.assign(res.url);
-          return; // Keep the spinner while the browser navigates to Stripe.
-        }
-      }
+      // Expo Go or a missing RevenueCat key: purchases need a development build.
+      if (!isPurchasingSupported) throw new Error(t('subscription.storeUnavailable'));
+      const result = await buySubscription(tier);
+      if (result) navigation.navigate('PaymentResult', { result: 'success', tier: result.tier });
     } catch (err: any) {
-      Alert.alert(t('subscription.paymentErrorTitle'), err.message || t('subscription.paymentErrorBody'));
+      if (err instanceof PaymentPendingError) {
+        navigation.navigate('PaymentResult', { result: 'pending' });
+      } else {
+        console.error('Subscription purchase failed', err);
+        const message =
+          err instanceof OwnedByOtherAccountError
+            ? t('subscription.ownedByOtherAccount')
+            : err.message || t('subscription.paymentErrorBody');
+        Alert.alert(t('subscription.paymentErrorTitle'), message);
+      }
+    } finally {
+      setIsProcessing(false);
     }
-    setIsProcessing(false);
   };
 
-  const handleManageStripe = async () => {
-    setIsProcessing(true);
+  const handleManage = async () => {
     try {
-      const { url } = await createStripePortalSession(`${window.location.origin}/subscription`);
-      window.location.assign(url);
-      return; // Keep the spinner while the browser navigates to Stripe.
+      await openManageSubscriptions();
     } catch (err: any) {
-      Alert.alert(t('subscription.paymentErrorTitle'), err.message || t('subscription.paymentErrorBody'));
+      Alert.alert(t('common.error'), err.message || t('subscription.storeUnavailable'));
     }
-    setIsProcessing(false);
   };
 
   const handleRestore = async () => {
@@ -145,7 +127,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       }
     } catch (err: any) {
       const message =
-        err instanceof PurchaseVerificationError && err.code === 'OWNED_BY_OTHER_ACCOUNT'
+        err instanceof OwnedByOtherAccountError
           ? t('subscription.ownedByOtherAccount')
           : err.message || t('subscription.storeUnavailable');
       Alert.alert(t('common.error'), message);
@@ -187,11 +169,9 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.container}>
           <View style={styles.hero}>
-            <Text style={styles.title}>
-              {canPurchaseInApp ? t('subscription.title') : t('subscription.titleReadOnly')}
-            </Text>
+            <Text style={styles.title}>{t('subscription.title')}</Text>
             <Text style={styles.subtitle}>
-              {canPurchaseInApp ? t('subscription.subtitle') : t('subscription.subtitleReadOnly')}
+              {t('subscription.subtitle')}
             </Text>
           </View>
 
@@ -210,13 +190,6 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 </Card>
               )}
 
-              {!canPurchaseInApp && !activeProvider && (
-                <Card style={styles.noticeCard}>
-                  <Icon name="information-circle-outline" size={20} color={colors.navy} />
-                  <Text style={styles.noticeText}>{t('subscription.notSoldInApp')}</Text>
-                </Card>
-              )}
-
               {/* Free Plan */}
               <Card style={styles.planCard}>
                 <View style={styles.planHeader}>
@@ -226,11 +199,9 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                       <Badge label={t('subscription.current')} tone="neutral" />
                     )}
                   </View>
-                  {canPurchaseInApp && (
-                    <Text style={styles.planPrice}>
-                      0 kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
-                    </Text>
-                  )}
+                  <Text style={styles.planPrice}>
+                    0 kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                  </Text>
                 </View>
 
                 <Badge
@@ -259,11 +230,9 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                       <Badge label={t('subscription.current')} tone="navy" />
                     )}
                   </View>
-                  {canPurchaseInApp && (
-                    <Text style={styles.planPrice}>
-                      {priceLabel('STANDARD', standard.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
-                    </Text>
-                  )}
+                  <Text style={styles.planPrice}>
+                    {priceLabel('STANDARD', standard.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                  </Text>
                 </View>
 
                 <Badge
@@ -282,17 +251,15 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   ))}
                 </View>
 
-                {canPurchaseInApp && (
-                  <Button
-                    title={currentTier === 'STANDARD' ? t('subscription.active') : t('subscription.chooseStandard')}
-                    variant="secondary"
-                    size="lg"
-                    fullWidth
-                    disabled={isProcessing || managedElsewhere || currentTier === 'STANDARD'}
-                    loading={isProcessing}
-                    onPress={() => handleSubscribe('STANDARD')}
-                  />
-                )}
+                <Button
+                  title={currentTier === 'STANDARD' ? t('subscription.active') : t('subscription.chooseStandard')}
+                  variant="secondary"
+                  size="lg"
+                  fullWidth
+                  disabled={isProcessing || managedElsewhere || currentTier === 'STANDARD'}
+                  loading={isProcessing}
+                  onPress={() => handleSubscribe('STANDARD')}
+                />
               </Card>
 
               {/* Premium Plan */}
@@ -306,11 +273,9 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 
                 <View style={styles.planHeader}>
                   <Text style={[styles.planName, { color: colors.gold }]}>Premium</Text>
-                  {canPurchaseInApp && (
-                    <Text style={styles.planPrice}>
-                      {priceLabel('PREMIUM', premium.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
-                    </Text>
-                  )}
+                  <Text style={styles.planPrice}>
+                    {priceLabel('PREMIUM', premium.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                  </Text>
                 </View>
 
                 <Badge
@@ -329,56 +294,45 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   ))}
                 </View>
 
-                {canPurchaseInApp && (
-                  <Button
-                    title={currentTier === 'PREMIUM' ? t('subscription.active') : t('subscription.choosePremium')}
-                    variant="gold"
-                    size="lg"
-                    fullWidth
-                    icon="star"
-                    disabled={isProcessing || managedElsewhere || currentTier === 'PREMIUM'}
-                    loading={isProcessing}
-                    onPress={() => handleSubscribe('PREMIUM')}
-                  />
-                )}
+                <Button
+                  title={currentTier === 'PREMIUM' ? t('subscription.active') : t('subscription.choosePremium')}
+                  variant="gold"
+                  size="lg"
+                  fullWidth
+                  icon="star"
+                  disabled={isProcessing || managedElsewhere || currentTier === 'PREMIUM'}
+                  loading={isProcessing}
+                  onPress={() => handleSubscribe('PREMIUM')}
+                />
               </Card>
 
               <View style={styles.footer}>
-                {isIapSupported && (
+                {isPurchasingSupported && (
                   <View style={styles.footerActions}>
-                    <Button
-                      title={t('subscription.restore')}
-                      variant="ghost"
-                      size="sm"
-                      disabled={isProcessing}
-                      onPress={handleRestore}
-                    />
+                    {/* Web Billing subscriptions belong to the logged-in account, so there is nothing to restore on web. */}
+                    {Platform.OS !== 'web' && (
+                      <Button
+                        title={t('subscription.restore')}
+                        variant="ghost"
+                        size="sm"
+                        disabled={isProcessing}
+                        onPress={handleRestore}
+                      />
+                    )}
                     {activeProvider === thisPlatformProvider && (
                       <Button
                         title={t('subscription.manage')}
                         variant="ghost"
                         size="sm"
-                        onPress={() => openManageSubscriptions(currentTier === 'FREE' ? undefined : currentTier)}
+                        disabled={isProcessing}
+                        onPress={handleManage}
                       />
                     )}
                   </View>
                 )}
-                {Platform.OS === 'web' && activeProvider === 'STRIPE' && (
-                  <View style={styles.footerActions}>
-                    <Button
-                      title={t('subscription.manage')}
-                      variant="ghost"
-                      size="sm"
-                      disabled={isProcessing}
-                      onPress={handleManageStripe}
-                    />
-                  </View>
-                )}
-                {thisPlatformProvider && (
-                  <Text style={styles.disclosure}>
-                    {t('subscription.disclosure', { store: storeLabel(thisPlatformProvider) })}
-                  </Text>
-                )}
+                <Text style={styles.disclosure}>
+                  {t('subscription.disclosure', { store: storeLabel(thisPlatformProvider) })}
+                </Text>
                 <View style={styles.footerActions}>
                   <Button
                     title={t('subscription.termsLink')}

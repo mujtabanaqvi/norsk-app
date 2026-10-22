@@ -1,10 +1,10 @@
 # Publishing Snakkly to Google Play (from scratch)
 
-A step-by-step checklist for taking Snakkly from zero to a live listing on Google Play. It covers accounts, server configuration, Stripe, builds, testing and review.
+A step-by-step checklist for taking Snakkly from zero to a live listing on Google Play. It covers accounts, Play subscriptions, RevenueCat, builds, testing and review.
 
-> **The Android app sells nothing in-app.** Users subscribe on the web (Stripe), and the Android app only reads their tier from the server. It refreshes the tier whenever the app returns to the foreground. That's why steps 2, 6 and 7 (payments profile, Play subscription products, service account/RTDN) are **skipped**. They are kept for reference in case Play Billing is re-enabled later (load `expo-iap` on Android in `src/lib/iap.ts`).
+> **Android sells subscriptions through Google Play Billing**, via RevenueCat (`react-native-purchases`). iOS uses the App Store and the web uses RevenueCat Web Billing (Stripe), all through the same RevenueCat project and entitlements.
 >
-> **Play policy:** Play's payments policy forbids buy buttons, prices with a call to action, upsells, and text or links that steer users to pay on the website. The app hides these on Android via `canPurchaseInApp` (`src/lib/iap.ts`). Keep it that way when adding new screens or copy.
+> **Play policy:** inside the Android app, payments must go through Play Billing. Don't add links or text that steer Android users to pay on the website.
 
 How the payment code works is described in [PAYMENTS.md](./PAYMENTS.md). This document covers only **setup and release**.
 
@@ -15,9 +15,9 @@ How the payment code works is described in [PAYMENTS.md](./PAYMENTS.md). This do
 | Thing | Value | Where it's defined |
 |---|---|---|
 | Package name | `com.snakkly.app` | `app.json` → `android.package` |
-| Standard product id (iOS; Play only if re-enabled) | `snakkly.standard.monthly` | `src/lib/iap-products.ts` |
-| Premium product id (iOS; Play only if re-enabled) | `snakkly.premium.monthly` | `src/lib/iap-products.ts` |
-| Default prices | 149 kr / 299 kr per month | `tier_configs` table (admin panel) |
+| Standard product id (all stores) | `snakkly.standard.monthly` | `src/lib/iap-products.ts` |
+| Premium product id (all stores) | `snakkly.premium.monthly` | `src/lib/iap-products.ts` |
+| Default prices | 149 kr / 299 kr per month | Play Console (charged), `tier_configs` (fallback label only) |
 | Public website | `https://snakkly.no` | separate repo `snakkly-frontend-website` |
 | API host | `https://<api-host>` (your deployed Next.js backend) | |
 
@@ -28,15 +28,15 @@ The package name and product ids **can never be changed or reused** after you cr
 ## Overview: order of operations
 
 1. Create the Google Play developer account and verify your identity.
-2. ~~Payments profile~~ (skip: nothing is sold through Play).
+2. Set up the payments profile (merchant account) so Google can pay you.
 3. Fix the release blockers in the app (account deletion, etc.).
 4. Create the app in Play Console.
 5. Build a signed AAB with EAS and upload it manually to **Internal testing**.
-6. ~~Subscription products~~ (skip).
-7. ~~Service account + RTDN~~ (skip).
-8. Configure the production server env vars and set up live Stripe. This is the only revenue path for Android users.
+6. Create the two subscription products.
+7. Connect Play to RevenueCat (service account + real-time developer notifications).
+8. Configure RevenueCat and the production server env vars.
 9. Fill in the store listing and all the "App content" declarations.
-10. Test that a web subscription unlocks the Android app.
+10. Test buying, upgrading, restoring and cancelling on Android.
 11. Closed testing: 12 testers for 14 days (personal accounts only).
 12. Apply for production access → submit for review → release.
 
@@ -55,7 +55,7 @@ The package name and product ids **can never be changed or reused** after you cr
 
 ---
 
-## 2. Payments profile (to receive money): SKIP, only needed if Play Billing is re-enabled
+## 2. Payments profile (to receive money)
 
 Google pays out your subscription revenue through a **payments profile** (merchant account). Without it, you can't create paid products.
 
@@ -69,7 +69,7 @@ Google pays out your subscription revenue through a **payments profile** (mercha
 4. **Tax info** (Payments profile → Settings → Manage tax info):
    - Fill in the US tax form. A non-US individual normally uses **W-8BEN**; a non-US company uses **W-8BEN-E**. Claim the Norway–US tax treaty so no US withholding is applied.
    - **Norwegian VAT (MVA)**: for sales to Norwegian consumers, Google is the merchant of record and collects and remits VAT. Prices you set in Play are **VAT-inclusive** for Norway. You don't add MVA on top.
-5. Google's **service fee for subscriptions is 15%**. Factor this in when setting prices; Stripe on the web is roughly 1.5–3% + per-transaction fee.
+5. Google's **service fee for subscriptions is 15%**. Factor this in when setting prices.
 6. Payouts happen monthly once your balance passes the minimum payout threshold.
 
 ---
@@ -79,9 +79,8 @@ Google pays out your subscription revenue through a **payments profile** (mercha
 Check these before building the release AAB:
 
 - [ ] **Account deletion (mandatory).** Any app that lets users create accounts must provide **(a)** an in-app way to delete the account and its data, and **(b)** a **public web URL** where users can request deletion without reinstalling the app. Play Console asks for this URL in *Data safety*. The backend doesn't have a delete-account endpoint yet (`app/api/auth` has none), so add one, add a button in the app, and add a page on snakkly.no (e.g. `https://snakkly.no/slett-konto`).
-- [ ] **No purchase steering on Android.** Already handled by `canPurchaseInApp` (`src/lib/iap.ts`): no buy buttons, prices, upsells or website links. Re-check any new copy, including server error messages the app displays (e.g. the daily-limit message in `app/api/exam/start/route.ts`), and the store listing and screenshots. Don't write "subscribe at snakkly.no" in the Play description.
-- [ ] **Web subscribers can cancel.** Android users manage their subscription on the website. The web subscription screen has a **Manage subscription** button for Stripe subscribers (`POST /api/stripe/portal`), but it only works once the Stripe Customer portal is configured in the dashboard (8.2 step 6), in both test and live mode.
-- [ ] **Optional: drop the BILLING permission.** `expo-iap` (still used for iOS) pulls in the Play Billing library, which adds `com.android.vending.BILLING`. It's harmless, but you can remove it by adding `"blockedPermissions": ["com.android.vending.BILLING"]` under `android` in `app.json`. Remove that again if Play Billing is ever re-enabled.
+- [ ] **No steering to the website.** In the Android app, buy only through Play. Don't link to the web checkout or write "subscribe at snakkly.no" in the app or the Play description.
+- [ ] **RevenueCat Android key.** Set `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` (`goog_…`) for production builds. Without it, the buy buttons show "store unavailable".
 - [ ] **Privacy policy URL.** The app has `PrivacyPolicyScreen`, but Play needs a **public URL** (e.g. `https://snakkly.no/personvern`) with the same content, covering microphone audio, AI processing (Azure / OpenAI), payments and deletion.
 - [ ] **Foreground service permission.** `app.json` requests `FOREGROUND_SERVICE_MEDIA_PLAYBACK`. Play requires a *Foreground service* declaration (with a short video) for it. If background audio isn't actually needed, remove `FOREGROUND_SERVICE` and `FOREGROUND_SERVICE_MEDIA_PLAYBACK` from `android.permissions` to avoid the declaration.
 - [ ] **Production API URL.** Set `EXPO_PUBLIC_API_URL=https://<api-host>` for EAS production builds (EAS → project → Environment variables → *production*, or an `env` block in the `production` profile of `eas.json`). Otherwise the release build tries to guess a LAN address (`src/config.ts`).
@@ -96,7 +95,7 @@ Check these before building the release AAB:
 1. Play Console → **All apps** → **Create app**.
    - App name: `Snakkly` (max 30 characters; you can change it later).
    - Default language: **Norwegian – no-NO** (add English translations later if you want).
-   - App or game: **App**. Free or paid: **Free** (subscriptions are bought on the website; the download itself is free. A free app can **never** be changed to paid).
+   - App or game: **App**. Free or paid: **Free** (the download is free and subscriptions are in-app purchases. A free app can **never** be changed to paid).
    - Accept the declarations.
 2. You land on the **Dashboard**. Its "Set up your app" checklist mirrors steps 9–12 here.
 
@@ -135,135 +134,24 @@ Later uploads can be automated (see step 12.4).
 
 ---
 
-## 6. Create the subscription products: SKIP, only needed if Play Billing is re-enabled
+## 6. Create the subscription products
 
-The **Monetize → Products → Subscriptions** page unlocks once a build containing the billing library is uploaded. `expo-iap` adds it automatically, so step 5 takes care of this. If the page still says you need to add the BILLING permission, wait a few minutes after the upload and reload.
-
-Do this once for each tier:
-
-| | Standard | Premium |
-|---|---|---|
-| Product ID | `snakkly.standard.monthly` | `snakkly.premium.monthly` |
-| Name | Snakkly Standard | Snakkly Premium |
-| Base plan ID | `monthly` | `monthly` |
-| Price (NOK, incl. MVA) | 149 kr | 299 kr |
-
-1. **Monetize with Play → Products → Subscriptions → Create subscription.**
-   - **Product ID**: exactly as in the table. It's permanent.
-   - **Name**: as in the table (users see this in Play and their subscriptions page).
-2. Add **benefits** (up to 4 short lines shown on the Play subscription page), e.g. "Flere prøver per dag", "Detaljert tilbakemelding".
-3. **Add base plan**:
-   - Base plan ID: `monthly`.
-   - Type: **Auto-renewing**, billing period **Monthly**.
-   - **Grace period**: e.g. 7 days. **Account hold**: the remainder up to 30 days. The server already maps grace period → active and account hold → past due.
-   - **Resubscribe**: allow.
-   - **Tags**: optional.
-   - **Prices**: *Set prices* → select all countries/regions you want → enter **NOK 149** (or 299) for Norway. Play converts the rest; adjust key markets by hand if you like.
-   - **Save**, then **Activate** the base plan.
-4. Optional: add an **offer** (e.g. a 7-day free trial for new customers). The app doesn't depend on offers, so you can add them later.
-5. Keep store prices **in sync with `tier_configs`** (admin panel → *Abonnement & Verveinnstillinger*). The Android app shows the store's localized price (`displayPrice`), while the web shows `tier_configs.price_cents`. They are independent, so update both when changing prices.
-
-Upgrades/downgrades: Standard and Premium are separate subscriptions on Play. Switching plans goes through the app's buy flow. The server recomputes the tier from every active subscription (`recomputeUserTier()`), so the user keeps the highest tier they pay for.
+Follow [PAYMENTS.md → 2.2 Create the subscriptions](./PAYMENTS.md#22-create-the-subscriptions). It covers both products, the `monthly` base plans, grace period and prices. The page unlocks once the build from step 5 is uploaded.
 
 ---
 
-## 7. Google Cloud: service account + Real-time developer notifications: SKIP, only needed if Play Billing is re-enabled
+## 7. Connect Google Play to RevenueCat
 
-The server needs to (a) call the **Google Play Developer API** to verify and acknowledge purchases (`lib/iap/google.ts`), and (b) receive **RTDN** pushes for renewals, cancellations and refunds (`app/api/iap/google/rtdn`).
-
-### 7.1 Google Cloud project
-
-1. Open <https://console.cloud.google.com>. Reuse the project that already has the Google Sign-In OAuth clients, or create one called `snakkly`.
-2. **APIs & Services → Library**: enable
-   - **Google Play Android Developer API**
-   - **Cloud Pub/Sub API**
-
-### 7.2 Service account for verifying purchases
-
-1. **IAM & Admin → Service accounts → Create service account**, e.g. `play-billing@<project>.iam.gserviceaccount.com`. No project roles are needed.
-2. Open it → **Keys → Add key → Create new key → JSON**. A file downloads. Treat it like a password.
-3. Play Console (**All apps** level) → **Users and permissions → Invite new users**:
-   - Email: the service account email.
-   - **App permissions** → add Snakkly with:
-     - *View app information and download bulk reports (read-only)*
-     - *View financial data, orders, and cancellation survey responses*
-     - *Manage orders and subscriptions*
-   - **Invite user**. Service accounts are added immediately; no email confirmation is needed.
-4. Permissions can take **up to 24–36 hours** to apply. If the verify endpoint returns `401/403 The current user has insufficient permissions`, a known trick is to edit any subscription's description, save it, and change it back. That forces a refresh.
-5. Convert the JSON key into a single line for the env var:
-   ```bash
-   node -e "console.log(JSON.stringify(require('./play-billing-key.json')))"
-   ```
-   Put the output in `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON`.
-
-### 7.3 Pub/Sub topic for RTDN
-
-1. **Pub/Sub → Topics → Create topic**: ID `play-rtdn`. Untick *Add a default subscription*.
-2. Open the topic → **Permissions** (info panel) → **Add principal**:
-   - Principal: `google-play-developer-notifications@system.gserviceaccount.com`
-   - Role: **Pub/Sub Publisher**
-3. Play Console → Snakkly → **Monetize with Play → Monetization setup**:
-   - **Real-time developer notifications** → Topic name: `projects/<project-id>/topics/play-rtdn`
-   - Notification content: **Subscriptions, voided purchases, and all one-time products**
-   - **Send test notification**: should report success. Save.
-
-### 7.4 Authenticated push subscription to the server
-
-1. Create a service account for signing push requests, e.g. `pubsub-push@<project>.iam.gserviceaccount.com` (no roles needed). You can reuse the one from 7.2.
-2. **Pub/Sub → Subscriptions → Create subscription**:
-   - ID: `play-rtdn-push`, topic: `play-rtdn`
-   - Delivery type: **Push**
-   - Endpoint URL: `https://<api-host>/api/iap/google/rtdn`
-   - **Enable authentication** → service account: the one from step 1
-   - **Audience**: `https://<api-host>/api/iap/google/rtdn` (same as the endpoint)
-   - Retry policy: *Retry after exponential backoff delay*
-   - Create. If the console asks to grant the Pub/Sub service agent the **Service Account Token Creator** role, accept.
-3. Server env vars:
-   - `GOOGLE_RTDN_AUDIENCE` = the audience URL above
-   - `GOOGLE_RTDN_SERVICE_ACCOUNT_EMAIL` = the push service account email
-4. Press **Send test notification** in Play Console again and check the server logs for a request to `/api/iap/google/rtdn`. A `401` means the audience or email doesn't match.
+Follow [PAYMENTS.md → 2.3 Service account](./PAYMENTS.md#23-service-account-lets-revenuecat-verify-and-acknowledge-purchases), [2.4 Real-time developer notifications](./PAYMENTS.md#24-real-time-developer-notifications) and [2.5 License testers](./PAYMENTS.md#25-license-testers). RevenueCat, not our server, verifies and acknowledges Play purchases; our server only hears about them through the RevenueCat webhook.
 
 ---
 
-## 8. Production server configuration (+ Stripe from scratch)
+## 8. RevenueCat and production configuration
 
-### 8.1 Env vars on the production backend
-
-| Variable | Value |
-|---|---|
-| `GOOGLE_PLAY_*`, `GOOGLE_RTDN_*` | Not needed while Android sells nothing in-app (step 7) |
-| `STRIPE_SECRET_KEY` | `sk_live_…` (8.2) |
-| `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the live webhook (8.2) |
-| `NEXT_PUBLIC_APP_URL` | Public URL of the web app (allowed Stripe return origin) |
-
-Redeploy after changing them. The full list is in [PAYMENTS.md](./PAYMENTS.md#environment-variables).
-
-### 8.2 Stripe (web payments)
-
-Stripe is how **web and Android users** subscribe (Android users pay on the website), so a live account is needed before launch. The checkout uses inline `price_data` from `tier_configs`, so **you don't need to create Products or Prices in Stripe**.
-
-1. Sign up at <https://dashboard.stripe.com/register> (country: **Norway**, currency **NOK**).
-2. **Activate the account** (Settings → Business → *Activate payments*):
-   - Business type (sole proprietorship / company), organisasjonsnummer, address.
-   - Representative's personal details and ID verification.
-   - Business website: `https://snakkly.no`, product description: "Subscription for AI-based Norskprøven speaking practice".
-   - **Bank account** (Norwegian IBAN) for payouts.
-   - **Public details**: statement descriptor `SNAKKLY`, support email, support URL.
-3. **Tax**: if you're MVA-registered, register Norwegian VAT under Settings → Tax, or include MVA in the `tier_configs` price. The current checkout doesn't enable Stripe Tax automatically, so prices are charged exactly as configured.
-4. **API keys** (Developers → API keys, with the *Test mode* toggle **off**): copy the **Secret key** `sk_live_…` → `STRIPE_SECRET_KEY`. Consider a **restricted key** with write access to Checkout Sessions, Customers and Subscriptions only.
-5. **Webhook** (Developers → Webhooks → *Add endpoint*):
-   - URL: `https://<api-host>/api/stripe/webhook`
-   - Events: `checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`
-   - Copy the **Signing secret** → `STRIPE_WEBHOOK_SECRET`.
-6. **Customer portal (required).** The web app's *Manage subscription* button opens it, and it's the only place Android users can cancel. Go to **Settings → Billing → Customer portal** (do it in both test and live mode) and set:
-   - **Cancel subscriptions**: on, mode *At end of billing period*. Optionally collect a cancellation reason.
-   - **Update payment methods**: on. **Invoice history**: on. **Customer information**: email/billing address as you like.
-   - **Switch plans / Update quantities**: **off**. The tier comes from the subscription's metadata and prices are created inline, so a plan switch in the portal would not change the user's tier. Upgrades go through Checkout in the app.
-   - **Business information**: headline, privacy policy URL and terms URL. Default redirect link: `https://<web-app>/subscription`.
-   - Save.
-
-   Also enable the *Subscription* emails (receipts, failed payment, upcoming renewal) under Settings → Emails. They're the main reminder Android users get, since nothing appears in Play.
-7. Test the live flow once with a real card on the web app, then refund yourself from the dashboard.
+1. Finish [PAYMENTS.md → 4. RevenueCat wiring](./PAYMENTS.md#4-revenuecat-wiring): the Play Store app with its service account, imported products, entitlements, the `default` Offering, restore behaviour and the webhook.
+2. Set the env vars from [PAYMENTS.md → 5](./PAYMENTS.md#5-environment-variables):
+   - **Backend:** `REVENUECAT_SECRET_API_KEY`, `REVENUECAT_WEBHOOK_AUTH`. Redeploy after setting them.
+   - **EAS production environment:** `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` (`goog_…`). Rebuild the app after setting it.
 
 ---
 
@@ -290,7 +178,7 @@ Add an **English (en-US)** translation of the listing if you want to reach non-N
 ### 9.2 App content (Policy → App content)
 
 - **Privacy policy**: the public URL from step 3.
-- **App access**: choose *All or some functionality is restricted* and give reviewers a **working test account** (email + password) that has a **paid tier** (set it via the admin panel, since it can't be bought in the app) and enough quota. Explain: "Log in, choose a topic, press record". Reviewers reject apps they can't get into.
+- **App access**: choose *All or some functionality is restricted* and give reviewers a **working test account** (email + password) that has a **paid tier** (set it via the admin panel, so reviewers don't have to buy one) and enough quota. Explain: "Log in, choose a topic, press record". Reviewers reject apps they can't get into.
 - **Ads**: *No, my app does not contain ads*.
 - **Content rating**: fill in the IARC questionnaire (category *Reference, News, or Educational*). You'll get ratings such as PEGI 3.
 - **Target audience**: **18 and over** (or 16+). Avoid ages under 13, which triggers the Families policy.
@@ -299,7 +187,7 @@ Add an **English (en-US)** translation of the listing if you want to reach non-N
   - *Personal info*: name, email address (account management). User IDs.
   - *Audio*: voice or sound recordings, collected for **App functionality**, processed by AI providers, not shared for advertising.
   - *App activity*: in-app actions (exam history, results).
-  - *Financial info*: none collected in the Android app. Payments happen on the website through Stripe; the app only receives the subscription tier.
+  - *Financial info*: *Purchase history* (subscriptions bought through Google Play, processed by Google and RevenueCat). Card details are handled by Google Play, not the app.
   - Encrypted in transit: **Yes**. Users can request deletion: **Yes**, plus the **deletion URL** from step 3.
   - Data is *shared* with service providers (Azure/OpenAI) only to process requests on your behalf. Google's definition of "processing by a service provider" isn't counted as sharing; read the help text in the form.
 - **Government apps**: No. **Financial features**: None. **Health**: None.
@@ -308,19 +196,22 @@ Add an **English (en-US)** translation of the listing if you want to reach non-N
 
 ### 9.3 Countries and pricing
 
-**Test and release → Production → Countries/regions**: add Norway (and others you want). Country availability only controls where the app can be downloaded. Subscriptions are sold on the website, wherever Stripe accepts the customer's card.
+**Test and release → Production → Countries/regions**: add Norway (and others you want). Subscriptions can only be bought in countries where the base plan has a price (step 6).
 
 ---
 
-## 10. Test that a web subscription unlocks the Android app
+## 10. Test buying on Android
+
+Use a **license tester** account (Play Console → Setup → License testing) that has opted in to the internal track. Test purchases are free and renew quickly (a monthly plan renews every few minutes).
 
 1. Install Snakkly from the internal testing opt-in link (step 5.4) and log in as a **free** user.
-2. Confirm the Android app shows **no** buy buttons, prices, "Upgrade"/"Unlock more" prompts or links to the website. The subscription screen is read-only ("Ditt abonnement") and says subscriptions can't be purchased in the app.
-3. Leave the app in the background. In a browser, log in to the web app with the **same account** and subscribe with Stripe.
-4. Return to the Android app: the tier badge updates to Standard/Premium without restarting (the profile is re-read on foreground).
-5. The subscription screen now shows "Abonnementet ditt administreres via nettsiden…" (managed on the website, no link).
-6. Cancel the subscription via Stripe. After the period ends (or after `customer.subscription.deleted`), the app drops back to Free on the next foreground.
-7. Also check:
+2. Open the subscription screen. Both plans show the **Play price** in NOK, not the `tier_configs` fallback. If the fallback shows, see Troubleshooting.
+3. Buy **Standard**. The Play purchase sheet opens, then PaymentResult shows "Standard". The tier badge updates, and RevenueCat → Customers shows the user (App User ID = our `users.id`) with the `standard` entitlement.
+4. Buy **Premium**. This replaces the Standard subscription (Play subscriptions page shows only one), and the tier becomes Premium.
+5. **Manage subscription** opens Google Play's subscription page. Cancel there. The app keeps Premium until the period ends, then drops to Free (via the RevenueCat webhook).
+6. **Restore purchases** on a second Snakkly account on the same device. You should see the "owned by another account" message, and the second account stays Free.
+7. Check the server logs for `POST /api/revenuecat/webhook` returning 200 after each step.
+8. Also check:
    - [ ] Google Sign-In works in the Play-installed build (step 5.5).
    - [ ] A `https://snakkly.no/r/<code>` referral link opens the app.
 
@@ -370,8 +261,9 @@ Skip this step if you have an **organization** account.
 - [ ] **Android vitals**: watch crash and ANR rates (Quality → Android vitals). Bad vitals reduce visibility in Play.
 - [ ] **Ratings and reviews**: reply to reviews.
 - [ ] **Target API level**: Google raises the minimum target SDK every year (deadline usually 31 August). Upgrade the Expo SDK in time; Play Console → *Policy status* warns you in advance.
-- [ ] **Payouts**: Stripe pays out to your bank account automatically (Stripe dashboard → *Balance → Payouts*). Apple pays out monthly for iOS sales.
-- [ ] **Price changes**: change `tier_configs` (admin panel); this is what Stripe charges new web/Android subscribers. Existing Stripe subscriptions keep their old price. Also change the App Store prices for iOS.
+- [ ] **Payouts**: Google pays out Play revenue monthly to the payments profile (step 2). Apple pays out monthly for iOS sales. Stripe pays out web (Web Billing) revenue automatically.
+- [ ] **Price changes**: change prices in each store: Play base plan, App Store, and the Web Billing products in RevenueCat. Existing subscribers follow each store's price-change rules. Update `tier_configs` too; it's only the fallback label.
+- [ ] **RevenueCat**: watch the dashboard (Customers, Charts) and the webhook delivery status. Failed deliveries are retried, but a long run of failures means the backend is down or `REVENUECAT_WEBHOOK_AUTH` doesn't match.
 - [ ] **Keystore and service-account keys**: back them up and keep them out of git. If the upload key is lost, you can request an upload-key reset from Play Console (App integrity), because Google holds the actual app-signing key.
 
 ---
@@ -380,16 +272,13 @@ Skip this step if you have an **organization** account.
 
 | Symptom | Likely cause / fix |
 |---|---|
-| Tier doesn't update after paying on the web | Check the Stripe webhook delivered (Stripe dashboard → Webhooks) and that the same account is used in both places. The app re-reads the profile when it returns to the foreground. |
-| Android app shows buy buttons or prices | It's running a build where `expo-iap` loads on Android, i.e. `canPurchaseInApp` is true. Check `src/lib/iap.ts`. |
+| Subscription screen shows `tier_configs` prices (e.g. "149 kr") instead of Play prices, or buying says "store unavailable" | `EXPO_PUBLIC_REVENUECAT_ANDROID_KEY` missing from the build, products not attached to the `default` Offering (or the Offering isn't *current*), app not installed from a Play track, tester not opted in, base plan not **Active**, or the country has no price. New products can take a few hours to propagate. |
+| "Your app doesn't have any in-app products yet… add the BILLING permission" | Upload an AAB built with `react-native-purchases` to any track first (step 5), wait a few minutes and reload. |
+| RevenueCat shows "invalid credentials" for the Play app | Service-account permissions not applied yet (wait up to 36 h, or edit/save a product), or the account wasn't invited to this app (PAYMENTS.md 2.3). |
+| Tier doesn't update after buying | The client syncs right after the purchase (`/api/revenuecat/sync`). Check that call and `REVENUECAT_SECRET_API_KEY` in the server logs. For later changes, check webhook deliveries in RevenueCat (401 = `REVENUECAT_WEBHOOK_AUTH` mismatch). |
+| Purchases are refunded after 3 days | RevenueCat never acknowledged them, usually because of invalid Play credentials in RevenueCat (PAYMENTS.md 2.3). |
+| Renewals/cancellations reach RevenueCat late | RTDN not configured (PAYMENTS.md 2.4). RevenueCat then only notices changes when it polls. |
 | Google Sign-In `DEVELOPER_ERROR` only in the Play build | Add the **App signing SHA-1** from App integrity to the Android OAuth client. |
 | Referral links open the browser instead of the app | `assetlinks.json` on snakkly.no lacks the App signing SHA-256, or isn't served at `/.well-known/assetlinks.json` with `Content-Type: application/json` and without redirects. |
 | Rejected: "Account deletion" / "Data safety" | Add the in-app deletion and public deletion URL (step 3), and make Data safety match what the app actually does. |
 | Rejected: "Unable to access app" | Provide a working reviewer login with a paid tier in *App access* (9.2). |
-| *Rows below apply only if Play Billing is re-enabled* | |
-| "Your app doesn't have any in-app products yet… add the BILLING permission" | Upload an AAB built with `expo-iap` to any track first (step 5). |
-| Products don't load in the app (`getSubscriptions` returns empty) | App not installed from a Play track, tester not opted in, base plan not **Active**, the country has no price, or a product ID typo. New products can take a few hours to propagate. |
-| `/api/iap/google/verify` returns 500 "insufficient permissions" | Service-account permissions not applied yet (wait up to 36 h, or edit/save a product), or the account wasn't invited to this app (7.2). |
-| `/api/iap/google/verify` returns 500 "GOOGLE_PLAY_SERVICE_ACCOUNT_JSON is not configured" / JSON parse error | Env var missing on the server, or not single-line JSON. |
-| Purchases are refunded after 3 days | The server never acknowledged them. Check the verify endpoint logs. |
-| RTDN never arrives / returns 401 | Topic missing Publisher grant for `google-play-developer-notifications@…`, push subscription not authenticated, or audience/email mismatch with `GOOGLE_RTDN_AUDIENCE` / `GOOGLE_RTDN_SERVICE_ACCOUNT_EMAIL`. |

@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { Alert, Linking, Platform, StatusBar, View, ActivityIndicator } from 'react-native';
+import { Linking, Platform, StatusBar, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   NavigationContainer,
@@ -23,13 +23,13 @@ import { HowToScreen } from './src/screens/HowToScreen';
 import { TermsScreen } from './src/screens/TermsScreen';
 import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 import { PaymentResultScreen } from './src/screens/PaymentResultScreen';
-import { startIapListener } from './src/lib/iap';
+import { addCustomerInfoListener, configurePurchases, logOutPurchases } from './src/lib/purchases';
+import { installWebAlert } from './src/lib/web-alert';
 import {
   captureReferralFromUrl,
   captureReferralOnFirstLaunch,
   clearPendingReferral,
 } from './src/lib/pending-referral';
-import { PurchaseVerificationError } from './src/api';
 import { Logo } from './src/components/ui';
 import { colors } from './src/theme';
 import type { RootStackParamList } from './src/types/exam';
@@ -37,10 +37,12 @@ import type { RootStackParamList } from './src/types/exam';
 const Stack = createNativeStackNavigator<RootStackParamList>();
 const navigationRef = createNavigationContainerRef<RootStackParamList>();
 
+installWebAlert();
+
 // The launch URL only needs handling once, not again after every logout.
 let initialUrlHandled = false;
 
-// Web only: lets Stripe Checkout return into the app (`/payment/success?session_id=…`).
+// Web only: browser URLs for the main screens.
 const linking: LinkingOptions<RootStackParamList> | undefined =
   Platform.OS === 'web'
     ? {
@@ -49,7 +51,6 @@ const linking: LinkingOptions<RootStackParamList> | undefined =
           screens: {
             ExamSetup: '',
             Subscription: 'subscription',
-            PaymentResult: 'payment/:result',
           },
         },
       }
@@ -73,28 +74,22 @@ function AppNavigation() {
   const { t, isLoading: isLocaleLoading } = useLocale();
   const userId = user?.id;
 
-  // Store purchases (iOS/Android) are delivered asynchronously, so the listener lives for the whole session.
+  // RevenueCat follows the logged-in user. Renewals, expirations and purchases made on another device
+  // reach the server through the RevenueCat webhook; the listener only refreshes the profile shown here.
   useEffect(() => {
     if (!userId) return;
-    return startIapListener({
-      onVerified: (result, userInitiated) => {
-        if (userInitiated && navigationRef.isReady()) {
-          navigationRef.navigate('PaymentResult', { result: 'success', tier: result.tier });
-        } else {
-          refreshProfile();
-        }
-      },
-      onPending: () => {
-        if (navigationRef.isReady()) navigationRef.navigate('PaymentResult', { result: 'pending' });
-      },
-      onError: (error) => {
-        const message =
-          error instanceof PurchaseVerificationError && error.code === 'OWNED_BY_OTHER_ACCOUNT'
-            ? t('subscription.ownedByOtherAccount')
-            : (error as any)?.message || t('subscription.paymentErrorBody');
-        Alert.alert(t('subscription.paymentErrorTitle'), message);
-      },
-    });
+    let removeListener = () => {};
+    let active = true;
+    configurePurchases(userId)
+      .then(() => {
+        if (active) removeListener = addCustomerInfoListener(() => refreshProfile());
+      })
+      .catch((err) => console.warn('RevenueCat setup failed', err));
+    return () => {
+      active = false;
+      removeListener();
+      logOutPurchases();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]);
 

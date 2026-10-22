@@ -9,6 +9,7 @@
 
 # Production builds
 /build
+/dist
 
 # Environment files
 .env*.local

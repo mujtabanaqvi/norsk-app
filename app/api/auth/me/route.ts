@@ -18,7 +18,6 @@ export async function GET(req: NextRequest) {
         image: users.image,
         role: users.role,
         subscriptionTier: users.subscriptionTier,
-        iapAccountToken: users.iapAccountToken,
         referralCode: users.referralCode,
         referredByUserId: users.referredByUserId,
         createdAt: users.createdAt,

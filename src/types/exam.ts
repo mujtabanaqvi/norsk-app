@@ -216,7 +216,6 @@ export type RootStackParamList = {
   PaymentResult:
     | {
         result?: 'success' | 'canceled' | 'pending';
-        session_id?: string;
         tier?: 'FREE' | 'STANDARD' | 'PREMIUM';
       }
     | undefined;

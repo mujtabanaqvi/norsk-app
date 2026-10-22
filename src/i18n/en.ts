@@ -106,7 +106,6 @@ export const en: Translations = {
     headerSubtitle: 'Norskprøven oral test',
     a11yGuide: 'Guide',
     a11yUpgrade: 'Upgrade',
-    myPlan: 'My plan',
     a11yLogout: 'Log out',
     fetchError: 'Unknown error while loading data',
     loginRequiredTitle: 'Login required',
@@ -374,9 +373,6 @@ export const en: Translations = {
   subscription: {
     title: 'Choose your plan',
     subtitle: 'Build real confidence for the oral test with more daily practice tests.',
-    titleReadOnly: 'Your plan',
-    subtitleReadOnly: 'See your current plan and what each plan includes.',
-    notSoldInApp: "Subscriptions can't be purchased in this app.",
     loadFailed: 'Could not load subscription plans',
     accountRequiredTitle: 'Account required',
     accountRequiredBody: 'You need to log in or create an account to buy a subscription.',
@@ -592,21 +588,6 @@ export const en: Translations = {
     fetchPlans: 'Could not load subscription plans',
     fetchReferral: 'Could not load the referral code',
     fetchLearningProfile: 'Could not load your learning profile ({status})',
-    checkout: 'Could not start the payment',
     verifyPurchase: 'Could not confirm the purchase',
-    checkoutSession: 'Could not load the payment status',
-    portal: 'Could not open subscription management',
-  },
-
-  web: {
-    backToApp: 'Back to the app',
-    successTitle: 'Thank you for your purchase!',
-    successBody:
-      'Your subscription is now active. Your daily test quota has been increased and you can keep practising for the oral Norskprøve.',
-    canceledTitle: 'Order cancelled',
-    canceledBody:
-      'The payment was not completed and your card was not charged. You can try again at any time to upgrade your subscription.',
-    stripeProductName: 'Norsk App {tier} Subscription',
-    stripeProductDescription: 'Access to {count} tests per day and full AI assessment',
   },
 };
