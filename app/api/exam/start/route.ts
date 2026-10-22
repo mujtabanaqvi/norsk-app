@@ -111,7 +111,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: 'Daily test limit reached',
-          message: `Du har nådd din daglige grense på ${dailyStatus.totalAllowedToday} test(er). Grensen nullstilles ved midnatt.`,
+          message: `Du har nådd din daglige grense på ${dailyStatus.totalAllowedToday} test(er). Grensen nullstilles ved midnatt. Oppgrader for å ta flere tester.`,
           code: 'DAILY_LIMIT_REACHED',
           dailyStatus,
         },
