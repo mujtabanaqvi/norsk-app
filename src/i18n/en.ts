@@ -106,6 +106,7 @@ export const en: Translations = {
     headerSubtitle: 'Norskprøven oral test',
     a11yGuide: 'Guide',
     a11yUpgrade: 'Upgrade',
+    myPlan: 'My plan',
     a11yLogout: 'Log out',
     fetchError: 'Unknown error while loading data',
     loginRequiredTitle: 'Login required',
@@ -373,6 +374,9 @@ export const en: Translations = {
   subscription: {
     title: 'Choose your plan',
     subtitle: 'Build real confidence for the oral test with more daily practice tests.',
+    titleReadOnly: 'Your plan',
+    subtitleReadOnly: 'See your current plan and what each plan includes.',
+    notSoldInApp: "Subscriptions can't be purchased in this app.",
     loadFailed: 'Could not load subscription plans',
     accountRequiredTitle: 'Account required',
     accountRequiredBody: 'You need to log in or create an account to buy a subscription.',
@@ -591,6 +595,7 @@ export const en: Translations = {
     checkout: 'Could not start the payment',
     verifyPurchase: 'Could not confirm the purchase',
     checkoutSession: 'Could not load the payment status',
+    portal: 'Could not open subscription management',
   },
 
   web: {

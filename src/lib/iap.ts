@@ -16,11 +16,15 @@ const SUBSCRIPTION_SKUS = Object.values(IAP_PRODUCT_IDS);
 type ExpoIap = typeof import('expo-iap');
 
 // Expo Go does not contain the expo-iap native module; importing it there crashes the app at startup.
-// Store purchases therefore need a development build (`npx expo run:android|ios`).
-const iap: ExpoIap | null =
-  (Platform.OS === 'ios' || Platform.OS === 'android') && !isRunningInExpoGo() ? require('expo-iap') : null;
+// Store purchases therefore need a development build (`npx expo run:ios`).
+// Android does not sell in-app: users subscribe on the web (Stripe) and the app only reads their tier.
+// The Google Play code paths below stay dormant so Play Billing can be re-enabled by loading the module on Android.
+const iap: ExpoIap | null = Platform.OS === 'ios' && !isRunningInExpoGo() ? require('expo-iap') : null;
 
 export const isIapSupported = iap !== null;
+
+/** False on Android (and Expo Go): the app must not show buy buttons, prices or upsells there. */
+export const canPurchaseInApp = Platform.OS === 'web' || isIapSupported;
 
 function store(): ExpoIap {
   if (!iap) throw new Error('In-app purchases are not available in this build');

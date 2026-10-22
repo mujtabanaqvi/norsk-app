@@ -507,6 +507,20 @@ export async function createStripeCheckout(tier: 'STANDARD' | 'PREMIUM', success
   return data;
 }
 
+/** Web: open the Stripe Customer Portal (cancel, update card, invoices) for the caller's Stripe subscription. */
+export async function createStripePortalSession(returnUrl?: string): Promise<{ url: string }> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/stripe/portal`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ returnUrl, locale: getCurrentLocale() }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new Error(data.message || data.error || tr('network.portal'));
+  }
+  return data;
+}
+
 export type PaidTierResult = { tier: 'FREE' | 'STANDARD' | 'PREMIUM' };
 
 /** Error from a purchase verification call, with the server's machine-readable code (e.g. OWNED_BY_OTHER_ACCOUNT). */

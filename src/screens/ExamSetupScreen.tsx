@@ -23,6 +23,7 @@ import type {
 } from '../types/exam';
 import type { LearningInsight } from '../types/learning-profile';
 import { TREND_ICON, TREND_LABEL_KEY } from '../lib/learning-profile-ui';
+import { canPurchaseInApp } from '../lib/iap';
 import {
   Screen,
   Logo,
@@ -231,7 +232,9 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const menuItems: { icon: IconName; label: string; color?: string; onPress: () => void }[] = [
     { icon: 'help-circle-outline', label: t('nav.howTo'), onPress: () => navigation.navigate('HowTo') },
     { icon: 'gift-outline', label: t('nav.referral'), onPress: () => navigation.navigate('Referral') },
-    { icon: 'star', label: t('setup.a11yUpgrade'), color: colors.gold, onPress: () => navigation.navigate('Subscription') },
+    canPurchaseInApp
+      ? { icon: 'star', label: t('setup.a11yUpgrade'), color: colors.gold, onPress: () => navigation.navigate('Subscription') }
+      : { icon: 'card-outline', label: t('setup.myPlan'), onPress: () => navigation.navigate('Subscription') },
     ...(user
       ? [{ icon: 'log-out-outline' as IconName, label: t('setup.a11yLogout'), color: colors.red, onPress: logout }]
       : []),
@@ -466,13 +469,15 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
               {dailyTestStatus && dailyTestStatus.remainingToday === 0 && (
                 <View style={styles.unlockRow}>
                   <Text style={styles.unlockHint}>{t('setup.limitReachedHint')}</Text>
-                  <Button
-                    title={t('setup.unlockMore')}
-                    variant="gold"
-                    size="sm"
-                    icon="star"
-                    onPress={() => navigation.navigate('Subscription')}
-                  />
+                  {canPurchaseInApp && (
+                    <Button
+                      title={t('setup.unlockMore')}
+                      variant="gold"
+                      size="sm"
+                      icon="star"
+                      onPress={() => navigation.navigate('Subscription')}
+                    />
+                  )}
                 </View>
               )}
             </Card>

@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AppState, Platform } from 'react-native';
 import { getStoredUser, clearAuthSession } from '../identity';
 import {
   fetchCurrentUser,
@@ -83,6 +84,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   useEffect(() => {
     refreshProfile();
+  }, [refreshProfile]);
+
+  // A subscription bought on the web (the only way to subscribe on Android) reaches the app
+  // through the server, so re-read the profile whenever the app returns to the foreground.
+  useEffect(() => {
+    if (Platform.OS === 'web') return;
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') refreshProfile();
+    });
+    return () => subscription.remove();
   }, [refreshProfile]);
 
   // Note: these deliberately don't toggle the global `isLoading` — that flag swaps the whole

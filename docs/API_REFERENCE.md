@@ -170,11 +170,12 @@ All auth errors share one shape: `{ "error": "<CODE>", "message": "<norsk tekst>
 See [PAYMENTS.md](./PAYMENTS.md) for the full flow per platform.
 - **`POST /api/stripe/checkout`** (web): Body `{ tier, successUrl?, cancelUrl?, locale? }`. Creates a Stripe Checkout session. Return URLs must be on the request origin or `NEXT_PUBLIC_APP_URL`. `409 MANAGED_BY_OTHER_PROVIDER` if the user already subscribes through the App Store / Play.
 - **`GET /api/stripe/checkout/session?session_id=`** (web): Returns `{ status: 'paid' | 'pending' | 'expired', tier }` for the caller's own session, fulfilling it immediately if paid.
+- **`POST /api/stripe/portal`** (web): Body `{ returnUrl?, locale? }`. Creates a Stripe Customer Portal session for the caller and returns `{ url }`. The return URL must be on the request origin or `NEXT_PUBLIC_APP_URL` (default `<origin>/subscription`). `404 NO_STRIPE_CUSTOMER` if the user has never started a Stripe checkout.
 - **`POST /api/stripe/webhook`**: Stripe webhooks (`checkout.session.completed`, `customer.subscription.updated`, `customer.subscription.deleted`). Signature required in production.
 - **`POST /api/iap/apple/verify`** (iOS): Body `{ signedTransaction }` (StoreKit 2 JWS). Verifies and stores the subscription, returns `{ tier }`. `403 OWNED_BY_OTHER_ACCOUNT` if it belongs to another account.
-- **`POST /api/iap/google/verify`** (Android): Body `{ purchaseToken }`. Verifies with the Play Developer API, acknowledges, returns `{ tier }`. `403 OWNED_BY_OTHER_ACCOUNT` as above.
+- **`POST /api/iap/google/verify`** (Android, currently unused: Play Billing is disabled in the app): Body `{ purchaseToken }`. Verifies with the Play Developer API, acknowledges, returns `{ tier }`. `403 OWNED_BY_OTHER_ACCOUNT` as above.
 - **`POST /api/iap/apple/notifications`**: App Store Server Notifications V2 receiver.
-- **`POST /api/iap/google/rtdn`**: Google Play Real-Time Developer Notifications (Pub/Sub push, OIDC-authenticated).
+- **`POST /api/iap/google/rtdn`**: Google Play Real-Time Developer Notifications (Pub/Sub push, OIDC-authenticated). Unused while Play Billing is disabled.
 - **`GET /api/referrals`**: Returns the authenticated user's referral code, total friends referred, and active bonus days.
 
 ---

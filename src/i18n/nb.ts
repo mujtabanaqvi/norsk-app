@@ -112,6 +112,7 @@ export const nb = {
     headerSubtitle: 'Norskprøven Muntlig',
     a11yGuide: 'Veileder',
     a11yUpgrade: 'Oppgrader',
+    myPlan: 'Mitt abonnement',
     a11yLogout: 'Logg ut',
     fetchError: 'Ukjent feil under henting av data',
     loginRequiredTitle: 'Innlogging påkrevd',
@@ -380,6 +381,9 @@ export const nb = {
   subscription: {
     title: 'Velg ditt abonnement',
     subtitle: 'Få ubegrenset selvtillit til muntlig prøve med flere daglige øvingstester.',
+    titleReadOnly: 'Ditt abonnement',
+    subtitleReadOnly: 'Her ser du planen din og hva som er inkludert i hver plan.',
+    notSoldInApp: 'Abonnement kan ikke kjøpes i denne appen.',
     loadFailed: 'Kunne ikke hente abonnementsplaner',
     accountRequiredTitle: 'Konto påkrevd',
     accountRequiredBody: 'Du må logge inn eller opprette en konto for å kjøpe et abonnement.',
@@ -602,6 +606,7 @@ export const nb = {
     checkout: 'Kunne ikke starte betaling',
     verifyPurchase: 'Kunne ikke bekrefte kjøpet',
     checkoutSession: 'Kunne ikke hente betalingsstatus',
+    portal: 'Kunne ikke åpne abonnementsadministrasjonen',
   },
 
   /** Next.js web pages (Stripe return pages) and Stripe checkout labels. */

@@ -10,9 +10,15 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
-import { fetchTierConfigs, createStripeCheckout, PurchaseVerificationError } from '../api';
+import {
+  fetchTierConfigs,
+  createStripeCheckout,
+  createStripePortalSession,
+  PurchaseVerificationError,
+} from '../api';
 import {
   buySubscription,
+  canPurchaseInApp,
   getSubscriptionProducts,
   isIapSupported,
   openManageSubscriptions,
@@ -62,8 +68,15 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Web: returning from the Stripe portal reloads this screen, so pick up a cancellation made there.
+  useEffect(() => {
+    if (Platform.OS === 'web' && user) refreshProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const activeProvider = user?.activeSubscriptionProvider ?? null;
-  const thisPlatformProvider = Platform.OS === 'ios' ? 'APPLE' : Platform.OS === 'android' ? 'GOOGLE' : 'STRIPE';
+  // Android sells nothing in-app (subscriptions are bought on the web), so every active subscription is managed elsewhere.
+  const thisPlatformProvider = !canPurchaseInApp ? null : Platform.OS === 'ios' ? 'APPLE' : 'STRIPE';
   const managedElsewhere = activeProvider !== null && activeProvider !== thisPlatformProvider;
   const storeLabel = (provider: string) =>
     provider === 'APPLE'
@@ -102,6 +115,18 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
           return; // Keep the spinner while the browser navigates to Stripe.
         }
       }
+    } catch (err: any) {
+      Alert.alert(t('subscription.paymentErrorTitle'), err.message || t('subscription.paymentErrorBody'));
+    }
+    setIsProcessing(false);
+  };
+
+  const handleManageStripe = async () => {
+    setIsProcessing(true);
+    try {
+      const { url } = await createStripePortalSession(`${window.location.origin}/subscription`);
+      window.location.assign(url);
+      return; // Keep the spinner while the browser navigates to Stripe.
     } catch (err: any) {
       Alert.alert(t('subscription.paymentErrorTitle'), err.message || t('subscription.paymentErrorBody'));
     }
@@ -162,9 +187,11 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
         <View style={styles.container}>
           <View style={styles.hero}>
-            <Text style={styles.title}>{t('subscription.title')}</Text>
+            <Text style={styles.title}>
+              {canPurchaseInApp ? t('subscription.title') : t('subscription.titleReadOnly')}
+            </Text>
             <Text style={styles.subtitle}>
-              {t('subscription.subtitle')}
+              {canPurchaseInApp ? t('subscription.subtitle') : t('subscription.subtitleReadOnly')}
             </Text>
           </View>
 
@@ -183,6 +210,13 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 </Card>
               )}
 
+              {!canPurchaseInApp && !activeProvider && (
+                <Card style={styles.noticeCard}>
+                  <Icon name="information-circle-outline" size={20} color={colors.navy} />
+                  <Text style={styles.noticeText}>{t('subscription.notSoldInApp')}</Text>
+                </Card>
+              )}
+
               {/* Free Plan */}
               <Card style={styles.planCard}>
                 <View style={styles.planHeader}>
@@ -192,9 +226,11 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                       <Badge label={t('subscription.current')} tone="neutral" />
                     )}
                   </View>
-                  <Text style={styles.planPrice}>
-                    0 kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
-                  </Text>
+                  {canPurchaseInApp && (
+                    <Text style={styles.planPrice}>
+                      0 kr <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                    </Text>
+                  )}
                 </View>
 
                 <Badge
@@ -223,9 +259,11 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                       <Badge label={t('subscription.current')} tone="navy" />
                     )}
                   </View>
-                  <Text style={styles.planPrice}>
-                    {priceLabel('STANDARD', standard.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
-                  </Text>
+                  {canPurchaseInApp && (
+                    <Text style={styles.planPrice}>
+                      {priceLabel('STANDARD', standard.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                    </Text>
+                  )}
                 </View>
 
                 <Badge
@@ -244,15 +282,17 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   ))}
                 </View>
 
-                <Button
-                  title={currentTier === 'STANDARD' ? t('subscription.active') : t('subscription.chooseStandard')}
-                  variant="secondary"
-                  size="lg"
-                  fullWidth
-                  disabled={isProcessing || managedElsewhere || currentTier === 'STANDARD'}
-                  loading={isProcessing}
-                  onPress={() => handleSubscribe('STANDARD')}
-                />
+                {canPurchaseInApp && (
+                  <Button
+                    title={currentTier === 'STANDARD' ? t('subscription.active') : t('subscription.chooseStandard')}
+                    variant="secondary"
+                    size="lg"
+                    fullWidth
+                    disabled={isProcessing || managedElsewhere || currentTier === 'STANDARD'}
+                    loading={isProcessing}
+                    onPress={() => handleSubscribe('STANDARD')}
+                  />
+                )}
               </Card>
 
               {/* Premium Plan */}
@@ -266,9 +306,11 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
 
                 <View style={styles.planHeader}>
                   <Text style={[styles.planName, { color: colors.gold }]}>Premium</Text>
-                  <Text style={styles.planPrice}>
-                    {priceLabel('PREMIUM', premium.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
-                  </Text>
+                  {canPurchaseInApp && (
+                    <Text style={styles.planPrice}>
+                      {priceLabel('PREMIUM', premium.priceCents)} <Text style={styles.planPeriod}>{t('subscription.perMonth')}</Text>
+                    </Text>
+                  )}
                 </View>
 
                 <Badge
@@ -287,16 +329,18 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   ))}
                 </View>
 
-                <Button
-                  title={currentTier === 'PREMIUM' ? t('subscription.active') : t('subscription.choosePremium')}
-                  variant="gold"
-                  size="lg"
-                  fullWidth
-                  icon="star"
-                  disabled={isProcessing || managedElsewhere || currentTier === 'PREMIUM'}
-                  loading={isProcessing}
-                  onPress={() => handleSubscribe('PREMIUM')}
-                />
+                {canPurchaseInApp && (
+                  <Button
+                    title={currentTier === 'PREMIUM' ? t('subscription.active') : t('subscription.choosePremium')}
+                    variant="gold"
+                    size="lg"
+                    fullWidth
+                    icon="star"
+                    disabled={isProcessing || managedElsewhere || currentTier === 'PREMIUM'}
+                    loading={isProcessing}
+                    onPress={() => handleSubscribe('PREMIUM')}
+                  />
+                )}
               </Card>
 
               <View style={styles.footer}>
@@ -319,9 +363,22 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                     )}
                   </View>
                 )}
-                <Text style={styles.disclosure}>
-                  {t('subscription.disclosure', { store: storeLabel(thisPlatformProvider) })}
-                </Text>
+                {Platform.OS === 'web' && activeProvider === 'STRIPE' && (
+                  <View style={styles.footerActions}>
+                    <Button
+                      title={t('subscription.manage')}
+                      variant="ghost"
+                      size="sm"
+                      disabled={isProcessing}
+                      onPress={handleManageStripe}
+                    />
+                  </View>
+                )}
+                {thisPlatformProvider && (
+                  <Text style={styles.disclosure}>
+                    {t('subscription.disclosure', { store: storeLabel(thisPlatformProvider) })}
+                  </Text>
+                )}
                 <View style={styles.footerActions}>
                   <Button
                     title={t('subscription.termsLink')}

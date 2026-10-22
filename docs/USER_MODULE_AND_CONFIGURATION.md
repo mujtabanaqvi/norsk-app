@@ -14,9 +14,9 @@ The user module provides:
    - Shared client/server form validation in `src/validation/auth.ts`.
    - Extensible Apple ID placeholder endpoint (`/api/auth/apple`) ready for future Apple Services ID configuration.
    - Session & token management supporting session cookies and Bearer JWTs.
-2. **Tiered Subscriptions (App Store, Google Play & Stripe)**:
+2. **Tiered Subscriptions (App Store & Stripe)**:
    - Three tiers: **Free**, **Standard**, and **Premium**.
-   - Native apps bill through App Store / Google Play in-app purchases; the web app uses Stripe Checkout. All purchases are verified server-side and the tier is recomputed from every provider's subscriptions. See [PAYMENTS.md](./PAYMENTS.md).
+   - The iOS app bills through App Store in-app purchases and the web app uses Stripe Checkout. The Android app sells nothing in-app: Android users subscribe on the web, and the app shows their tier (it re-reads the profile when it returns to the foreground). All purchases are verified server-side and the tier is recomputed from every provider's subscriptions. See [PAYMENTS.md](./PAYMENTS.md).
 3. **Daily Test Quotas (Calendar Day Reset)**:
    - Users are restricted to a configurable number of tests per calendar day (resetting at 00:00:00 Europe/Oslo time).
    - Enforced on the server inside `POST /api/exam/start`.
