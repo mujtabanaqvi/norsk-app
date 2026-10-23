@@ -27,6 +27,12 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+# Signing credentials
+credentials.json
+credentials/
+*.jks
+*.keystore
+
 # Expo
 .expo/
 /android/
