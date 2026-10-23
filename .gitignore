@@ -14,6 +14,7 @@
 # Environment files
 .env*.local
 .env
+.env.production
 
 # TypeScript build info
 *.tsbuildinfo
