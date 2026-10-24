@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { fetchLearningProfile, fetchTopicsAndQuota, startExamSession } from '../api';
+import { ApiError, fetchLearningProfile, fetchTopicsAndQuota, startExamSession } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
 import type {
@@ -57,7 +57,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const insets = useSafeAreaInsets();
 
-  const { user, dailyTestStatus, logout } = useAuth();
+  const { user, dailyTestStatus, logout, refreshProfile } = useAuth();
   const { t, locale } = useLocale();
   const publicLinks = usePublicLinks();
 
@@ -168,6 +168,21 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     remainingSeconds !== null && remainingSeconds < MIN_REQUIRED_QUOTA_SECONDS;
 
   /**
+   * Friendly upsell when today's tests are used up. Premium is the top tier, so it only
+   * gets the reset notice; everyone else is offered the subscription screen.
+   */
+  const showDailyLimitReached = () => {
+    if (user?.subscriptionTier === 'PREMIUM') {
+      Alert.alert(t('setup.dailyLimitTitle'), t('setup.dailyLimitBodyTopTier'));
+      return;
+    }
+    Alert.alert(t('setup.dailyLimitTitle'), t('setup.dailyLimitBody'), [
+      { text: t('setup.dailyLimitLater'), style: 'cancel' },
+      { text: t('setup.dailyLimitUpgrade'), onPress: () => navigation.navigate('Subscription') },
+    ]);
+  };
+
+  /**
    * Call POST /api/exam/start and navigate to Active Exam Room
    */
   const handleStartExam = async () => {
@@ -191,6 +206,11 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
           minutes: MIN_REQUIRED_QUOTA_SECONDS / 60,
         })
       );
+      return;
+    }
+
+    if (dailyTestStatus && dailyTestStatus.remainingToday <= 0) {
+      showDailyLimitReached();
       return;
     }
 
@@ -218,6 +238,12 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
         initialTranscript: result.transcript || [],
       });
     } catch (err) {
+      if (err instanceof ApiError && err.code === 'DAILY_LIMIT_REACHED') {
+        // Our cached count was stale; sync it so the card shows the limit too.
+        refreshProfile();
+        showDailyLimitReached();
+        return;
+      }
       const message = err instanceof Error ? err.message : t('setup.startFailed');
       Alert.alert(t('setup.startFailedTitle'), message);
     } finally {

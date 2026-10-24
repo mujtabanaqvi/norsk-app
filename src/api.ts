@@ -204,7 +204,12 @@ export async function startExamSession(params: {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new Error(body.message || body.error || tr('network.startExam', { status: res.status }));
+    // This route puts its machine-readable code in `code` (e.g. DAILY_LIMIT_REACHED), not `error`.
+    throw new ApiError(
+      res.status,
+      { ...body, error: body.code ?? body.error },
+      body.message || body.error || tr('network.startExam', { status: res.status })
+    );
   }
 
   return res.json();

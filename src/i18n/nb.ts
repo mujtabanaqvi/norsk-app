@@ -147,6 +147,13 @@ export const nb = {
     bonus: ' (+{count} bonus)',
     limitReachedHint: 'Dagens grense er nådd. Nullstilles ved midnatt.',
     unlockMore: 'Lås opp flere',
+    dailyLimitTitle: 'Det var alt for i dag!',
+    dailyLimitBody:
+      'Godt jobbet – du har brukt alle dagens øvingstester. Oppgrader abonnementet ditt for å ta flere tester hver dag, eller kom tilbake etter midnatt.',
+    dailyLimitBodyTopTier:
+      'Godt jobbet – du har brukt alle dagens øvingstester. Testene nullstilles ved midnatt.',
+    dailyLimitUpgrade: 'Se abonnementer',
+    dailyLimitLater: 'Ikke nå',
     step1: '1. VELG MÅLNIVÅ (CEFR)',
     levelLabel: 'Nivå {level}',
     levelB1Desc: 'Selvstendig bruker (Middels)',

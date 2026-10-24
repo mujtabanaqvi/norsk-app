@@ -139,6 +139,13 @@ export const en: Translations = {
     bonus: ' (+{count} bonus)',
     limitReachedHint: "Today's limit has been reached. It resets at midnight.",
     unlockMore: 'Unlock more',
+    dailyLimitTitle: "That's all for today!",
+    dailyLimitBody:
+      "Great work — you've used all of today's practice tests. Upgrade your subscription to take more tests every day, or come back after midnight.",
+    dailyLimitBodyTopTier:
+      "Great work — you've used all of today's practice tests. Your tests reset at midnight.",
+    dailyLimitUpgrade: 'See subscriptions',
+    dailyLimitLater: 'Not now',
     step1: '1. CHOOSE TARGET LEVEL (CEFR)',
     levelLabel: 'Level {level}',
     levelB1Desc: 'Independent user (Intermediate)',
