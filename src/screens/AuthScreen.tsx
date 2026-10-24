@@ -432,40 +432,22 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                 <View style={styles.dividerLine} />
               </View>
 
-              {/* Social providers side by side — Google has already verified the email */}
-              <View style={styles.socialRow}>
-                <View style={styles.socialItem}>
-                  <GoogleSignInButton
-                    compact
-                    disabled={isBusy}
-                    loading={isGoogleLoading}
-                    onIdToken={handleGoogleIdToken}
-                    onError={(message) => {
-                      setErrorMessage(message);
-                      setIsGoogleLoading(false);
-                    }}
-                    devIdentity={
-                      devGoogleEmail.success
-                        ? { email: devGoogleEmail.data, name: values.name.trim() || 'Google Bruker' }
-                        : undefined
-                    }
-                  />
-                </View>
-                <View style={styles.socialItem}>
-                  <Button
-                    title={t('auth.appleShort')}
-                    variant="outline"
-                    size="md"
-                    icon="logo-apple"
-                    fullWidth
-                    disabled={true}
-                    accessibilityLabel={t('auth.appleButton')}
-                    onPress={() =>
-                      Alert.alert(t('common.comingSoon'), t('auth.appleComingSoon'))
-                    }
-                  />
-                </View>
-              </View>
+              {/* Google has already verified the email. Apple sign-in is hidden until it is set up. */}
+              <GoogleSignInButton
+                disabled={isBusy}
+                loading={isGoogleLoading}
+                onIdToken={handleGoogleIdToken}
+                onError={(message) => {
+                  setErrorMessage(message);
+                  setIsGoogleLoading(false);
+                }}
+                devIdentity={
+                  devGoogleEmail.success
+                    ? { email: devGoogleEmail.data, name: values.name.trim() || 'Google Bruker' }
+                    : undefined
+                }
+              />
+
 
               {/* Covers email sign-up and Google, which can also create an account */}
               <Text style={styles.consentNote}>
@@ -656,13 +638,6 @@ const styles = StyleSheet.create({
   dividerText: {
     ...type.overline,
     marginHorizontal: space.md,
-  },
-  socialRow: {
-    flexDirection: 'row',
-    gap: space.sm,
-  },
-  socialItem: {
-    flex: 1,
   },
   switchModeButton: {
     marginTop: space.md,
