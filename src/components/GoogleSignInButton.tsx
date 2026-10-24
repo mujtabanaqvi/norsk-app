@@ -1,9 +1,10 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Platform, type StyleProp, type ViewStyle } from 'react-native';
 import * as WebBrowser from 'expo-web-browser';
 import * as Google from 'expo-auth-session/providers/google';
 import { Button, GoogleIcon } from './ui';
 import { useLocale } from '../hooks/useLocale';
+import { signInWithGoogleNative } from '../lib/native-google-signin';
 
 // Completes the OAuth popup/redirect on web.
 WebBrowser.maybeCompleteAuthSession();
@@ -15,9 +16,11 @@ const GOOGLE_CLIENT_IDS = {
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined,
 };
 
+// Android signs in natively and requests the token for the web client ID; the browser flow
+// there would send a custom-scheme redirect, which Google rejects with "invalid_request".
 const platformClientId = Platform.select({
   ios: GOOGLE_CLIENT_IDS.iosClientId,
-  android: GOOGLE_CLIENT_IDS.androidClientId,
+  android: GOOGLE_CLIENT_IDS.webClientId,
   default: GOOGLE_CLIENT_IDS.webClientId,
 });
 
@@ -75,8 +78,51 @@ const OAuthGoogleButton: React.FC<GoogleSignInButtonProps> = ({
   );
 };
 
+const NativeGoogleButton: React.FC<GoogleSignInButtonProps & { webClientId: string }> = ({
+  webClientId,
+  disabled,
+  loading,
+  onIdToken,
+  onError,
+  compact,
+  style,
+}) => {
+  const { t } = useLocale();
+  const [inProgress, setInProgress] = useState(false);
+
+  const handlePress = async () => {
+    setInProgress(true);
+    try {
+      const idToken = await signInWithGoogleNative(webClientId);
+      if (idToken) onIdToken(idToken);
+      // null — user closed the account picker; nothing to report.
+    } catch (error) {
+      onError(error instanceof Error && error.message ? error.message : t('auth.googleNoToken'));
+    } finally {
+      setInProgress(false);
+    }
+  };
+
+  return (
+    <Button
+      title={compact ? t('auth.googleShort') : t('auth.googleButton')}
+      variant="outline"
+      size={compact ? 'md' : 'lg'}
+      leading={<GoogleIcon size={20} />}
+      fullWidth
+      loading={loading}
+      disabled={disabled || inProgress}
+      onPress={handlePress}
+      style={style}
+    />
+  );
+};
+
 export const GoogleSignInButton: React.FC<GoogleSignInButtonProps> = (props) => {
   const { t } = useLocale();
+  if (Platform.OS === 'android' && platformClientId) {
+    return <NativeGoogleButton {...props} webClientId={platformClientId} />;
+  }
   if (platformClientId) {
     return <OAuthGoogleButton {...props} />;
   }
