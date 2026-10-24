@@ -31,7 +31,7 @@ export const CriterionScoreSchema = z.object({
     .describe('Score from 1 (lowest) to 10 (highest) based on HK-dir B1/B2 rubric'),
   feedbackNo: z
     .string()
-    .describe('Konstruktiv og presis tilbakemelding på norsk i henhold til HK-dir kriteriene'),
+    .describe('Konstruktiv og presis tilbakemelding på norsk i henhold til vurderingskriteriene'),
   feedbackEn: z
     .string()
     .describe('Constructive and actionable rubric feedback in English'),
@@ -124,7 +124,8 @@ const GPT4O_COMPLETION_RATE_PER_TOKEN = 10.0 / 1_000_000;
  * System prompt embedding the official HK-dir Norskprøven muntlig (A1–B2) rubric.
  */
 const HK_DIR_EXAMINER_SYSTEM_PROMPT = `
-Du er en autorisert sensor for Norskprøven muntlig (A1–B2) i regi av Direktoratet for høyere utdanning og kompetanse (HK-dir).
+Du er en erfaren sensor som vurderer øvingsprøver for Norskprøven muntlig (A1–B2) i en eksamenssimulator.
+Ikke omtal deg selv som offisiell eller autorisert sensor, og ikke nevn HK-dir i tilbakemeldingen.
 Din oppgave er å vurdere kandidatenes muntlige prestasjon basert på den fullstendige transkripsjonen fra eksamenssimulatoren.
 
 Du skal vurdere kandidatene strengt og rettferdig etter HK-dirs offisielle vurderingskriterier for Norskprøven muntlig:

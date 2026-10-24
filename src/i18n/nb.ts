@@ -50,12 +50,12 @@ export const nb = {
     badge: 'NORSKPRØVEN MUNTLIG · B1 / B2',
     brandTitle: 'Muntlig Eksamenssimulator',
     brandSubtitle:
-      'Øv på den offisielle muntlige prøven med AI-sensor og få umiddelbar HK-dir karaktervurdering.',
+      'Øv til den muntlige prøven i en realistisk simulering med AI-sensor og få umiddelbar vurdering.',
     feature1Title: 'Full muntlig eksamen',
     feature1Desc: 'Del 1 (egenpresentasjon), Del 2 (samtale) og Del 3 (oppfølging).',
     feature2Title: 'Interaktiv AI-medkandidat',
     feature2Desc: 'Øv alene når det passer deg, eller ta prøven sammen med en venn.',
-    feature3Title: 'HK-dir Sensorvurdering',
+    feature3Title: 'Detaljert vurdering',
     feature3Desc: 'Detaljert poengsum på flyt, uttale, grammatikk og ordforråd.',
     loginTitle: 'Logg inn for å starte',
     registerTitle: 'Opprett konto for å starte',
@@ -202,7 +202,7 @@ export const nb = {
     examinerSays: 'Sensor sier:',
     task: 'Oppgave ({part}):',
     examinerName: 'Sensor (AI Sensor)',
-    examinerRole: 'Offisiell eksaminator (HK-dir)',
+    examinerRole: 'AI-sensor (simulert)',
     speakingNow: 'Taler nå',
     listening: 'Lytter',
     peerAndYou: 'AI Medkandidat & Deg',
@@ -241,7 +241,7 @@ export const nb = {
     endShort: 'Avslutt',
     endConfirmTitle: 'Avslutt prøve',
     endConfirmBody:
-      'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere din HK-dir vurdering.',
+      'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere vurderingen din.',
     endConfirmAction: 'Avslutt og få vurdering',
     micPermission:
       'Mikrofontilgang er nødvendig for muntlig prøve. Vennligst gi tilgang i innstillingene.',
@@ -254,21 +254,21 @@ export const nb = {
 
   results: {
     loadingSteps: [
-      'Sensoren vurderer prestasjonen din etter HK-dir sine kriterier for B1/B2...',
+      'Sensoren vurderer prestasjonen din etter kriteriene for B1/B2...',
       'Analyserer flyt, responstid og turtaking i samtalen...',
       'Vurderer uttale, intonasjon og setningsmelodi...',
       'Sjekker ordforrådets bredde, idiomer og presisjon...',
       'Gransker V2-regelen, leddsetninger og substantivkjønn...',
-      'Beregner helhetlig HK-dir måloppnåelse og poengsum...',
+      'Beregner helhetlig måloppnåelse og poengsum...',
     ],
-    loadingTitle: 'Sensoren vurderer prestasjonen din etter HK-dir sine kriterier for B1/B2...',
-    badge: 'HK-DIR SENSOR VURDERING',
+    loadingTitle: 'Sensoren vurderer prestasjonen din etter kriteriene for B1/B2...',
+    badge: 'AI-SENSORENS VURDERING',
     invalidSession: 'Ugyldig sesjons-ID',
     fetchFailed: 'Feil ved henting av vurdering',
     timeout:
       'Vurderingen tok lenger tid enn forventet. Vennligst trykk «Prøv på nytt» eller gå tilbake.',
     stepTranscription: 'Transkripsjon',
-    stepRubric: 'HK-dir Rubrikk',
+    stepRubric: 'B1/B2-rubrikk',
     stepCorrections: 'Rettelser',
     loadingNote:
       'Dette tar vanligvis 10–25 sekunder mens GPT-4o analyserer grammatikk, uttale og flyt i samtalen.',
@@ -278,24 +278,24 @@ export const nb = {
     noEvalBody: 'Det ble ikke funnet noen godkjente ytringer eller evaluering for denne prøven.',
     startNew: 'Start ny prøve',
     headerFallback: 'Eksamensresultat',
-    headerSubtitle: 'HK-dir B1/B2 Vurdering',
+    headerSubtitle: 'B1/B2-vurdering',
     share: 'Del',
     dualNotice: 'Lokal to-kandidaters prøve – Velg kandidat for å se individuell vurdering:',
     youSuffix: ' (Deg)',
     targetLevelBadge: 'Målnivå: {level}',
     assessedLevel: 'Vurdert nivå',
-    average: 'HK-dir Snitt',
+    average: 'Gjennomsnitt',
     outOf10: 'av 10 poeng',
     passed: 'BESTÅTT MÅLNIVÅ',
     needsWork: 'TRENGER MER ØVING',
-    passedBody: 'Gratulerer! Du oppfyller HK-dir sine kompetansemål for nivå {level}.',
+    passedBody: 'Gratulerer! På denne øvingsprøven oppfyller du kompetansemålene for nivå {level}.',
     needsWorkBody: 'Du er vurdert til {assessed}. Øv mer for å nå målnivå {target}.',
     summaryTitle: 'Sensorens helhetsvurdering',
     feedbackShowNo: 'Vis på norsk',
     feedbackShowEn: 'Show English',
-    criteriaTitle: 'HK-dir Vurderingskriterier',
+    criteriaTitle: 'Vurderingskriterier',
     scale: 'Skala 1–10',
-    hkdirStandard: 'HK-dir standard',
+    hkdirStandard: 'B1/B2-skala',
     bandStrongB2: 'Sterk B2',
     bandB2: 'B2-nivå',
     bandB1: 'B1-nivå',
@@ -477,9 +477,9 @@ export const nb = {
   },
 
   howTo: {
-    introTitle: 'Offisiell HK-dir B1/B2 Eksamenssimulator',
+    introTitle: 'Simulator for muntlig B1/B2-prøve',
     introText:
-      'Simulatoren er bygget etter retningslinjene til Direktoratet for høyere utdanning og kompetanse (HK-dir) og trener deg på den muntlige delen av Norskprøven.',
+      'Snakkly er en øvingssimulator som er laget for å ligge så nært som mulig den muntlige delen av Norskprøven. Appen er ikke tilknyttet HK-dir, og format, oppgaver og vurdering kan avvike fra den virkelige prøven. Bruk den kun til øving.',
     steps: [
       {
         badge: 'DEL 1',
@@ -503,7 +503,7 @@ export const nb = {
     evalBadge: 'VURDERING',
     evalTitle: 'Umiddelbar tilbakemelding & poeng',
     evalDesc:
-      'Etter fullført prøve vurderes din tale automatisk etter 5 offisielle kriterier: flyt, uttale, vokabular, grammatikk og oppgaveforståelse.',
+      'Etter fullført prøve vurderes talen din automatisk på flyt, uttale, vokabular, grammatikk og oppgaveforståelse.',
   },
 
   // In-app summaries of the full documents on the website (snakkly-frontend-website, /vilkar and /personvern).
@@ -514,7 +514,7 @@ export const nb = {
     sections: [
       {
         title: '1. Om tjenesten',
-        body: 'Ved å opprette en konto eller bruke {brand} godtar du disse vilkårene. Snakkly er et øvingsverktøy for den muntlige delen av Norskprøven (B1/B2) og er ikke tilknyttet HK-dir, som eier og arrangerer Norskprøven.',
+        body: 'Ved å opprette en konto eller bruke {brand} godtar du disse vilkårene. Snakkly er et øvingsverktøy for den muntlige delen av Norskprøven (B1/B2) og er ikke tilknyttet HK-dir, som eier og arrangerer Norskprøven. Appen er en simulator som prøver å ligge så nært som mulig den virkelige prøven, men den er kun ment til øving, og oppgaver, format og vurderinger kan avvike fra den virkelige prøven.',
       },
       {
         title: '2. Brukerkonto',
@@ -538,7 +538,7 @@ export const nb = {
       },
       {
         title: '7. AI-vurderinger',
-        body: 'Sensor, medkandidat og vurderinger lages av kunstig intelligens og kan inneholde feil. Vurderingen er veiledende og garanterer ikke resultatet på den offisielle prøven.',
+        body: 'Sensor, medkandidat og vurderinger lages av kunstig intelligens og kan inneholde feil. Vurderingen er veiledende og garanterer ikke resultatet på den virkelige prøven. Snakkly er ikke ansvarlig for avvik mellom simulatoren og den virkelige prøven, eller for resultatet ditt der.',
       },
       {
         title: '8. Ansvar, endringer og lovvalg',

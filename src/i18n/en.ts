@@ -44,12 +44,12 @@ export const en: Translations = {
     badge: 'NORSKPRØVEN ORAL TEST · B1 / B2',
     brandTitle: 'Oral exam simulator',
     brandSubtitle:
-      'Practise the official oral test with an AI examiner and get an instant HK-dir style assessment.',
+      'Practise for the oral test in a realistic simulation with an AI examiner and get an instant assessment.',
     feature1Title: 'Full oral exam',
     feature1Desc: 'Part 1 (self-presentation), Part 2 (conversation) and Part 3 (follow-up).',
     feature2Title: 'Interactive AI co-candidate',
     feature2Desc: 'Practise alone whenever it suits you, or take the test together with a friend.',
-    feature3Title: 'HK-dir examiner assessment',
+    feature3Title: 'Detailed assessment',
     feature3Desc: 'Detailed scores for fluency, pronunciation, grammar and vocabulary.',
     loginTitle: 'Log in to get started',
     registerTitle: 'Create an account to get started',
@@ -154,7 +154,7 @@ export const en: Translations = {
     aiPeerTitle: 'Practise alone (AI examiner + AI co-candidate)',
     aiPeerBadge: 'Recommended for self-study',
     aiPeerDesc:
-      'The AI plays both the official examiner and a friendly co-candidate in the conversation part. A full conversation simulation right on your phone.',
+      'The AI plays both the examiner and a friendly co-candidate in the conversation part. A full conversation simulation right on your phone.',
     humanTitle: 'Practise with a friend next to you (Shared microphone)',
     humanBadge: 'Shared microphone (2 people)',
     humanDesc:
@@ -194,7 +194,7 @@ export const en: Translations = {
     examinerSays: 'Examiner says:',
     task: 'Task ({part}):',
     examinerName: 'Examiner (AI)',
-    examinerRole: 'Official examiner (HK-dir)',
+    examinerRole: 'AI examiner (simulated)',
     speakingNow: 'Speaking',
     listening: 'Listening',
     peerAndYou: 'AI co-candidate & you',
@@ -233,7 +233,7 @@ export const en: Translations = {
     endShort: 'End',
     endConfirmTitle: 'End test',
     endConfirmBody:
-      'Are you sure you want to end the test? The examiner will immediately generate your HK-dir assessment.',
+      'Are you sure you want to end the test? The examiner will immediately generate your assessment.',
     endConfirmAction: 'End and get assessment',
     micPermission:
       'Microphone access is required for the oral test. Please allow access in your settings.',
@@ -247,20 +247,20 @@ export const en: Translations = {
 
   results: {
     loadingSteps: [
-      'The examiner is assessing your performance against the HK-dir B1/B2 criteria...',
+      'The examiner is assessing your performance against the B1/B2 criteria...',
       'Analysing fluency, response time and turn-taking in the conversation...',
       'Assessing pronunciation, intonation and sentence melody...',
       'Checking vocabulary range, idioms and precision...',
       'Reviewing the V2 rule, subordinate clauses and noun gender...',
-      'Calculating the overall HK-dir score...',
+      'Calculating your overall score...',
     ],
-    loadingTitle: 'The examiner is assessing your performance against the HK-dir B1/B2 criteria...',
-    badge: 'HK-DIR EXAMINER ASSESSMENT',
+    loadingTitle: 'The examiner is assessing your performance against the B1/B2 criteria...',
+    badge: 'AI EXAMINER ASSESSMENT',
     invalidSession: 'Invalid session ID',
     fetchFailed: 'Error while loading the assessment',
     timeout: 'The assessment took longer than expected. Please tap “Try again” or go back.',
     stepTranscription: 'Transcription',
-    stepRubric: 'HK-dir rubric',
+    stepRubric: 'B1/B2 rubric',
     stepCorrections: 'Corrections',
     loadingNote:
       'This usually takes 10–25 seconds while GPT-4o analyses grammar, pronunciation and fluency in the conversation.',
@@ -270,24 +270,24 @@ export const en: Translations = {
     noEvalBody: 'No valid utterances or assessment were found for this test.',
     startNew: 'Start a new test',
     headerFallback: 'Exam result',
-    headerSubtitle: 'HK-dir B1/B2 assessment',
+    headerSubtitle: 'B1/B2 assessment',
     share: 'Share',
     dualNotice: 'Local two-candidate test – choose a candidate to see their individual assessment:',
     youSuffix: ' (You)',
     targetLevelBadge: 'Target level: {level}',
     assessedLevel: 'Assessed level',
-    average: 'HK-dir average',
+    average: 'Average score',
     outOf10: 'out of 10 points',
     passed: 'TARGET LEVEL PASSED',
     needsWork: 'NEEDS MORE PRACTICE',
-    passedBody: 'Congratulations! You meet the HK-dir competence goals for level {level}.',
+    passedBody: 'Congratulations! In this practice test you meet the competence goals for level {level}.',
     needsWorkBody: 'You were assessed at {assessed}. Keep practising to reach target level {target}.',
     summaryTitle: "Examiner's overall assessment",
     feedbackShowNo: 'Show in Norwegian',
     feedbackShowEn: 'Show in English',
-    criteriaTitle: 'HK-dir assessment criteria',
+    criteriaTitle: 'Assessment criteria',
     scale: 'Scale 1–10',
-    hkdirStandard: 'HK-dir standard',
+    hkdirStandard: 'B1/B2 scale',
     bandStrongB2: 'Strong B2',
     bandB2: 'B2 level',
     bandB1: 'B1 level',
@@ -468,9 +468,9 @@ export const en: Translations = {
   },
 
   howTo: {
-    introTitle: 'Official HK-dir B1/B2 exam simulator',
+    introTitle: 'B1/B2 oral test simulator',
     introText:
-      'The simulator follows the guidelines of the Norwegian Directorate for Higher Education and Skills (HK-dir) and trains you for the oral part of Norskprøven.',
+      'Snakkly is a practice simulator designed to be as close as possible to the oral part of Norskprøven. It is not affiliated with HK-dir, and the format, tasks and assessment may differ from the real test. Use it for practice only.',
     steps: [
       {
         badge: 'PART 1',
@@ -494,7 +494,7 @@ export const en: Translations = {
     evalBadge: 'ASSESSMENT',
     evalTitle: 'Instant feedback & scores',
     evalDesc:
-      'After the test, your speech is automatically assessed against 5 official criteria: fluency, pronunciation, vocabulary, grammar and task comprehension.',
+      'After the test, your speech is automatically assessed on fluency, pronunciation, vocabulary, grammar and task comprehension.',
   },
 
   terms: {
@@ -502,7 +502,7 @@ export const en: Translations = {
     sections: [
       {
         title: '1. About the service',
-        body: 'By creating an account or using {brand}, you accept these terms. Snakkly is a practice tool for the oral part of Norskprøven (B1/B2) and is not affiliated with HK-dir, which owns and runs Norskprøven.',
+        body: 'By creating an account or using {brand}, you accept these terms. Snakkly is a practice tool for the oral part of Norskprøven (B1/B2) and is not affiliated with HK-dir, which owns and runs Norskprøven. The app is a simulator that aims to be as close as possible to the real test, but it is meant for practice only, and its tasks, format and assessments may differ from the real test.',
       },
       {
         title: '2. User account',
@@ -526,7 +526,7 @@ export const en: Translations = {
       },
       {
         title: '7. AI assessments',
-        body: 'The examiner, co-candidate and assessments are produced by artificial intelligence and may contain errors. The assessment is indicative and does not guarantee your result in the official test.',
+        body: 'The examiner, co-candidate and assessments are produced by artificial intelligence and may contain errors. The assessment is indicative and does not guarantee your result in the real test. Snakkly is not responsible for any differences between the simulator and the real test, or for your result in it.',
       },
       {
         title: '8. Liability, changes and governing law',

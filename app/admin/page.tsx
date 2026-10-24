@@ -617,7 +617,7 @@ export default function AdminPortalPage() {
         {/* Top Bar */}
         <header style={styles.header}>
           <div>
-            <div style={styles.badge}>HK-DIR MUNTLIG EKSAMENSSIMULATOR</div>
+            <div style={styles.badge}>MUNTLIG EKSAMENSSIMULATOR</div>
             <h1 style={styles.headerTitle}>Web Admin Portal — Eksamener &amp; Spørsmål</h1>
             <p style={styles.headerSubtitle}>
               Eksamener og Del 3-spørsmål som er aktive her trekkes tilfeldig hver gang en

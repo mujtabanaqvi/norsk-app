@@ -6,7 +6,7 @@ export const metadata: Metadata = {
     default: 'Snakkly · Norskprøven Muntlig',
     template: '%s · Snakkly',
   },
-  description: 'Øv til muntlig Norskprøven (HK-dir B1/B2) med AI-sensor og direkte tilbakemelding.',
+  description: 'Øv til muntlig Norskprøven (B1/B2) i en realistisk simulator med AI-sensor og direkte tilbakemelding.',
 };
 
 export default function RootLayout({

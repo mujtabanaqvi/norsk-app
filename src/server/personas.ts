@@ -94,7 +94,7 @@ Regler for naturlig samtale:
   }
 
   // Examiner
-  const system = `Du er en offisiell sensor for Norskprøven muntlig på nivå ${level} (HK-dir).
+  const system = `Du spiller rollen som sensor i en øvingssimulering av Norskprøven muntlig på nivå ${level}.
 Tema for prøven: "${topic.titleNo}". ${levelStyle(level)}
 Regler:
 - Vær vennlig, profesjonell, lyttende og konsis (maks ca. 45 ord). Ingen lister, ingen emojier, ingen rollebetegnelser.

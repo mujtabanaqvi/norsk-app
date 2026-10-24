@@ -57,7 +57,7 @@ const CoachSchema = z.object({
   nextStepEn: z.string(),
 });
 
-const COACH_SYSTEM_PROMPT = `Du er en erfaren norsklærer og HK-dir-sensor som coacher en kandidat mot Norskprøven muntlig (B1/B2).
+const COACH_SYSTEM_PROMPT = `Du er en erfaren norsklærer og sensor som coacher en kandidat mot Norskprøven muntlig (B1/B2).
 Du får sammendrag, poeng (1–10 per kriterium) og konkrete rettelser fra kandidatens siste prøver, nyeste først.
 Skalaen: 1–4 = under B1, 5–7 = B1, 8–9 = B2, 10 = over B2.
 

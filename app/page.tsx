@@ -37,7 +37,7 @@ export default function HomePage() {
                 <span className="snakkly-badge">B1 / B2</span>
               </div>
               <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>
-                Norskprøven Muntlig · Offisiell HK-dir Simulator Backend
+                Norskprøven Muntlig · Simulator Backend
               </div>
             </div>
           </div>
@@ -120,7 +120,7 @@ export default function HomePage() {
             </li>
             <li className="snakkly-endpoint-item">
               <code>POST /api/exam/:sessionId/finish</code> Finalizes session usage and triggers
-              post-exam HK-dir rubric evaluation in the background.
+              post-exam B1/B2 rubric evaluation in the background.
             </li>
             <li className="snakkly-endpoint-item">
               <code>GET /api/exam/:sessionId/results</code> Polls session status, transcript, and
