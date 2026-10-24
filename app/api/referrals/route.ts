@@ -4,9 +4,10 @@ import { users, referralRewards } from '@/src/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { getReferralSettings } from '@/lib/tier-policy';
+import { getWebsiteBaseUrl } from '@/lib/public-links';
 
 // Served by the marketing website (snakkly-frontend-website, app/r/[code]); opens the app via Universal/App Links.
-const REFERRAL_LINK_BASE_URL = (process.env.REFERRAL_LINK_BASE_URL || 'https://snakkly.no').replace(/\/+$/, '');
+const REFERRAL_LINK_BASE_URL = getWebsiteBaseUrl();
 
 export async function GET(req: NextRequest) {
   try {

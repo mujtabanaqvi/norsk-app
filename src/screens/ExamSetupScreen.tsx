@@ -23,6 +23,7 @@ import type {
 } from '../types/exam';
 import type { LearningInsight } from '../types/learning-profile';
 import { TREND_ICON, TREND_LABEL_KEY } from '../lib/learning-profile-ui';
+import { openSupportEmail, usePublicLinks } from '../lib/public-links';
 import {
   Screen,
   Logo,
@@ -57,7 +58,23 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const insets = useSafeAreaInsets();
 
   const { user, dailyTestStatus, logout } = useAuth();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
+  const publicLinks = usePublicLinks();
+
+  // There is no self-service delete endpoint: the request goes to support (see the privacy policy, #slett-konto).
+  const confirmDeleteAccount = (email: string) =>
+    Alert.alert(t('support.deleteTitle'), t('support.deleteBody'), [
+      { text: t('common.cancel'), style: 'cancel' },
+      {
+        text: t('support.deleteConfirm'),
+        style: 'destructive',
+        onPress: () =>
+          openSupportEmail(locale, publicLinks.supportEmail, {
+            subject: t('support.deleteSubject'),
+            body: t('support.deleteMailBody', { email }),
+          }),
+      },
+    ]);
 
   /**
    * Fetch theme catalog and remaining user audio quota from backend
@@ -232,8 +249,14 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     { icon: 'help-circle-outline', label: t('nav.howTo'), onPress: () => navigation.navigate('HowTo') },
     { icon: 'gift-outline', label: t('nav.referral'), onPress: () => navigation.navigate('Referral') },
     { icon: 'star', label: t('setup.a11yUpgrade'), color: colors.gold, onPress: () => navigation.navigate('Subscription') },
+    { icon: 'document-text-outline', label: t('nav.terms'), onPress: () => navigation.navigate('Terms') },
+    { icon: 'shield-checkmark-outline', label: t('nav.privacy'), onPress: () => navigation.navigate('PrivacyPolicy') },
+    { icon: 'mail-outline', label: t('nav.support'), onPress: () => openSupportEmail(locale, publicLinks.supportEmail) },
     ...(user
-      ? [{ icon: 'log-out-outline' as IconName, label: t('setup.a11yLogout'), color: colors.red, onPress: logout }]
+      ? [
+          { icon: 'trash-outline' as IconName, label: t('nav.deleteAccount'), onPress: () => confirmDeleteAccount(user.email) },
+          { icon: 'log-out-outline' as IconName, label: t('setup.a11yLogout'), color: colors.red, onPress: logout },
+        ]
       : []),
   ];
 

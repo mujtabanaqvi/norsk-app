@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
 import { Screen, AppHeader, Card } from '../components/ui';
+import { LegalContactCard } from '../components/LegalContactCard';
 import { useLocale } from '../hooks/useLocale';
 import { colors, space, type } from '../theme';
 
@@ -28,6 +29,8 @@ export const PrivacyPolicyScreen: React.FC<Props> = ({ navigation }) => {
               <Text style={styles.paragraph}>{section.body}</Text>
             </Card>
           ))}
+
+          <LegalContactCard document="privacy" />
         </View>
       </ScrollView>
     </Screen>

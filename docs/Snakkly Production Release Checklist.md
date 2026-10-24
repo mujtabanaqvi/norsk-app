@@ -53,7 +53,8 @@ The template is `.env.production.example` in the repo root: 25 backend keys (inc
 | `DATABASE_URL` | Server | Neon pooled connection (runtime) |
 | `DIRECT_DATABASE_URL` | Server | Neon direct connection (migrations) |
 | `NEXT_PUBLIC_APP_URL`, `BETTER_AUTH_URL` | Server | Public backend URL, used in email links and auth callbacks |
-| `REFERRAL_LINK_BASE_URL` | Server | `https://snakkly.no` for `/r/<code>` links |
+| `REFERRAL_LINK_BASE_URL` | Server | `https://snakkly.no` for `/r/<code>` links and the legal pages (`/vilkar`, `/personvern`) |
+| `SUPPORT_EMAIL` | Server | `support@snakkly.no`, shown in the app, in emails and on the website (`NEXT_PUBLIC_SUPPORT_EMAIL` there) |
 | `JWT_SECRET`, `BETTER_AUTH_SECRET`, `ADMIN_SECRET` | Server | Random 48-byte secrets; missing ones fall back to hard-coded dev values |
 | `AI_PROVIDER`, `AZURE_OPENAI_*` (6 keys) | Server | Azure Foundry chat and evaluation models |
 | `STT_PROVIDER` | Server | `azure-speech` (600 RPM, no deployment needed) |
@@ -107,7 +108,8 @@ Two blockers come first: account deletion does not exist yet, and the Android ke
 - [ ] Remove the signing files from git: `git rm --cached credentials.json credentials/android/keystore.jks` and commit (`.gitignore` now ignores them). They stay in history, so if this GitHub repo is public or shared, treat that key as leaked and ask Play support to reset the upload key.
 - [ ] Store the keystore and its passwords in a password manager.
 - [ ] Add account deletion: an API endpoint, a button in the app, and a public page such as `https://snakkly.no/slett-konto`. Both Play and the App Store require it; no delete endpoint exists in `app/api/auth`.
-- [ ] Publish the privacy policy and terms at public URLs on snakkly.no, matching the in-app screens.
+- [x] Publish the privacy policy and terms at public URLs on snakkly.no, matching the in-app screens: `https://snakkly.no/personvern` and `https://snakkly.no/vilkar` (`?lang=en` for English). Replace the `OPERATOR` placeholder in the website's `lib/legal.ts` first.
+- [ ] In Play Console, set the privacy policy URL to `https://snakkly.no/personvern` and the account deletion URL to `https://snakkly.no/personvern#slett-konto`. Deletion requests currently arrive by email ("Delete account" in the app menu opens a pre-filled mail to `SUPPORT_EMAIL`).
 
 **Android**
 

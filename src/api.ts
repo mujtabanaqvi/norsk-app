@@ -483,6 +483,17 @@ export async function fetchTierConfigs() {
   return res.json();
 }
 
+export async function fetchPublicLinks() {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/config/links`, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    throw new Error(tr('common.unknownError'));
+  }
+  return res.json();
+}
+
 export async function fetchReferrals() {
   const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/referrals`, {
     method: 'GET',

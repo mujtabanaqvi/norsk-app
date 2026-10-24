@@ -14,6 +14,7 @@ import type { RootStackParamList } from '../types/exam';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
 import { ApiError, resendVerificationEmail } from '../api';
+import { openSupportEmail, usePublicLinks } from '../lib/public-links';
 import { Screen, Logo, Card, Button, Icon, LanguageToggle } from '../components/ui';
 import { colors, radius, space, type } from '../theme';
 import { OTP_LENGTH, otpSchema, validationMessage } from '../validation/auth';
@@ -26,6 +27,7 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { email } = route.params;
   const { verifyEmail } = useAuth();
   const { locale, t } = useLocale();
+  const publicLinks = usePublicLinks();
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -205,6 +207,19 @@ export const VerifyEmailScreen: React.FC<Props> = ({ navigation, route }) => {
               onPress={() => navigation.navigate('Auth', { mode: 'register' })}
             >
               <Text style={styles.footerSubText}>{t('verify.wrongEmail')}</Text>
+            </Pressable>
+            <Pressable
+              style={styles.footerAction}
+              onPress={() =>
+                openSupportEmail(locale, publicLinks.supportEmail, {
+                  subject: t('verify.title'),
+                  body: email,
+                })
+              }
+            >
+              <Text style={styles.footerSubText}>
+                {t('verify.noEmail', { email: publicLinks.supportEmail })}
+              </Text>
             </Pressable>
           </View>
         </ScrollView>

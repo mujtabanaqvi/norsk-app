@@ -466,6 +466,25 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   />
                 </View>
               </View>
+
+              {/* Covers email sign-up and Google, which can also create an account */}
+              <Text style={styles.consentNote}>
+                {t('auth.consent')
+                  .split(/(\{terms\}|\{privacy\})/)
+                  .map((part, i) =>
+                    part === '{terms}' ? (
+                      <Text key={i} style={styles.consentLink} accessibilityRole="link" onPress={() => navigation.navigate('Terms')}>
+                        {t('auth.consentTerms')}
+                      </Text>
+                    ) : part === '{privacy}' ? (
+                      <Text key={i} style={styles.consentLink} accessibilityRole="link" onPress={() => navigation.navigate('PrivacyPolicy')}>
+                        {t('auth.consentPrivacy')}
+                      </Text>
+                    ) : (
+                      part
+                    )
+                  )}
+              </Text>
             </Card>
 
             <Pressable style={styles.switchModeButton} onPress={switchMode} disabled={isBusy}>
@@ -612,6 +631,17 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     marginTop: space.sm,
+  },
+  consentNote: {
+    ...type.caption,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginTop: space.md,
+  },
+  consentLink: {
+    color: colors.navy,
+    fontWeight: '600',
+    textDecorationLine: 'underline',
   },
   dividerContainer: {
     flexDirection: 'row',

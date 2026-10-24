@@ -34,6 +34,8 @@ export const en: Translations = {
     howTo: 'How the test works',
     terms: 'Terms of use',
     privacy: 'Privacy policy',
+    support: 'Contact support',
+    deleteAccount: 'Delete account',
     auth: 'Log in & sign up',
     verifyEmail: 'Verify email',
   },
@@ -81,6 +83,9 @@ export const en: Translations = {
     loginButton: 'Log in',
     registerButton: 'Create account',
     verifyNote: 'We will send a verification code to your email address.',
+    consent: 'By continuing, you accept the {terms} and confirm that you have read the {privacy}.',
+    consentTerms: 'terms of use',
+    consentPrivacy: 'privacy policy',
     switchToRegister: "Don't have an account? Sign up here",
     switchToLogin: 'Already have an account? Log in',
   },
@@ -100,6 +105,7 @@ export const en: Translations = {
       'Did you click the link in the email instead? Then your account is verified and you can log in.',
     confirmedLogin: "I've verified – log in",
     wrongEmail: 'Wrong email address? Sign up again',
+    noEmail: 'No email after a few minutes? Contact {email}',
   },
 
   setup: {
@@ -485,43 +491,91 @@ export const en: Translations = {
   },
 
   terms: {
-    lastUpdated: 'Last updated: October 2026',
+    lastUpdated: 'Last updated: 24 October 2026',
     sections: [
       {
-        title: '1. Acceptance of terms',
-        body: 'By creating a user account or using {brand} (Norskprøven Oral Test Simulator), you agree to these terms. The service is offered as a practice tool to prepare for the official Norskprøven.',
+        title: '1. About the service',
+        body: 'By creating an account or using {brand}, you accept these terms. Snakkly is a practice tool for the oral part of Norskprøven (B1/B2) and is not affiliated with HK-dir, which owns and runs Norskprøven.',
       },
       {
-        title: '2. User account and authentication',
-        body: 'To access oral tests, speech recordings and saved assessments, you must create a personal user account. You are responsible for keeping your login details confidential.',
+        title: '2. User account',
+        body: 'You must be at least 16. If you are under 18, you need consent from a parent or guardian to buy a subscription. Your account is personal, and you are responsible for keeping your login details secret.',
       },
       {
-        title: '3. Subscriptions and quotas',
-        body: 'Free users can take 1 test per day. Standard and Premium subscriptions give an extended daily test quota and access to additional features. Payments are processed securely through the App Store, Google Play or Stripe (on the web).',
+        title: '3. Free version and subscriptions',
+        body: 'The free version has a limited number of tests per day. Standard and Premium give more tests and features. The quota resets at midnight Norwegian time, and unused tests do not carry over. Referral bonuses have no cash value.',
       },
       {
-        title: '4. Disclaimer',
-        body: "The simulator gives indicative feedback based on artificial intelligence and HK-dir's assessment criteria. Results in the simulator do not guarantee a specific result in the official exam.",
+        title: '4. Payment, renewal and cancellation',
+        body: 'Subscriptions are bought through Google Play, the App Store or web checkout (Stripe) and renew automatically every month unless you cancel at least 24 hours before the period ends. Cancel in the store you bought from; you keep access until the end of the period.',
+      },
+      {
+        title: '5. Right of withdrawal and refunds',
+        body: 'You have a 14-day right of withdrawal under the Norwegian Right of Withdrawal Act. If you use paid features during that period and then withdraw, you pay for what you have received. Refunds for Google Play and App Store purchases are handled by the store.',
+      },
+      {
+        title: '6. Acceptable use',
+        body: 'Do not record others without their knowledge, share illegal or offensive content, try to get around quotas, payment or security, or use automated access.',
+      },
+      {
+        title: '7. AI assessments',
+        body: 'The examiner, co-candidate and assessments are produced by artificial intelligence and may contain errors. The assessment is indicative and does not guarantee your result in the official test.',
+      },
+      {
+        title: '8. Liability, changes and governing law',
+        body: 'The service is provided as is, within mandatory consumer law. Significant changes to these terms are announced at least 30 days in advance. These terms are governed by Norwegian law.',
       },
     ],
   },
 
   privacy: {
-    lastUpdated: 'Last updated: October 2026',
+    lastUpdated: 'Last updated: 24 October 2026',
     sections: [
       {
-        title: '1. Processing of personal data',
-        body: 'We take your privacy very seriously. We store your registered email, name and progress in order to provide the service, in line with applicable data protection law (GDPR).',
+        title: '1. What we store',
+        body: 'Name, email, hashed password (or Google profile), your tests with transcripts, AI assessments and learning profile, quota and usage, subscription status and referral code. We never receive card details.',
       },
       {
-        title: '2. Audio recordings and transcription',
-        body: 'When you take an oral test, your speech recordings are sent securely to speech recognition (Speech-to-Text) to assess pronunciation, vocabulary and fluency. The recordings are used only to give you feedback and are not stored permanently for model training.',
+        title: '2. Audio recordings and AI',
+        body: 'The microphone is only used when you tap to speak. The recording is transcribed by Microsoft Azure AI Speech and is not kept afterwards. Replies and assessments are generated by Azure OpenAI. Neither we nor Microsoft use your data to train AI models.',
       },
       {
-        title: '3. Your rights',
-        body: 'You have the right to access your own data, and to correct or delete your account and its transcripts, by contacting support or deleting your account.',
+        title: '3. Purposes and legal basis',
+        body: 'We use the data to provide the service (contract), protect it against abuse (legitimate interest) and comply with the Bookkeeping Act. We do not send marketing or sell data.',
+      },
+      {
+        title: '4. Who we share with',
+        body: 'Neon (database in the EU), Microsoft Azure (speech and AI), Vercel (hosting), Resend (email), RevenueCat (subscriptions), and Google, Apple and Stripe (sign-in and payments). Transfers outside the EEA use EU Standard Contractual Clauses or the Data Privacy Framework.',
+      },
+      {
+        title: '5. Retention',
+        body: 'Account data and tests are kept for as long as you have an account. Verification codes expire after 15 minutes. Payment records are kept as long as the Bookkeeping Act requires.',
+      },
+      {
+        title: '6. Your rights',
+        body: 'You have the right to access, correction, deletion, restriction, objection and data portability. You can also complain to Datatilsynet, the Norwegian Data Protection Authority.',
+      },
+      {
+        title: '7. Deleting your account',
+        body: 'Choose "Delete account" in the menu, or email support. We delete the account and its data within 30 days. Remember to cancel your subscription in Google Play or the App Store first.',
       },
     ],
+  },
+
+  legal: {
+    readFull: 'Read the full document on the website',
+    contact: 'Questions? Email us at {email}.',
+  },
+
+  support: {
+    title: 'Support',
+    noMailApp: 'No email app was found. Email us at {email}.',
+    deleteTitle: 'Delete your account?',
+    deleteBody:
+      'We will open a pre-filled email to support. Send it, and we will delete your account and all tests, transcripts and assessments within 30 days. Cancel your subscription in Google Play or the App Store first.',
+    deleteConfirm: 'Write email',
+    deleteSubject: 'Delete account',
+    deleteMailBody: 'Hi! Please delete my Snakkly account with the email address {email} and all its data.',
   },
 
   validation: {

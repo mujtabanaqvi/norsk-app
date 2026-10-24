@@ -30,6 +30,7 @@ yarn-error.log*
 
 # Signing credentials
 credentials.json
+deploy-account.json
 credentials/
 *.jks
 *.keystore

@@ -40,6 +40,8 @@ export const nb = {
     howTo: 'Slik fungerer prøven',
     terms: 'Vilkår for bruk',
     privacy: 'Personvernerklæring',
+    support: 'Kontakt kundeservice',
+    deleteAccount: 'Slett konto',
     auth: 'Innlogging & Registrering',
     verifyEmail: 'Bekreft e-post',
   },
@@ -87,6 +89,10 @@ export const nb = {
     loginButton: 'Logg inn',
     registerButton: 'Registrer konto',
     verifyNote: 'Vi sender en bekreftelseskode til e-postadressen din.',
+    // `{terms}` and `{privacy}` become tappable links (consentTerms / consentPrivacy).
+    consent: 'Når du fortsetter, godtar du {terms} og bekrefter at du har lest {privacy}.',
+    consentTerms: 'vilkårene',
+    consentPrivacy: 'personvernerklæringen',
     switchToRegister: 'Har du ikke en konto? Registrer deg her',
     switchToLogin: 'Har du allerede en konto? Logg inn',
   },
@@ -106,6 +112,7 @@ export const nb = {
       'Har du heller trykket på lenken i e-posten? Da er kontoen bekreftet og du kan logge inn.',
     confirmedLogin: 'Jeg har bekreftet – logg inn',
     wrongEmail: 'Feil e-postadresse? Registrer deg på nytt',
+    noEmail: 'Ingen e-post etter noen minutter? Kontakt {email}',
   },
 
   setup: {
@@ -492,45 +499,95 @@ export const nb = {
       'Etter fullført prøve vurderes din tale automatisk etter 5 offisielle kriterier: flyt, uttale, vokabular, grammatikk og oppgaveforståelse.',
   },
 
+  // In-app summaries of the full documents on the website (snakkly-frontend-website, /vilkar and /personvern).
+  // Keep them in step with that text.
   terms: {
-    lastUpdated: 'Sist oppdatert: Oktober 2026',
+    lastUpdated: 'Sist oppdatert: 24. oktober 2026',
     // `{brand}` is replaced with the styled Snakkly wordmark.
     sections: [
       {
-        title: '1. Aksept av vilkår',
-        body: 'Ved å opprette en brukerkonto eller benytte {brand} (Norskprøven Muntlig Simulator), samtykker du til disse vilkårene. Tjenesten tilbys som et øvingsverktøy til forberedelse til den offisielle Norskprøven.',
+        title: '1. Om tjenesten',
+        body: 'Ved å opprette en konto eller bruke {brand} godtar du disse vilkårene. Snakkly er et øvingsverktøy for den muntlige delen av Norskprøven (B1/B2) og er ikke tilknyttet HK-dir, som eier og arrangerer Norskprøven.',
       },
       {
-        title: '2. Brukerkonto og autentisering',
-        body: 'For å få tilgang til muntlige prøver, taleopptak og lagrede vurderinger må du opprette en personlig brukerkonto. Du er ansvarlig for å opprettholde konfidensialiteten til din innloggingsinformasjon.',
+        title: '2. Brukerkonto',
+        body: 'Du må være minst 16 år. Er du under 18 år, trenger du samtykke fra en forelder eller verge for å kjøpe abonnement. Kontoen er personlig, og du er ansvarlig for å holde innloggingsopplysningene hemmelige.',
       },
       {
-        title: '3. Abonnement og kvoter',
-        body: 'Gratisbrukere har tilgang til 1 prøve per dag. Standard- og Premium-abonnement gir utvidet daglig testkvote og tilgang til ytterligere funksjoner. Betalinger behandles sikkert via App Store, Google Play eller Stripe (på nett).',
+        title: '3. Gratisversjon og abonnement',
+        body: 'Gratisversjonen har et begrenset antall prøver per dag. Standard og Premium gir flere prøver og funksjoner. Kvoten nullstilles ved midnatt norsk tid, og ubrukte prøver overføres ikke. Vervebonuser har ingen pengeverdi.',
       },
       {
-        title: '4. Ansvarsfraskrivelse',
-        body: 'Simulatoren gir veiledende tilbakemeldinger basert på kunstig intelligens og HK-dirs vurderingskriterier. Resultater i simulatoren garanterer ikke et spesifikt resultat på den offisielle eksamenen.',
+        title: '4. Betaling, fornyelse og oppsigelse',
+        body: 'Abonnementer kjøpes via Google Play, App Store eller betaling på nett (Stripe) og fornyes automatisk hver måned, med mindre du sier opp senest 24 timer før perioden går ut. Du sier opp i butikken der du kjøpte, og beholder tilgangen ut perioden.',
+      },
+      {
+        title: '5. Angrerett og refusjon',
+        body: 'Du har 14 dagers angrerett etter angrerettloven. Tar du i bruk betalte funksjoner i angrefristen, må du betale for det du har fått hvis du angrer. Refusjon for kjøp i Google Play og App Store behandles av butikken.',
+      },
+      {
+        title: '6. Akseptabel bruk',
+        body: 'Ikke ta opp andre uten at de vet om det, ikke del ulovlig eller krenkende innhold, og ikke prøv å omgå kvoter, betaling eller sikkerhet, eller å bruke automatisert tilgang.',
+      },
+      {
+        title: '7. AI-vurderinger',
+        body: 'Sensor, medkandidat og vurderinger lages av kunstig intelligens og kan inneholde feil. Vurderingen er veiledende og garanterer ikke resultatet på den offisielle prøven.',
+      },
+      {
+        title: '8. Ansvar, endringer og lovvalg',
+        body: 'Tjenesten leveres som den er, innenfor ufravikelig forbrukerlovgivning. Vesentlige endringer i vilkårene varsles minst 30 dager i forveien. Vilkårene reguleres av norsk lov.',
       },
     ],
   },
 
   privacy: {
-    lastUpdated: 'Sist oppdatert: Oktober 2026',
+    lastUpdated: 'Sist oppdatert: 24. oktober 2026',
     sections: [
       {
-        title: '1. Behandling av personopplysninger',
-        body: 'Vi tar personvernet ditt på største alvor. Vi lagrer din registrerte e-post, navn og progresjon for å tilby tjenesten i samsvar med gjeldende personvernlovgivning (GDPR).',
+        title: '1. Hva vi lagrer',
+        body: 'Navn, e-post, hashet passord (eller Google-profil), prøvene dine med transkripsjoner, AI-vurderinger og læringsprofil, kvote og bruk, abonnementsstatus og vervekode. Vi mottar aldri kortopplysninger.',
       },
       {
-        title: '2. Lydopptak og transkribering',
-        body: 'Når du gjennomfører en muntlig prøve, sendes taleopptakene sikkert til talegjenkjenning (Speech-to-Text) for å vurdere uttale, ordforråd og flyt. Lydopptakene brukes utelukkende for å gi deg tilbakemelding og lagres ikke permanent for modelltrening.',
+        title: '2. Lydopptak og AI',
+        body: 'Mikrofonen brukes bare når du trykker for å snakke. Opptaket transkriberes av Microsoft Azure AI Speech og lagres ikke etter det. Svar og vurderinger lages av Azure OpenAI. Verken vi eller Microsoft bruker dataene dine til å trene AI-modeller.',
       },
       {
-        title: '3. Dine rettigheter',
-        body: 'Du har rett til innsyn i egne data, retting eller sletting av din konto og tilhørende transkripsjoner ved å kontakte support eller slette kontoen din.',
+        title: '3. Formål og grunnlag',
+        body: 'Vi bruker opplysningene for å levere tjenesten (avtale), sikre den mot misbruk (berettiget interesse) og oppfylle bokføringsloven. Vi sender ikke markedsføring og selger ikke data.',
+      },
+      {
+        title: '4. Hvem vi deler med',
+        body: 'Neon (database i EU), Microsoft Azure (tale og AI), Vercel (drift), Resend (e-post), RevenueCat (abonnement), og Google, Apple og Stripe (innlogging og betaling). Overføring utenfor EØS skjer med EUs standardavtaler eller Data Privacy Framework.',
+      },
+      {
+        title: '5. Lagringstid',
+        body: 'Kontodata og prøver lagres så lenge du har en konto. Bekreftelseskoder utløper etter 15 minutter. Betalingsopplysninger oppbevares så lenge bokføringsloven krever.',
+      },
+      {
+        title: '6. Dine rettigheter',
+        body: 'Du har rett til innsyn, retting, sletting, begrensning, protest og dataportabilitet. Du kan også klage til Datatilsynet.',
+      },
+      {
+        title: '7. Sletting av konto',
+        body: 'Velg «Slett konto» i menyen, eller send en e-post til kundeservice. Vi sletter kontoen og tilhørende data innen 30 dager. Husk å si opp abonnementet i Google Play eller App Store først.',
       },
     ],
+  },
+
+  legal: {
+    readFull: 'Les hele dokumentet på nettsiden',
+    contact: 'Spørsmål? Skriv til oss på {email}.',
+  },
+
+  support: {
+    title: 'Kundeservice',
+    noMailApp: 'Fant ingen e-postapp. Skriv til oss på {email}.',
+    deleteTitle: 'Slette kontoen?',
+    deleteBody:
+      'Vi åpner en ferdig utfylt e-post til kundeservice. Send den, så sletter vi kontoen og alle prøver, transkripsjoner og vurderinger innen 30 dager. Si opp abonnementet i Google Play eller App Store først.',
+    deleteConfirm: 'Skriv e-post',
+    deleteSubject: 'Slett konto',
+    deleteMailBody: 'Hei! Jeg vil at Snakkly-kontoen min med e-postadressen {email} og alle tilhørende data slettes.',
   },
 
   validation: {

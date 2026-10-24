@@ -167,6 +167,7 @@ All auth errors share one shape: `{ "error": "<CODE>", "message": "<norsk tekst>
 
 ## 9. Subscription & Tier Endpoints
 - **`GET /api/config/tiers`**: Public endpoint returning all tier policies (`FREE`, `STANDARD`, `PREMIUM`) including daily test limits, monthly pricing, and feature arrays.
+- **`GET /api/config/links`**: Public endpoint returning `{ websiteUrl, termsUrl, privacyUrl, accountDeletionUrl, supportEmail }`, built from `REFERRAL_LINK_BASE_URL` and `SUPPORT_EMAIL` (`lib/public-links.ts`). The app uses it for the legal links, "Contact support" and "Delete account"; it falls back to `https://snakkly.no` and `support@snakkly.no` when offline.
 See [PAYMENTS.md](./PAYMENTS.md) for the full flow per platform.
 - **`POST /api/revenuecat/sync`** (authenticated): Re-reads the caller's subscriptions from RevenueCat, stores them and returns `{ tier }`. The app calls it right after a purchase or restore. There is no request body, and it never syncs another user.
 - **`POST /api/revenuecat/webhook`**: RevenueCat webhook for all stores. Requires `Authorization` equal to `REVENUECAT_WEBHOOK_AUTH` (`401` otherwise). Re-syncs `event.app_user_id` (and `transferred_from` / `transferred_to`); anonymous ids are ignored. A non-2xx response makes RevenueCat retry.

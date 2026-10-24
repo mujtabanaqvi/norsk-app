@@ -3,6 +3,8 @@
  * https://resend.com/docs/api-reference/emails/send-email
  */
 
+import { getPublicLinks } from './public-links';
+
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const DEFAULT_FROM = 'Snakkly <onboarding@resend.dev>';
 
@@ -37,6 +39,7 @@ export function buildVerificationEmail(
 ): ResendPayload {
   const greeting = params.name ? `Hei ${params.name}!` : 'Hei!';
   const subject = `${params.code} er din bekreftelseskode for Snakkly`;
+  const links = getPublicLinks();
 
   const text = [
     greeting,
@@ -50,6 +53,10 @@ export function buildVerificationEmail(
     '',
     `Koden og lenken er gyldige i ${params.expiresInMinutes} minutter.`,
     'Hvis du ikke opprettet en konto, kan du se bort fra denne e-posten.',
+    '',
+    `Spørsmål? Kontakt oss på ${links.supportEmail}.`,
+    `Vilkår: ${links.termsUrl}`,
+    `Personvern: ${links.privacyUrl}`,
   ].join('\n');
 
   const html = `<!doctype html>
@@ -76,6 +83,12 @@ export function buildVerificationEmail(
             <p style="margin:0;font-size:13px;color:#6B7280;line-height:1.5;">
               Koden og lenken er gyldige i ${params.expiresInMinutes} minutter.
               Hvis du ikke opprettet en konto, kan du se bort fra denne e-posten.
+            </p>
+            <p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #E5E7EB;font-size:12px;color:#6B7280;line-height:1.6;">
+              Spørsmål? Kontakt oss på
+              <a href="mailto:${escapeHtml(links.supportEmail)}" style="color:#BA0C2F;">${escapeHtml(links.supportEmail)}</a>.<br />
+              <a href="${escapeHtml(links.termsUrl)}" style="color:#6B7280;">Vilkår</a> ·
+              <a href="${escapeHtml(links.privacyUrl)}" style="color:#6B7280;">Personvern</a>
             </p>
           </td></tr>
         </table>
