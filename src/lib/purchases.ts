@@ -26,6 +26,13 @@ const apiKey = API_KEYS[Platform.OS];
 // Expo Go has no store module (RevenueCat would only run in its mock "preview" mode), so purchases need a development build.
 export const isPurchasingSupported = Boolean(apiKey) && !isRunningInExpoGo();
 
+/** Developer-facing reason purchases are disabled on this build, or null when they are supported. */
+export const purchasingUnavailableReason: string | null = isRunningInExpoGo()
+  ? 'Running in Expo Go, which has no store module. Use a development build (eas build --profile development) or install from a Play/TestFlight track.'
+  : !apiKey
+    ? `EXPO_PUBLIC_REVENUECAT_${Platform.OS.toUpperCase()}_KEY was not set when this JS bundle was built.`
+    : null;
+
 /** Error code RevenueCat returns when a store purchase already belongs to another App User ID (another Snakkly account). */
 const RECEIPT_ALREADY_IN_USE = Purchases.PURCHASES_ERROR_CODE.RECEIPT_ALREADY_IN_USE_ERROR;
 

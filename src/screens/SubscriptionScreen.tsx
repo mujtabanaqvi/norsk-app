@@ -18,6 +18,7 @@ import {
   openManageSubscriptions,
   OwnedByOtherAccountError,
   PaymentPendingError,
+  purchasingUnavailableReason,
   restorePurchases,
 } from '../lib/purchases';
 import type { PaidTier } from '../lib/iap-products';
@@ -88,7 +89,11 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     setIsProcessing(true);
     try {
       // Expo Go or a missing RevenueCat key: purchases need a development build.
-      if (!isPurchasingSupported) throw new Error(t('subscription.storeUnavailable'));
+      if (!isPurchasingSupported) {
+        console.warn('Purchases unavailable:', purchasingUnavailableReason);
+        const detail = __DEV__ && purchasingUnavailableReason ? `\n\n${purchasingUnavailableReason}` : '';
+        throw new Error(t('subscription.storeUnavailable') + detail);
+      }
       const result = await buySubscription(tier);
       if (result) navigation.navigate('PaymentResult', { result: 'success', tier: result.tier });
     } catch (err: any) {
