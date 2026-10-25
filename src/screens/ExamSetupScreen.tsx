@@ -344,7 +344,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       {/* Header: brand on the left, at most two fixed-size controls on the right so it never overflows */}
       <View style={styles.header}>
         <View style={styles.brandBlock}>
-          <Logo size={36} withWordmark />
+          <Logo size={46} withWordmark />
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {t('setup.headerSubtitle')}
           </Text>

@@ -262,7 +262,7 @@ export const AuthScreen: React.FC<Props> = ({ navigation, route }) => {
                   <Text style={styles.backButtonText}>{t('common.back')}</Text>
                 </Pressable>
               ) : (
-                <Logo size={48} withWordmark />
+                <Logo size={60} withWordmark />
               )}
               <LanguageToggle />
             </View>

@@ -3,6 +3,11 @@ import { Image, View, Text, StyleSheet, type ViewStyle, type TextStyle, type Sty
 import { colors } from '../../theme';
 
 const LOGO = require('../../../assets/brand/snakkly-icon-192.png');
+// Full "mark + Snakkly" lockups: light for light surfaces, dark (navy background) for dark surfaces.
+const WORDMARK = {
+  light: { source: require('../../../assets/brand/snakkly-wordmark-light.png'), aspectRatio: 885 / 268 },
+  dark: { source: require('../../../assets/brand/snakkly-wordmark-dark.png'), aspectRatio: 925 / 308 },
+} as const;
 
 interface BrandTextProps {
   style?: StyleProp<TextStyle>;
@@ -23,45 +28,48 @@ export const BrandText: React.FC<BrandTextProps> = ({
 );
 
 interface LogoProps {
+  /** Height of the logo in points. */
   size?: number;
-  /** Show the "Snakkly" wordmark next to the mark. */
+  /** Show the full "Snakkly" lockup (mark + name) instead of the mark alone. */
   withWordmark?: boolean;
-  /** Primary wordmark color for "Snakk" (defaults to navy). */
-  wordmarkColor?: string;
-  /** Accent color for "ly" (defaults to red). */
-  accentColor?: string;
+  /** Lockup for light surfaces (default) or dark/navy surfaces. Only applies with `withWordmark`. */
+  variant?: 'light' | 'dark';
   style?: ViewStyle;
 }
 
 export const Logo: React.FC<LogoProps> = ({
   size = 32,
   withWordmark = false,
-  wordmarkColor = colors.navy,
-  accentColor = colors.red,
+  variant = 'light',
   style,
-}) => (
-  <View style={[styles.row, style]}>
-    <Image
-      source={LOGO}
-      style={{ width: size, height: size }}
-      resizeMode="contain"
-      accessibilityLabel="Snakkly"
-    />
-    {withWordmark && (
-      <BrandText
-        snakkColor={wordmarkColor}
-        lyColor={accentColor}
-        style={[
-          styles.wordmark,
-          { fontSize: Math.round(size * 0.64) },
-        ]}
+}) => {
+  if (withWordmark) {
+    const { source, aspectRatio } = WORDMARK[variant];
+    return (
+      <View style={[styles.row, style]}>
+        <Image
+          source={source}
+          style={{ height: size, width: Math.round(size * aspectRatio) }}
+          resizeMode="contain"
+          accessibilityLabel="Snakkly"
+        />
+      </View>
+    );
+  }
+
+  return (
+    <View style={[styles.row, style]}>
+      <Image
+        source={LOGO}
+        style={{ width: size, height: size }}
+        resizeMode="contain"
+        accessibilityLabel="Snakkly"
       />
-    )}
-  </View>
-);
+    </View>
+  );
+};
 
 const styles = StyleSheet.create({
-  row: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-  wordmark: { fontWeight: '800', letterSpacing: -0.6 },
+  row: { flexDirection: 'row', alignItems: 'center' },
   brandInline: { fontWeight: '700' },
 });

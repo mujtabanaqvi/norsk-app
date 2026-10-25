@@ -5,6 +5,9 @@
 
 import { getPublicLinks } from './public-links';
 
+/** Light "mark + Snakkly" lockup hosted on the marketing website (885×268 source, 3.3:1). */
+const EMAIL_LOGO_PATH = '/snakkly-wordmark-light.png';
+
 const RESEND_ENDPOINT = 'https://api.resend.com/emails';
 const DEFAULT_FROM = 'Snakkly <onboarding@resend.dev>';
 
@@ -66,7 +69,9 @@ export function buildVerificationEmail(
       <tr><td align="center">
         <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:480px;background:#FFFFFF;border-radius:16px;padding:32px;">
           <tr><td>
-            <h1 style="margin:0 0 8px;font-size:22px;color:#BA0C2F;">Snakkly</h1>
+            <a href="${escapeHtml(links.websiteUrl)}" style="display:inline-block;margin:0 0 20px;">
+              <img src="${escapeHtml(links.websiteUrl + EMAIL_LOGO_PATH)}" alt="Snakkly" width="132" height="40" style="display:block;border:0;outline:none;text-decoration:none;height:40px;width:132px;" />
+            </a>
             <p style="margin:0 0 16px;font-size:16px;">${escapeHtml(greeting)}</p>
             <p style="margin:0 0 24px;font-size:15px;line-height:1.5;">
               Takk for at du registrerte deg. Skriv inn koden under i appen for å bekrefte e-postadressen din:

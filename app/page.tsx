@@ -14,26 +14,15 @@ export default function HomePage() {
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <img
-              src="/brand/snakkly-logo.svg"
-              alt="Snakkly"
-              width={52}
-              height={56}
-              style={{ display: 'block' }}
-            />
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <span
-                  style={{
-                    fontSize: '1.75rem',
-                    fontWeight: 800,
-                    letterSpacing: '-0.03em',
-                    color: 'var(--navy)',
-                  }}
-                >
-                  <span style={{ color: 'var(--navy)' }}>Snakk</span>
-                  <span style={{ color: 'var(--red)' }}>ly</span>
-                </span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                <img
+                  src="/brand/snakkly-wordmark-light.png"
+                  alt="Snakkly"
+                  width={172}
+                  height={52}
+                  style={{ display: 'block' }}
+                />
                 <span className="snakkly-badge">B1 / B2</span>
               </div>
               <div style={{ fontSize: '0.9rem', color: 'var(--text-secondary)', fontWeight: 500 }}>

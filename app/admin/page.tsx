@@ -577,6 +577,7 @@ export default function AdminPortalPage() {
     return (
       <div style={styles.pageWrapper}>
         <div style={styles.loginCard}>
+          <img src="/brand/snakkly-wordmark-dark.png" alt="Snakkly" width={150} height={50} style={styles.brandLogo} />
           <div style={styles.badge}>WEB ADMIN PORTAL</div>
           <h1 style={styles.loginTitle}>Norskprøven Eksamen-admin</h1>
           <p style={styles.loginSubtitle}>
@@ -617,6 +618,7 @@ export default function AdminPortalPage() {
         {/* Top Bar */}
         <header style={styles.header}>
           <div>
+            <img src="/brand/snakkly-wordmark-dark.png" alt="Snakkly" width={150} height={50} style={styles.brandLogo} />
             <div style={styles.badge}>MUNTLIG EKSAMENSSIMULATOR</div>
             <h1 style={styles.headerTitle}>Web Admin Portal — Eksamener &amp; Spørsmål</h1>
             <p style={styles.headerSubtitle}>
@@ -1613,6 +1615,11 @@ const styles: Record<string, React.CSSProperties> = {
     padding: '4px 10px',
     borderRadius: '6px',
     marginBottom: '8px',
+  },
+  brandLogo: {
+    display: 'block',
+    borderRadius: '10px',
+    marginBottom: '16px',
   },
   loginTitle: {
     fontSize: '24px',
