@@ -6,7 +6,7 @@
     "version": "1.0.0",
     "orientation": "portrait",
     "userInterfaceStyle": "light",
-    "icon": "./assets/brand/snakkly-icon-512.png",
+    "icon": "./assets/brand/apple-touch-icon.png",
     "backgroundColor": "#FFFDFA",
     "primaryColor": "#BA0C2F",
     "splash": {
@@ -43,7 +43,7 @@
         }
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/brand/snakkly-icon-512.png",
+        "foregroundImage": "./assets/brand/icon-maskable-512.png",
         "backgroundColor": "#FFFDFA"
       },
       "permissions": [
