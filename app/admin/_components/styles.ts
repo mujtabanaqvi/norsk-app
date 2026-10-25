@@ -1,0 +1,71 @@
+import type React from 'react';
+
+export const colors = {
+  bg: '#0B1120',
+  surface: '#111A2E',
+  surfaceRaised: '#16213A',
+  border: '#24324D',
+  text: '#F1F5F9',
+  muted: '#8B9AB4',
+  accent: '#38BDF8',
+  accentStrong: '#0284C7',
+  b1: '#38BDF8',
+  b2: '#A78BFA',
+  success: '#34D399',
+  warning: '#FBBF24',
+  danger: '#F87171',
+};
+
+/** Inline form styles shared by the config cards and drawers. */
+export const styles: Record<string, React.CSSProperties> = {
+  label: {
+    display: 'block',
+    fontSize: '13px',
+    fontWeight: 600,
+    color: '#CBD5E1',
+    marginBottom: '6px',
+  },
+  helperText: {
+    fontSize: '12px',
+    color: colors.muted,
+    margin: '0 0 8px 0',
+    lineHeight: 1.5,
+  },
+  input: {
+    width: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: colors.bg,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '8px',
+    padding: '9px 12px',
+    color: colors.text,
+    fontSize: '14px',
+    marginBottom: '8px',
+    fontFamily: 'inherit',
+  },
+  select: {
+    width: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: colors.bg,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '8px',
+    padding: '9px 12px',
+    color: colors.text,
+    fontSize: '14px',
+    marginBottom: '8px',
+    fontFamily: 'inherit',
+  },
+  textarea: {
+    width: '100%',
+    boxSizing: 'border-box',
+    backgroundColor: colors.bg,
+    border: `1px solid ${colors.border}`,
+    borderRadius: '8px',
+    padding: '10px 12px',
+    color: colors.text,
+    fontSize: '14px',
+    fontFamily: 'inherit',
+    lineHeight: 1.5,
+    resize: 'vertical',
+  },
+};
