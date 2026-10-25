@@ -7,18 +7,18 @@
     "orientation": "portrait",
     "userInterfaceStyle": "light",
     "icon": "./assets/brand/snakkly-icon-512.png",
-    "backgroundColor": "#FFFFFF",
+    "backgroundColor": "#FFFDFA",
     "primaryColor": "#BA0C2F",
     "splash": {
       "image": "./assets/brand/snakkly-logo-1024.png",
       "resizeMode": "contain",
-      "backgroundColor": "#FFFFFF"
+      "backgroundColor": "#FFFDFA"
     },
     "web": {
       "favicon": "./assets/brand/snakkly-icon-192.png",
       "name": "Snakkly · Norskprøven Muntlig",
       "themeColor": "#BA0C2F",
-      "backgroundColor": "#F6F7FA"
+      "backgroundColor": "#FFFDFA"
     },
     "ios": {
       "supportsTablet": true,
@@ -44,7 +44,7 @@
       ],
       "adaptiveIcon": {
         "foregroundImage": "./assets/brand/snakkly-icon-512.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#FFFDFA"
       },
       "permissions": [
         "android.permission.RECORD_AUDIO",

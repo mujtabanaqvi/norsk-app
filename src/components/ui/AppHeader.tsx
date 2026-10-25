@@ -64,7 +64,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: space.lg,
     paddingVertical: space.md,
     minHeight: 60,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
   },
   bordered: { borderBottomWidth: 1, borderBottomColor: colors.border },
   backBtn: {
@@ -73,7 +73,7 @@ const styles = StyleSheet.create({
     borderRadius: 19,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
     borderWidth: 1,
     borderColor: colors.border,
   },

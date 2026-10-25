@@ -17,7 +17,7 @@ export const colors = {
   goldSoft: '#FFF5DB',
 
   // Surfaces
-  bg: '#F6F7FA',
+  bg: '#FFFDFA',
   surface: '#FFFFFF',
   surfaceMuted: '#F0F2F7',
   border: '#E3E7EF',

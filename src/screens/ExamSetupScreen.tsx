@@ -35,9 +35,11 @@ import {
   LanguageToggle,
   type IconName,
 } from '../components/ui';
-import { colors, radius, shadow, space, type } from '../theme';
+import { colors, radius, shadow, space, tierColors, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'ExamSetup'>;
+
+type MenuItem = { icon: IconName; label: string; color?: string; onPress: () => void };
 
 // Minimum audio quota required by backend (180 seconds / 3 minutes)
 const MIN_REQUIRED_QUOTA_SECONDS = 180;
@@ -271,45 +273,81 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             .join(' · ')
         : '';
 
-  const menuItems: { icon: IconName; label: string; color?: string; onPress: () => void }[] = [
-    { icon: 'help-circle-outline', label: t('nav.howTo'), onPress: () => navigation.navigate('HowTo') },
-    { icon: 'gift-outline', label: t('nav.referral'), onPress: () => navigation.navigate('Referral') },
-    { icon: 'star', label: t('setup.a11yUpgrade'), color: colors.gold, onPress: () => navigation.navigate('Subscription') },
-    { icon: 'document-text-outline', label: t('nav.terms'), onPress: () => navigation.navigate('Terms') },
-    { icon: 'shield-checkmark-outline', label: t('nav.privacy'), onPress: () => navigation.navigate('PrivacyPolicy') },
-    { icon: 'mail-outline', label: t('nav.support'), onPress: () => openSupportEmail(locale, publicLinks.supportEmail) },
+  const isPremium = user?.subscriptionTier === 'PREMIUM';
+  const openProgress = () => navigation.navigate(user ? 'LearningProfile' : 'Auth');
+
+  const menuSections: { title: string; items: MenuItem[] }[] = [
+    {
+      title: t('setup.menuPractice'),
+      items: [
+        { icon: 'help-circle-outline', label: t('nav.howTo'), onPress: () => navigation.navigate('HowTo') },
+        { icon: 'stats-chart-outline', label: t('nav.profile'), onPress: openProgress },
+        { icon: 'gift-outline', label: t('nav.referral'), onPress: () => navigation.navigate('Referral') },
+      ],
+    },
+    {
+      title: t('setup.menuHelp'),
+      items: [
+        { icon: 'mail-outline', label: t('nav.support'), onPress: () => openSupportEmail(locale, publicLinks.supportEmail) },
+        { icon: 'document-text-outline', label: t('nav.terms'), onPress: () => navigation.navigate('Terms') },
+        { icon: 'shield-checkmark-outline', label: t('nav.privacy'), onPress: () => navigation.navigate('PrivacyPolicy') },
+      ],
+    },
     ...(user
       ? [
-          { icon: 'trash-outline' as IconName, label: t('nav.deleteAccount'), onPress: () => confirmDeleteAccount(user.email) },
-          { icon: 'log-out-outline' as IconName, label: t('setup.a11yLogout'), color: colors.red, onPress: logout },
+          {
+            title: t('setup.menuAccount'),
+            items: [
+              { icon: 'trash-outline' as IconName, label: t('nav.deleteAccount'), onPress: () => confirmDeleteAccount(user.email) },
+              { icon: 'log-out-outline' as IconName, label: t('setup.a11yLogout'), color: colors.red, onPress: logout },
+            ],
+          },
         ]
       : []),
   ];
 
+  const quickActions: { icon: IconName; label: string; tint: string; iconColor: string; onPress: () => void }[] = [
+    { icon: 'gift-outline', label: t('setup.quickReferral'), tint: colors.redSoft, iconColor: colors.red, onPress: () => navigation.navigate('Referral') },
+    { icon: 'stats-chart-outline', label: t('setup.quickProgress'), tint: colors.navySoft, iconColor: colors.navy, onPress: openProgress },
+    { icon: 'help-circle-outline', label: t('setup.quickHowTo'), tint: colors.navySoft, iconColor: colors.navy, onPress: () => navigation.navigate('HowTo') },
+    {
+      icon: 'star',
+      label: isPremium ? t('setup.quickMyPlan') : t('setup.quickUpgrade'),
+      tint: colors.goldSoft,
+      iconColor: colors.gold,
+      onPress: () => navigation.navigate('Subscription'),
+    },
+  ];
+
+  const selectionSummary = [
+    targetLevel,
+    practiceMode === 'AI_PEER' ? t('setup.aiPeerShort') : t('setup.humanShort'),
+    selectedThemeId === 'RANDOM' ? t('setup.randomShort') : selectedTheme?.titleNo,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
   const stats = learningInsight?.stats;
   const trend = stats ? TREND_ICON[stats.overallTrend] : null;
+  const tierRing = user ? tierColors(user.subscriptionTier) : null;
+  const closeMenuThen = (action: () => void) => {
+    setIsMenuOpen(false);
+    action();
+  };
 
   return (
     <Screen>
-      {/* Compact header: brand + the few actions used most; the rest live in the overflow menu */}
+      {/* Header: brand on the left, at most two fixed-size controls on the right so it never overflows */}
       <View style={styles.header}>
         <View style={styles.brandBlock}>
-          <Logo size={42} withWordmark />
+          <Logo size={36} withWordmark />
           <Text style={styles.headerSubtitle} numberOfLines={1}>
-            {t('setup.headerSubtitle')}{user ? ` · ${user.name || user.email.split('@')[0]}` : ''}
+            {t('setup.headerSubtitle')}
           </Text>
         </View>
 
         <View style={styles.headerActions}>
-          {user ? (
-            <Pressable
-              onPress={() => navigation.navigate('Subscription')}
-              accessibilityRole="button"
-              accessibilityLabel={t('nav.subscription')}
-            >
-              <TierBadge tier={user.subscriptionTier} />
-            </Pressable>
-          ) : (
+          {!user && (
             <Button
               title={t('common.login')}
               variant="outline"
@@ -319,50 +357,119 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             />
           )}
 
-          <LanguageToggle />
-
           <Pressable
             onPress={() => setIsMenuOpen(true)}
-            style={({ pressed }) => [styles.iconBtn, pressed && styles.iconBtnPressed]}
+            style={({ pressed }) => [
+              styles.iconBtn,
+              user && tierRing && [styles.avatarBtn, { borderColor: tierRing.border }],
+              pressed && styles.iconBtnPressed,
+            ]}
             accessibilityRole="button"
-            accessibilityLabel={t('setup.more')}
+            accessibilityLabel={t('setup.accountMenu')}
           >
-            <Icon name="ellipsis-horizontal" size={22} color={colors.navy} />
+            {user ? (
+              <>
+                <Text style={styles.avatarInitial}>
+                  {(user.name || user.email).trim().charAt(0).toUpperCase()}
+                </Text>
+                {isPremium && (
+                  <View style={styles.avatarStar}>
+                    <Icon name="star" size={9} color={colors.white} />
+                  </View>
+                )}
+              </>
+            ) : (
+              <Icon name="menu" size={22} color={colors.navy} />
+            )}
           </Pressable>
         </View>
       </View>
 
-      {/* Overflow menu */}
+      {/* Account & settings sheet: slides up from the bottom and scrolls, so it always fits on screen */}
       <Modal
         visible={isMenuOpen}
         transparent
-        animationType="fade"
+        animationType="slide"
         onRequestClose={() => setIsMenuOpen(false)}
       >
-        <Pressable style={styles.menuBackdrop} onPress={() => setIsMenuOpen(false)}>
-          <View style={[styles.menuCard, { top: insets.top + 56 }]}>
-            {menuItems.map((item, index) => (
-              <Pressable
-                key={item.label}
-                onPress={() => {
-                  setIsMenuOpen(false);
-                  item.onPress();
-                }}
-                style={({ pressed }) => [
-                  styles.menuItem,
-                  index > 0 && styles.menuItemBorder,
-                  pressed && styles.menuItemPressed,
-                ]}
-                accessibilityRole="button"
-              >
-                <Icon name={item.icon} size={20} color={item.color ?? colors.navy} />
-                <Text style={[styles.menuItemText, item.color === colors.red && { color: colors.red }]}>
-                  {item.label}
-                </Text>
-              </Pressable>
-            ))}
+        <View style={styles.sheetRoot}>
+          <Pressable style={styles.sheetBackdrop} onPress={() => setIsMenuOpen(false)} accessibilityLabel={t('common.hide')} />
+          <View style={[styles.sheet, { paddingBottom: insets.bottom + space.md }]}>
+            <View style={styles.sheetHandle} />
+            <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.sheetContent}>
+              {user ? (
+                <View style={styles.accountCard}>
+                  <View style={styles.accountRow}>
+                    <View style={[styles.accountAvatar, tierRing && { borderColor: tierRing.border }]}>
+                      <Text style={styles.avatarInitial}>
+                        {(user.name || user.email).trim().charAt(0).toUpperCase()}
+                      </Text>
+                    </View>
+                    <View style={styles.accountMeta}>
+                      <Text style={styles.accountName} numberOfLines={1}>
+                        {user.name || user.email.split('@')[0]}
+                      </Text>
+                      <Text style={styles.accountEmail} numberOfLines={1}>
+                        {user.email}
+                      </Text>
+                    </View>
+                    <TierBadge tier={user.subscriptionTier} />
+                  </View>
+                  <Button
+                    title={isPremium ? t('setup.managePlan') : t('setup.upgradePlan')}
+                    variant={isPremium ? 'outline' : 'gold'}
+                    size="sm"
+                    icon="star"
+                    fullWidth
+                    onPress={() => closeMenuThen(() => navigation.navigate('Subscription'))}
+                  />
+                </View>
+              ) : (
+                <Button
+                  title={t('common.login')}
+                  variant="primary"
+                  icon="person-outline"
+                  fullWidth
+                  onPress={() => closeMenuThen(() => navigation.navigate('Auth'))}
+                />
+              )}
+
+              <View style={styles.languageRow}>
+                <View style={styles.languageLabelGroup}>
+                  <Icon name="language-outline" size={20} color={colors.navy} />
+                  <Text style={styles.menuItemText}>{t('common.language')}</Text>
+                </View>
+                <LanguageToggle />
+              </View>
+
+              {menuSections.map((section) => (
+                <View key={section.title} style={styles.menuSection}>
+                  <Text style={styles.menuSectionTitle}>{section.title}</Text>
+                  <View style={styles.menuGroup}>
+                    {section.items.map((item, index) => (
+                      <Pressable
+                        key={item.label}
+                        onPress={() => closeMenuThen(item.onPress)}
+                        style={({ pressed }) => [
+                          styles.menuItem,
+                          index > 0 && styles.menuItemBorder,
+                          pressed && styles.menuItemPressed,
+                        ]}
+                        accessibilityRole="button"
+                      >
+                        <Icon name={item.icon} size={20} color={item.color ?? colors.navy} />
+                        <Text style={[styles.menuItemText, styles.menuItemLabel, item.color && { color: item.color }]}>
+                          {item.label}
+                        </Text>
+                        <Icon name="chevron-forward" size={16} color={colors.textMuted} />
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ))}
+            </ScrollView>
           </View>
-        </Pressable>
+        </View>
       </Modal>
 
       {/* Insufficient Quota Warning Banner */}
@@ -525,6 +632,26 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               )}
             </Card>
+
+            {/* Quick actions: the most-used shortcuts, one tap from the home screen */}
+            <View style={styles.quickActionsRow}>
+              {quickActions.map((action) => (
+                <Pressable
+                  key={action.label}
+                  onPress={action.onPress}
+                  style={({ pressed }) => [styles.quickAction, pressed && styles.quickActionPressed]}
+                  accessibilityRole="button"
+                  accessibilityLabel={action.label}
+                >
+                  <View style={[styles.quickActionIcon, { backgroundColor: action.tint }]}>
+                    <Icon name={action.icon} size={22} color={action.iconColor} />
+                  </View>
+                  <Text style={styles.quickActionLabel} numberOfLines={2}>
+                    {action.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
 
             {/* Section 1: Target Level Selector (Segmented Control) */}
             <View style={styles.section}>
@@ -706,6 +833,11 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       {/* Sticky Footer Start Button */}
       <View style={styles.footer}>
         <View style={styles.footerInner}>
+          {!!selectionSummary && (
+            <Text style={styles.footerSummary} numberOfLines={1}>
+              {selectionSummary}
+            </Text>
+          )}
           <Button
             title={isStarting ? t('setup.starting') : t('setup.start')}
             variant="primary"
@@ -729,14 +861,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: space.lg,
     paddingVertical: space.sm,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
     gap: space.sm,
   },
   brandBlock: {
-    flexShrink: 1,
-    minWidth: 160,
+    flex: 1,
+    minWidth: 0,
   },
   headerSubtitle: {
     ...type.caption,
@@ -761,19 +893,121 @@ const styles = StyleSheet.create({
   iconBtnPressed: {
     backgroundColor: colors.navySoft,
   },
-  menuBackdrop: {
-    flex: 1,
+  avatarBtn: {
+    backgroundColor: colors.surface,
+    borderWidth: 2,
   },
-  menuCard: {
+  avatarInitial: {
+    color: colors.navy,
+    fontSize: 16,
+    fontWeight: '800',
+  },
+  avatarStar: {
     position: 'absolute',
-    right: space.lg,
-    minWidth: 220,
+    right: -3,
+    bottom: -3,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: colors.gold,
+    borderWidth: 1.5,
+    borderColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sheetRoot: {
+    flex: 1,
+    justifyContent: 'flex-end',
+  },
+  sheetBackdrop: {
+    ...StyleSheet.absoluteFill,
+    backgroundColor: colors.overlay,
+  },
+  sheet: {
+    maxHeight: '85%',
+    width: '100%',
+    maxWidth: 680,
+    alignSelf: 'center',
+    backgroundColor: colors.bg,
+    borderTopLeftRadius: radius.xl,
+    borderTopRightRadius: radius.xl,
+    paddingTop: space.sm,
+    ...shadow.raised,
+  },
+  sheetHandle: {
+    alignSelf: 'center',
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderStrong,
+    marginBottom: space.sm,
+  },
+  sheetContent: {
+    paddingHorizontal: space.lg,
+    paddingBottom: space.sm,
+    gap: space.md,
+  },
+  accountCard: {
     backgroundColor: colors.surface,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: colors.border,
-    paddingVertical: space.xs,
-    ...shadow.raised,
+    padding: space.md,
+    gap: space.md,
+  },
+  accountRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  accountAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountMeta: {
+    flex: 1,
+    minWidth: 0,
+  },
+  accountName: {
+    ...type.bodyStrong,
+  },
+  accountEmail: {
+    ...type.caption,
+  },
+  languageRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    paddingHorizontal: space.lg,
+    paddingVertical: space.sm,
+  },
+  languageLabelGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.md,
+  },
+  menuSection: {
+    gap: space.xs,
+  },
+  menuSectionTitle: {
+    ...type.overline,
+    marginLeft: space.xs,
+  },
+  menuGroup: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
   },
   menuItem: {
     flexDirection: 'row',
@@ -792,6 +1026,42 @@ const styles = StyleSheet.create({
   menuItemText: {
     ...type.bodyStrong,
     fontSize: 14,
+  },
+  menuItemLabel: {
+    flex: 1,
+  },
+  quickActionsRow: {
+    flexDirection: 'row',
+    gap: space.sm,
+    marginBottom: space.lg,
+  },
+  quickAction: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.xs,
+    borderRadius: radius.lg,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  quickActionPressed: {
+    backgroundColor: colors.surfaceMuted,
+  },
+  quickActionIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  quickActionLabel: {
+    fontSize: 12,
+    lineHeight: 15,
+    fontWeight: '700',
+    color: colors.text,
+    textAlign: 'center',
   },
   warningBanner: {
     flexDirection: 'row',
@@ -1062,7 +1332,14 @@ const styles = StyleSheet.create({
     paddingVertical: space.md,
     borderTopWidth: 1,
     borderTopColor: colors.border,
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
+  },
+  footerSummary: {
+    ...type.caption,
+    color: colors.textSecondary,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: space.sm,
   },
   footerInner: {
     width: '100%',

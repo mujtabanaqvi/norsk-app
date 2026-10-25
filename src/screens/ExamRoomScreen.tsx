@@ -12,6 +12,8 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  type StyleProp,
+  type ViewStyle,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
@@ -21,7 +23,7 @@ import type {
   RootStackParamList,
   ExamStage,
 } from '../types/exam';
-import { Card, Badge, Button, Icon, Waveform } from '../components/ui';
+import { Card, Badge, Button, Icon, Waveform, type BadgeTone } from '../components/ui';
 import { colors, radius, shadow, space, type } from '../theme';
 
 // Enable LayoutAnimation on Android
@@ -212,11 +214,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.timerText}>{formattedTimer}</Text>
           </View>
 
-          <View style={styles.topBarCenter}>
-            <Text style={styles.examTitleText} numberOfLines={1}>
-              {topicTitle}
-            </Text>
-          </View>
+          <View style={styles.topBarSpacer} />
 
           <View style={styles.levelBadge}>
             <Text style={styles.levelBadgeText}>{level}</Text>
@@ -233,6 +231,10 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             <Text style={styles.endButtonText}>{t('room.endShort')}</Text>
           </Pressable>
         </View>
+
+        <Text style={styles.examTitleText} numberOfLines={1}>
+          {topicTitle}
+        </Text>
 
         {/* Phase Segmented Pills */}
         <View style={styles.phaseContainer}>
@@ -291,176 +293,82 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
               </ScrollView>
             </Card>
 
-            {/* Participants side by side */}
-            <View style={styles.participantsRow}>
-              {/* Sensor (AI Examiner) */}
-              <Card
-                style={[
-                  styles.participantTile,
-                  isExaminerSpeaking && styles.participantCardActiveNavy,
-                ]}
-              >
-                <View style={styles.participantHeader}>
-                  <View style={[styles.avatar, styles.participantAvatarExaminer]}>
-                    <Text style={styles.avatarLetter}>S</Text>
-                  </View>
-                  <View style={styles.participantMeta}>
-                    <Text style={styles.participantName} numberOfLines={1}>
-                      {t('room.examinerName')}
-                    </Text>
-                    <Text style={styles.participantRole} numberOfLines={1}>
-                      {t('room.examinerRole')}
-                    </Text>
-                  </View>
-                </View>
-                <View style={styles.participantFooter}>
-                  <Badge
-                    label={isExaminerSpeaking ? t('room.speakingNow') : t('room.listening')}
-                    tone={isExaminerSpeaking ? 'solidNavy' : 'neutral'}
-                  />
-                  <Waveform
-                    active={isExaminerSpeaking}
-                    color={isExaminerSpeaking ? colors.navy : colors.borderStrong}
-                    accentColor={isExaminerSpeaking ? colors.red : colors.borderStrong}
-                    height={20}
-                    barWidth={3}
-                  />
-                </View>
-              </Card>
+            {/* Exam table: the examiner sits across from the candidates, who sit side by side */}
+            <View style={styles.examTable}>
+              <Text style={styles.seatLabel}>{t('room.seatAcross')}</Text>
+              <SeatTile
+                style={styles.examinerSeat}
+                avatar="S"
+                avatarColor={colors.navy}
+                name={t('room.examinerName')}
+                role={t('room.examinerRole')}
+                badgeLabel={isExaminerSpeaking ? t('room.speakingNow') : t('room.listening')}
+                badgeTone={isExaminerSpeaking ? 'solidNavy' : 'neutral'}
+                active={isExaminerSpeaking}
+                activeColor={colors.navy}
+              />
 
-              {/* Co-Candidate or Shared-mic Candidates */}
-              {coCandidateMode === 'AI_PEER' ? (
-                <Card
-                  style={[
-                    styles.participantTile,
-                    (isAiCoCandidateSpeaking || isLocalSpeaking) &&
-                      styles.participantCardActiveRed,
-                  ]}
-                >
-                  <View style={styles.participantHeader}>
-                    <View style={[styles.avatar, styles.participantAvatarPeer]}>
-                      <Text style={styles.avatarLetter}>M</Text>
-                    </View>
-                    <View style={styles.participantMeta}>
-                      <Text style={styles.participantName} numberOfLines={1}>
-                        {stage === 'DEL_2' ? t('room.peerAndYou') : t('room.candidateYou')}
-                      </Text>
-                      <Text style={styles.participantRole} numberOfLines={1}>
-                        {stage === 'DEL_2'
-                          ? t('room.peerRole', { level })
-                          : t('room.targetLevel', { level })}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.participantFooter}>
-                    <Badge
-                      label={
-                        isAiCoCandidateSpeaking
-                          ? t('room.peerSpeaking')
-                          : isLocalSpeaking
-                            ? t('room.youSpeaking')
-                            : t('room.ready')
-                      }
-                      tone={
-                        isAiCoCandidateSpeaking
-                          ? 'navy'
-                          : isLocalSpeaking
-                            ? 'solidRed'
-                            : 'neutral'
-                      }
-                    />
-                    <Waveform
-                      active={isAiCoCandidateSpeaking || isLocalSpeaking}
-                      color={
-                        isAiCoCandidateSpeaking || isLocalSpeaking
-                          ? colors.red
-                          : colors.borderStrong
-                      }
-                      accentColor={
-                        isAiCoCandidateSpeaking || isLocalSpeaking
-                          ? colors.navy
-                          : colors.borderStrong
-                      }
-                      height={20}
-                      barWidth={3}
-                    />
-                  </View>
-                </Card>
-              ) : (
-                <Card
-                  style={[
-                    styles.participantTile,
-                    isLocalSpeaking && styles.participantCardActiveRed,
-                  ]}
-                >
-                  <View style={styles.participantHeader}>
-                    <View style={[styles.avatar, styles.participantAvatarLocal]}>
-                      <Text style={styles.avatarLetterLocal}>2x</Text>
-                    </View>
-                    <View style={styles.participantMeta}>
-                      <Text style={styles.participantName} numberOfLines={1}>
-                        {t('room.sharedMicTitle')}
-                      </Text>
-                      <Text style={styles.participantRole} numberOfLines={1}>
-                        {t('room.activeSpeaker', {
-                          name:
-                            candidateSpeaker === 'CANDIDATE_2'
-                              ? t('common.candidate2')
-                              : t('common.candidate1'),
-                        })}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={styles.participantFooter}>
-                    <Badge
-                      label={isLocalSpeaking ? t('room.micActive') : t('room.ready')}
-                      tone={isLocalSpeaking ? 'solidRed' : 'neutral'}
-                    />
-                    <Waveform
-                      active={isLocalSpeaking}
-                      color={isLocalSpeaking ? colors.red : colors.borderStrong}
-                      accentColor={isLocalSpeaking ? colors.navy : colors.borderStrong}
-                      height={20}
-                      barWidth={3}
-                    />
-                  </View>
-                </Card>
-              )}
-            </View>
-
-            {/* Candidate 1 / Candidate 2 Selector for HUMAN_LOCAL */}
-            {coCandidateMode === 'HUMAN_LOCAL' && (
-              <View style={styles.speakerSelectorRow}>
-                {(['CANDIDATE_1', 'CANDIDATE_2'] as const).map((cand) => {
-                  const selected = candidateSpeaker === cand;
-                  return (
-                    <Pressable
-                      key={cand}
-                      style={[
-                        styles.speakerSelectButton,
-                        selected && styles.speakerSelectButtonActive,
-                      ]}
-                      onPress={() => setCandidateSpeaker(cand)}
-                      disabled={phase === 'recording' || phase === 'thinking'}
-                    >
-                      <Icon
-                        name="person-outline"
-                        size={17}
-                        color={selected ? colors.white : colors.navy}
-                      />
-                      <Text
-                        style={[
-                          styles.speakerSelectButtonText,
-                          selected && styles.speakerSelectButtonTextActive,
-                        ]}
-                      >
-                        {cand === 'CANDIDATE_1' ? t('common.candidate1') : t('common.candidate2')}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
+              <View style={styles.tableEdge}>
+                <View style={styles.tableEdgeLine} />
+                <Text style={styles.seatLabel}>{t('room.seatYourSide')}</Text>
+                <View style={styles.tableEdgeLine} />
               </View>
-            )}
+
+              <View style={styles.candidatesRow}>
+                {coCandidateMode === 'AI_PEER' ? (
+                  <>
+                    <SeatTile
+                      avatar="M"
+                      avatarColor={colors.navyLight}
+                      name={t('room.coCandidateName')}
+                      role={t('room.peerRole', { level })}
+                      badgeLabel={
+                        isAiCoCandidateSpeaking
+                          ? t('room.speakingNow')
+                          : stage === 'DEL_2'
+                            ? t('room.listening')
+                            : t('room.waiting')
+                      }
+                      badgeTone={isAiCoCandidateSpeaking ? 'solidNavy' : 'neutral'}
+                      active={isAiCoCandidateSpeaking}
+                      activeColor={colors.navyLight}
+                      dimmed={stage !== 'DEL_2'}
+                    />
+                    <SeatTile
+                      avatar={t('room.you')}
+                      avatarColor={colors.red}
+                      name={t('room.candidateYou')}
+                      role={t('room.targetLevel', { level })}
+                      badgeLabel={isLocalSpeaking ? t('room.youSpeaking') : t('room.ready')}
+                      badgeTone={isLocalSpeaking ? 'solidRed' : 'neutral'}
+                      active={isLocalSpeaking}
+                      activeColor={colors.red}
+                    />
+                  </>
+                ) : (
+                  (['CANDIDATE_1', 'CANDIDATE_2'] as const).map((cand, index) => {
+                    const selected = candidateSpeaker === cand;
+                    const speaking = selected && isLocalSpeaking;
+                    return (
+                      <SeatTile
+                        key={cand}
+                        avatar={String(index + 1)}
+                        avatarColor={selected ? colors.red : colors.textMuted}
+                        name={cand === 'CANDIDATE_1' ? t('common.candidate1') : t('common.candidate2')}
+                        role={t('room.tapToSwitch')}
+                        badgeLabel={speaking ? t('room.micActive') : selected ? t('room.ready') : t('room.waiting')}
+                        badgeTone={speaking ? 'solidRed' : selected ? 'red' : 'neutral'}
+                        active={selected}
+                        speaking={speaking}
+                        activeColor={colors.red}
+                        onPress={() => setCandidateSpeaker(cand)}
+                        disabled={phase === 'recording' || phase === 'thinking'}
+                      />
+                    );
+                  })
+                )}
+              </View>
+            </View>
 
             {/* Hint / Retry Notification */}
             {hintMessage && (
@@ -712,6 +620,94 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
   );
 };
 
+interface SeatTileProps {
+  avatar: string;
+  avatarColor: string;
+  name: string;
+  role: string;
+  badgeLabel: string;
+  badgeTone: BadgeTone;
+  /** Highlighted seat (outlined in `activeColor`). */
+  active: boolean;
+  /** Animates the waveform; defaults to `active`. */
+  speaking?: boolean;
+  activeColor: string;
+  /** Seat is present but not part of the current exam part. */
+  dimmed?: boolean;
+  onPress?: () => void;
+  disabled?: boolean;
+  style?: StyleProp<ViewStyle>;
+}
+
+/** One participant at the exam table: avatar, name, status badge and a live waveform. */
+const SeatTile: React.FC<SeatTileProps> = ({
+  avatar,
+  avatarColor,
+  name,
+  role,
+  badgeLabel,
+  badgeTone,
+  active,
+  speaking = active,
+  activeColor,
+  dimmed = false,
+  onPress,
+  disabled,
+  style,
+}) => {
+  const body = (
+    <>
+      <View style={styles.participantHeader}>
+        <View style={[styles.avatar, { backgroundColor: avatarColor }]}>
+          <Text style={styles.avatarLetter} numberOfLines={1}>
+            {avatar}
+          </Text>
+        </View>
+        <View style={styles.participantMeta}>
+          <Text style={styles.participantName} numberOfLines={1}>
+            {name}
+          </Text>
+          <Text style={styles.participantRole} numberOfLines={1}>
+            {role}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.participantFooter}>
+        <Badge label={badgeLabel} tone={badgeTone} />
+        <Waveform
+          active={speaking}
+          color={active ? activeColor : colors.borderStrong}
+          accentColor={active ? colors.red : colors.borderStrong}
+          height={18}
+          barWidth={3}
+        />
+      </View>
+    </>
+  );
+  const tileStyle = [
+    styles.participantTile,
+    active && { borderColor: activeColor, borderWidth: 1.5 },
+    dimmed && styles.participantDimmed,
+    style,
+  ];
+
+  if (onPress) {
+    return (
+      <Pressable
+        onPress={onPress}
+        disabled={disabled}
+        accessibilityRole="button"
+        accessibilityState={{ selected: active, disabled }}
+        accessibilityLabel={name}
+        style={({ pressed }) => [styles.participantTileBase, tileStyle, pressed && styles.participantPressed]}
+      >
+        {body}
+      </Pressable>
+    );
+  }
+  return <View style={[styles.participantTileBase, tileStyle]}>{body}</View>;
+};
+
 const styles = StyleSheet.create({
   topSafeArea: {
     flex: 1,
@@ -770,15 +766,15 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontVariant: ['tabular-nums'],
   },
-  topBarCenter: {
+  topBarSpacer: {
     flex: 1,
-    marginHorizontal: space.xs,
   },
   examTitleText: {
     color: colors.white,
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
+    fontSize: 15,
+    fontWeight: '700',
+    paddingHorizontal: space.lg,
+    paddingBottom: space.xs,
   },
   levelBadge: {
     backgroundColor: colors.red,
@@ -797,8 +793,10 @@ const styles = StyleSheet.create({
     gap: 4,
     backgroundColor: colors.navyLight,
     paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingVertical: 4,
     borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.red,
   },
   endButtonPressed: {
     backgroundColor: colors.redPressed,
@@ -886,22 +884,52 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 22,
   },
-  participantsRow: {
+  examTable: {
+    gap: 6,
+  },
+  seatLabel: {
+    ...type.overline,
+    fontSize: 10,
+    textAlign: 'center',
+  },
+  examinerSeat: {
+    alignSelf: 'center',
+    width: '78%',
+    backgroundColor: colors.navySoft,
+    borderColor: colors.navySoft,
+  },
+  tableEdge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginTop: 2,
+  },
+  tableEdgeLine: {
+    flex: 1,
+    height: 2,
+    borderRadius: 1,
+    backgroundColor: colors.borderStrong,
+  },
+  candidatesRow: {
     flexDirection: 'row',
     gap: space.sm,
   },
+  participantTileBase: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   participantTile: {
     flex: 1,
-    padding: space.md,
-    gap: space.sm,
+    padding: space.sm,
+    gap: 6,
   },
-  participantCardActiveNavy: {
-    borderColor: colors.navy,
-    borderWidth: 1.5,
+  participantDimmed: {
+    opacity: 0.55,
   },
-  participantCardActiveRed: {
-    borderColor: colors.red,
-    borderWidth: 1.5,
+  participantPressed: {
+    backgroundColor: colors.surfaceMuted,
   },
   participantHeader: {
     flexDirection: 'row',
@@ -909,31 +937,15 @@ const styles = StyleSheet.create({
     gap: space.sm,
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 34,
+    height: 34,
+    borderRadius: 17,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  participantAvatarExaminer: {
-    backgroundColor: colors.navy,
-  },
-  participantAvatarPeer: {
-    backgroundColor: colors.red,
-  },
-  participantAvatarLocal: {
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.navy,
-  },
   avatarLetter: {
     color: colors.white,
-    fontSize: 16,
-    fontWeight: '800',
-  },
-  avatarLetterLocal: {
-    color: colors.navy,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '800',
   },
   participantMeta: {
@@ -956,34 +968,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: space.xs,
     flexWrap: 'wrap',
-  },
-  speakerSelectorRow: {
-    flexDirection: 'row',
-    gap: space.sm,
-  },
-  speakerSelectButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    backgroundColor: colors.surfaceMuted,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  speakerSelectButtonActive: {
-    backgroundColor: colors.navy,
-    borderColor: colors.navy,
-  },
-  speakerSelectButtonText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: colors.navy,
-  },
-  speakerSelectButtonTextActive: {
-    color: colors.white,
   },
   hintBanner: {
     flexDirection: 'row',
@@ -1023,7 +1007,7 @@ const styles = StyleSheet.create({
     marginBottom: space.xs,
   },
   dock: {
-    backgroundColor: colors.surface,
+    backgroundColor: colors.bg,
     borderTopWidth: 1,
     borderTopColor: colors.border,
     borderTopLeftRadius: radius.xl,

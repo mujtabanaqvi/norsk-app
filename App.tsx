@@ -62,7 +62,7 @@ const navigationTheme: Theme = {
     ...DefaultTheme.colors,
     primary: colors.red,
     background: colors.bg,
-    card: colors.surface,
+    card: colors.bg,
     text: colors.text,
     border: colors.border,
     notification: colors.red,
@@ -119,13 +119,13 @@ function AppNavigation() {
       <View
         style={{
           flex: 1,
-          backgroundColor: colors.white,
+          backgroundColor: colors.bg,
           alignItems: 'center',
           justifyContent: 'center',
           gap: 24,
         }}
       >
-        <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+        <StatusBar barStyle="dark-content" backgroundColor={colors.bg} />
         <Logo size={96} />
         <ActivityIndicator size="small" color={colors.red} />
       </View>
