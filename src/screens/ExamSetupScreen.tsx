@@ -15,6 +15,7 @@ import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { ApiError, fetchLearningProfile, fetchTopicsAndQuota, startExamSession } from '../api';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
+import { LOCALE_TAGS } from '../i18n';
 import type {
   CefrLevel,
   CoCandidateMode,
@@ -616,7 +617,15 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
                         : t('setup.limitReached')
                       : t('setup.resetsMidnight')}
                     {dailyTestStatus && dailyTestStatus.bonusTests > 0
-                      ? t('setup.bonus', { count: dailyTestStatus.bonusTests })
+                      ? dailyTestStatus.bonusExpiresAt
+                        ? t('setup.bonusUntil', {
+                            count: dailyTestStatus.bonusTests,
+                            date: new Date(dailyTestStatus.bonusExpiresAt).toLocaleDateString(
+                              LOCALE_TAGS[locale],
+                              { day: 'numeric', month: 'short' }
+                            ),
+                          })
+                        : t('setup.bonus', { count: dailyTestStatus.bonusTests })
                       : ''}
                   </Text>
                 </View>

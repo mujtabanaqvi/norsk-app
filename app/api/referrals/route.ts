@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/src/db';
 import { users, referralRewards } from '@/src/db/schema';
-import { eq, desc } from 'drizzle-orm';
+import { eq, desc, or } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { getReferralSettings, isRewardActiveToday } from '@/lib/tier-policy';
 import { getWebsiteBaseUrl } from '@/lib/public-links';
@@ -30,10 +30,12 @@ export async function GET(req: NextRequest) {
 
     const referralSettings = await getReferralSettings();
 
-    // Fetch referral history
-    const rewards = await db
+    // Rewards benefit both sides: those earned by referring friends, plus the welcome bonus
+    // this user got for signing up with someone else's code.
+    const allRewards = await db
       .select({
         id: referralRewards.id,
+        referrerUserId: referralRewards.referrerUserId,
         referredUserId: referralRewards.referredUserId,
         bonusTestsPerDay: referralRewards.bonusTestsPerDay,
         startsAt: referralRewards.startsAt,
@@ -41,11 +43,14 @@ export async function GET(req: NextRequest) {
         createdAt: referralRewards.createdAt,
       })
       .from(referralRewards)
-      .where(eq(referralRewards.referrerUserId, user.id))
+      .where(or(eq(referralRewards.referrerUserId, user.id), eq(referralRewards.referredUserId, user.id)))
       .orderBy(desc(referralRewards.createdAt));
 
+    const rewards = allRewards.filter((r) => r.referrerUserId === user.id);
+    const welcomeBonus = allRewards.find((r) => r.referredUserId === user.id) ?? null;
+
     const now = new Date();
-    const activeRewards = rewards.filter((r) => isRewardActiveToday(r, now));
+    const activeRewards = allRewards.filter((r) => isRewardActiveToday(r, now));
 
     return NextResponse.json({
       referralCode: user.referralCode,
@@ -57,6 +62,7 @@ export async function GET(req: NextRequest) {
         currentBonusTestsPerDay: activeRewards.reduce((sum, r) => sum + r.bonusTestsPerDay, 0),
       },
       rewards,
+      welcomeBonus,
     });
   } catch (error) {
     if (error instanceof AuthenticationError) {

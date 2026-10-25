@@ -174,7 +174,7 @@ All auth errors share one shape: `{ "error": "<CODE>", "message": "<norsk tekst>
 See [PAYMENTS.md](./PAYMENTS.md) for the full flow per platform.
 - **`POST /api/revenuecat/sync`** (authenticated): Re-reads the caller's subscriptions from RevenueCat, stores them and returns `{ tier }`. The app calls it right after a purchase or restore. There is no request body, and it never syncs another user.
 - **`POST /api/revenuecat/webhook`**: RevenueCat webhook for all stores. Requires `Authorization` equal to `REVENUECAT_WEBHOOK_AUTH` (`401` otherwise). Re-syncs `event.app_user_id` (and `transferred_from` / `transferred_to`); anonymous ids are ignored. A non-2xx response makes RevenueCat retry.
-- **`GET /api/referrals`**: Returns the authenticated user's referral code, total friends referred, and active bonus days.
+- **`GET /api/referrals`**: Returns the authenticated user's referral code and link, referral settings, stats, the rewards they earned as referrer (`rewards`) and the welcome bonus they got for signing up with a code (`welcomeBonus`, or `null`). Each reward gives **both** the referrer and the referred user `bonusTestsPerDay` extra daily tests until `expiresAt` (`durationDays` after verification).
 
 ---
 

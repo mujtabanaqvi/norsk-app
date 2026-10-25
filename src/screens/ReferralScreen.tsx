@@ -46,13 +46,17 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
+  const bonusPerDay = data?.referralSettings?.bonusDailyTests || 2;
+  const durationDays = data?.referralSettings?.durationDays || 7;
+
   const handleShare = async () => {
     if (!data?.referralCode) return;
+    const params = { code: data.referralCode, bonus: bonusPerDay, days: durationDays };
     try {
       await Share.share({
         message: data.referralLink
-          ? t('referral.shareLinkMessage', { link: data.referralLink, code: data.referralCode })
-          : t('referral.shareMessage', { code: data.referralCode }),
+          ? t('referral.shareLinkMessage', { ...params, link: data.referralLink })
+          : t('referral.shareMessage', params),
       });
     } catch (err: any) {
       console.error('Share error:', err);
@@ -95,8 +99,8 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
     );
   }
 
-  const bonusPerDay = data?.referralSettings?.bonusDailyTests || 2;
-  const durationDays = data?.referralSettings?.durationDays || 7;
+  const welcomeBonus = data?.welcomeBonus;
+  const welcomeBonusActive = welcomeBonus && new Date(welcomeBonus.expiresAt) > new Date();
 
   return (
     <Screen>
@@ -118,6 +122,12 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
             <Text style={styles.subtitle}>
               {t('referral.heroBody', { bonus: bonusPerDay, days: durationDays })}
             </Text>
+            <View style={styles.validityNote}>
+              <Icon name="time-outline" size={16} color={colors.red} />
+              <Text style={styles.validityNoteText}>
+                {t('referral.validityNote', { days: durationDays })}
+              </Text>
+            </View>
           </View>
 
           {isLoading ? (
@@ -170,6 +180,23 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
                 </View>
               </View>
 
+              {/* Welcome bonus for signing up with a friend's code */}
+              {welcomeBonusActive ? (
+                <Card style={styles.welcomeCard}>
+                  <View style={styles.rewardItemBody}>
+                    <Text style={styles.rewardItemText}>
+                      {t('referral.welcomeBonus', { count: welcomeBonus.bonusTestsPerDay })}
+                    </Text>
+                    <Text style={styles.rewardSubtext}>
+                      {t('referral.usableUntil', {
+                        date: new Date(welcomeBonus.expiresAt).toLocaleDateString(LOCALE_TAGS[locale]),
+                      })}
+                    </Text>
+                  </View>
+                  <Badge label={t('referral.active')} tone="success" />
+                </Card>
+              ) : null}
+
               {/* Stats Overview */}
               <Card style={styles.statsCard}>
                 <View style={styles.statCol}>
@@ -199,12 +226,12 @@ export const ReferralScreen: React.FC<Props> = ({ navigation }) => {
                           idx === data.rewards.length - 1 && { borderBottomWidth: 0 },
                         ]}
                       >
-                        <View>
+                        <View style={styles.rewardItemBody}>
                           <Text style={styles.rewardItemText}>
                             {t('referral.rewardTests', { count: r.bonusTestsPerDay })}
                           </Text>
                           <Text style={styles.rewardSubtext}>
-                            {t('referral.expires', {
+                            {t('referral.usableUntil', {
                               date: new Date(r.expiresAt).toLocaleDateString(LOCALE_TAGS[locale]),
                             })}
                           </Text>
@@ -268,6 +295,25 @@ const styles = StyleSheet.create({
   },
   title: {
     ...type.display,
+  },
+  validityNote: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.xs,
+    marginTop: space.sm,
+  },
+  validityNoteText: {
+    ...type.caption,
+    flex: 1,
+  },
+  welcomeCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: space.md,
+  },
+  rewardItemBody: {
+    flex: 1,
   },
   subtitle: {
     ...type.body,

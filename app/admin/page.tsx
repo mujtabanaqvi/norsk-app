@@ -1529,7 +1529,7 @@ function ReferralConfigCard({
         Verveprogram Innstillinger (Referrals)
       </h2>
       <p style={{ color: '#94A3B8', fontSize: '14px', margin: '0 0 20px 0' }}>
-        Konfigurer hvor mange ekstra tester en bruker mottar per dag når en vervet venn registrerer seg, og varigheten på bonusen.
+        Konfigurer hvor mange ekstra tester per dag både ververen og den vervede vennen mottar når vennen registrerer seg, og varigheten på bonusen.
       </p>
 
       <form onSubmit={handleSubmit}>

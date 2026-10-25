@@ -28,6 +28,8 @@ export interface DailyTestStatus {
   tier: 'FREE' | 'STANDARD' | 'PREMIUM';
   baseLimit: number;
   bonusTests: number;
+  /** When the soonest-expiring active referral bonus ends (ISO), or null without a bonus. */
+  bonusExpiresAt?: string | null;
   activeRewardsCount: number;
   totalAllowedToday: number;
   testsUsedToday: number;

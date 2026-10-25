@@ -101,28 +101,33 @@ export function isRewardActiveToday(
 }
 
 /**
- * Calculate the user's active referral bonus tests per day for today
+ * Calculate the user's active referral bonus tests per day for today.
+ * Each reward benefits both sides: the referrer and the friend who signed up with their code.
  */
 export async function getActiveReferralBonusTests(
   userId: string,
   now = new Date()
-): Promise<{ bonusTests: number; activeRewardsCount: number }> {
+): Promise<{ bonusTests: number; activeRewardsCount: number; bonusExpiresAt: string | null }> {
   try {
     const activeRewards = await db
       .select()
       .from(referralRewards)
       .where(
         and(
-          eq(referralRewards.referrerUserId, userId),
+          or(eq(referralRewards.referrerUserId, userId), eq(referralRewards.referredUserId, userId)),
           lt(referralRewards.startsAt, getEndOfCalendarDayOslo(now)),
           gte(referralRewards.expiresAt, getStartOfCalendarDayOslo(now))
         )
       );
 
     const bonusTests = activeRewards.reduce((sum, r) => sum + r.bonusTestsPerDay, 0);
-    return { bonusTests, activeRewardsCount: activeRewards.length };
+    // Earliest expiry, so the user isn't told bonus tests last longer than they do
+    const bonusExpiresAt = activeRewards.length
+      ? new Date(Math.min(...activeRewards.map((r) => new Date(r.expiresAt).getTime()))).toISOString()
+      : null;
+    return { bonusTests, activeRewardsCount: activeRewards.length, bonusExpiresAt };
   } catch {
-    return { bonusTests: 0, activeRewardsCount: 0 };
+    return { bonusTests: 0, activeRewardsCount: 0, bonusExpiresAt: null };
   }
 }
 
@@ -181,7 +186,7 @@ export async function getUserDailyTestStatus(userId: string) {
 
   // 3. Fetch referral bonuses active at any point today
   const now = new Date();
-  const { bonusTests, activeRewardsCount } = await getActiveReferralBonusTests(userId, now);
+  const { bonusTests, activeRewardsCount, bonusExpiresAt } = await getActiveReferralBonusTests(userId, now);
   const totalAllowedToday = baseLimit + bonusTests;
 
   // 4. Count tests started by this user today (Oslo calendar day) that are finished or still in
@@ -218,6 +223,7 @@ export async function getUserDailyTestStatus(userId: string) {
     tier,
     baseLimit,
     bonusTests,
+    bonusExpiresAt,
     activeRewardsCount,
     totalAllowedToday,
     testsUsedToday,
