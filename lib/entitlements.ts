@@ -3,7 +3,8 @@ import { users, subscriptions } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
 
 export type Tier = 'FREE' | 'STANDARD' | 'PREMIUM';
-export type PaymentProvider = 'STRIPE' | 'APPLE' | 'GOOGLE';
+/** PROMO = free access from a redeemed promo code; the rest are stores synced from RevenueCat. */
+export type PaymentProvider = 'STRIPE' | 'APPLE' | 'GOOGLE' | 'PROMO';
 export type SubscriptionStatus = 'INACTIVE' | 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED';
 
 const TIER_RANK: Record<Tier, number> = { FREE: 0, STANDARD: 1, PREMIUM: 2 };
@@ -31,11 +32,20 @@ export function pickEffectiveTier(rows: EntitlementRow[], now: Date = new Date()
   return best;
 }
 
-/** Provider of the subscription currently granting the user's tier, if any. */
-export function pickActiveProvider(rows: EntitlementRow[], now: Date = new Date()): PaymentProvider | null {
+/**
+ * Subscription currently granting the user's tier, if any. A paid store subscription wins over a
+ * promo grant of the same tier, since that is the one the user can manage or cancel.
+ */
+export function pickActiveSubscription(rows: EntitlementRow[], now: Date = new Date()): EntitlementRow | null {
   const tier = pickEffectiveTier(rows, now);
   if (tier === 'FREE') return null;
-  return rows.find((r) => r.tier === tier && isEntitling(r, now))?.provider ?? null;
+  const granting = rows.filter((r) => r.tier === tier && isEntitling(r, now));
+  return granting.find((r) => r.provider !== 'PROMO') ?? granting[0] ?? null;
+}
+
+/** Provider of the subscription currently granting the user's tier, if any. */
+export function pickActiveProvider(rows: EntitlementRow[], now: Date = new Date()): PaymentProvider | null {
+  return pickActiveSubscription(rows, now)?.provider ?? null;
 }
 
 export interface UpsertSubscriptionInput {
@@ -98,6 +108,27 @@ export async function recomputeUserTier(userId: string): Promise<Tier> {
   return tier;
 }
 
+/**
+ * Re-derive the tier on read. Nothing downgrades the stored tier when a period simply runs out
+ * (promo grants have no store webhook), so callers holding a paid stored tier check it here.
+ * Only writes when the tier actually changed.
+ */
+export async function refreshUserTier(userId: string, storedTier: Tier): Promise<Tier> {
+  const tier = pickEffectiveTier(await loadEntitlementRows(userId));
+  if (tier !== storedTier) {
+    await db.update(users).set({ subscriptionTier: tier, updatedAt: new Date() }).where(eq(users.id, userId));
+  }
+  return tier;
+}
+
 export async function getActiveSubscriptionProvider(userId: string): Promise<PaymentProvider | null> {
   return pickActiveProvider(await loadEntitlementRows(userId));
+}
+
+/** Provider and end date of the subscription granting the user's tier (null when on FREE). */
+export async function getActiveSubscription(
+  userId: string
+): Promise<{ provider: PaymentProvider | null; currentPeriodEnd: Date } | null> {
+  const row = pickActiveSubscription(await loadEntitlementRows(userId));
+  return row ? { provider: row.provider ?? null, currentPeriodEnd: row.currentPeriodEnd } : null;
 }

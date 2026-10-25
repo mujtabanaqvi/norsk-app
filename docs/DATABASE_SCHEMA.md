@@ -209,20 +209,48 @@ Key-value store for global system settings such as referral bonus defaults.
 | `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Last update timestamp. |
 
 ### 2.9 `subscriptions`
-Paid subscriptions synced from RevenueCat (`lib/revenuecat.ts`). `user.subscription_tier` is recomputed from these rows. See [PAYMENTS.md](./PAYMENTS.md).
+Paid subscriptions synced from RevenueCat (`lib/revenuecat.ts`), plus free grants from promo codes (`lib/promo-codes.ts`). `user.subscription_tier` is recomputed from these rows. See [PAYMENTS.md](./PAYMENTS.md).
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | `PRIMARY KEY` | Row id. |
 | `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)`, cascade delete | Owner (= RevenueCat App User ID). |
-| `provider` | `payment_provider` | `NOT NULL` | Store that sold it: `'APPLE'`, `'GOOGLE'` or `'STRIPE'` (RevenueCat Web Billing). |
-| `external_id` | `VARCHAR(512)` | `NOT NULL`, unique with `provider` | `rc:<userId>:<productId>`. |
+| `provider` | `payment_provider` | `NOT NULL` | Store that sold it: `'APPLE'`, `'GOOGLE'` or `'STRIPE'` (RevenueCat Web Billing), or `'PROMO'` for a redeemed promo code. |
+| `external_id` | `VARCHAR(512)` | `NOT NULL`, unique with `provider` | `rc:<userId>:<productId>`, or `promo:<promoCodeId>:<userId>`. |
 | `product_id` | `VARCHAR(255)` | `NULLABLE` | Store product id, e.g. `snakkly.premium.monthly`. |
 | `environment` | `VARCHAR(16)` | `NOT NULL`, `DEFAULT 'production'` | `'production'` or `'sandbox'`. |
 | `tier` | `subscription_tier` | `NOT NULL` | `'STANDARD'` or `'PREMIUM'`. |
 | `status` | `subscription_status` | `NOT NULL` | `ACTIVE`, `TRIALING`, `PAST_DUE`, `CANCELED` or `INACTIVE`. |
 | `current_period_start` / `current_period_end` | `TIMESTAMPTZ` | `NOT NULL` | Paid period; the tier applies only while `current_period_end` is in the future. |
-| `cancel_at_period_end` | `BOOLEAN` | `NOT NULL`, `DEFAULT false` | Auto-renew turned off. |
+| `cancel_at_period_end` | `BOOLEAN` | `NOT NULL`, `DEFAULT false` | Auto-renew turned off (always `true` for promo grants). |
+
+### 2.10 `promo_codes`
+Admin-created codes (admin panel → *Kampanjekoder*) that grant a paid tier for a number of months without payment. See [PAYMENTS.md](./PAYMENTS.md#promo-codes).
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY` | Code id. |
+| `code` | `VARCHAR(32)` | `NOT NULL`, `UNIQUE` | The code users type, stored uppercase (`A–Z`, `0–9`, `-`). |
+| `tier` | `subscription_tier` | `NOT NULL` | `'STANDARD'` or `'PREMIUM'`. |
+| `discount_percent` | `INTEGER` | `NOT NULL`, `DEFAULT 100` | Only `100` is redeemable today. |
+| `duration_months` | `INTEGER` | `NOT NULL` | Length of the grant from the moment of redemption. |
+| `max_redemptions` | `INTEGER` | `NULLABLE` | Total uses allowed; `NULL` = unlimited. |
+| `redemption_count` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Uses so far. |
+| `valid_from` / `expires_at` | `TIMESTAMPTZ` | `NULLABLE` | Window in which the code can be redeemed (not how long access lasts). |
+| `is_active` | `BOOLEAN` | `NOT NULL`, `DEFAULT true` | Deactivated codes can't be redeemed; existing grants keep running. |
+| `note` | `TEXT` | `NULLABLE` | Admin label, e.g. the campaign. |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Timestamps. |
+
+### 2.11 `promo_redemptions`
+One row per user per redeemed code.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY` | Row id. |
+| `promo_code_id` | `UUID` | `NOT NULL`, `FK -> promo_codes(id)`, cascade delete | Code redeemed. |
+| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)`, cascade delete | Who redeemed it. Unique with `promo_code_id`. |
+| `subscription_id` | `UUID` | `NULLABLE`, `FK -> subscriptions(id)`, set null on delete | The `PROMO` subscription row it created. |
+| `redeemed_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Redemption time. |
 
 ---
 

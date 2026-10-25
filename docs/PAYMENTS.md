@@ -255,3 +255,22 @@ Before any test:
   - Both `/api/revenuecat/sync` (the caller only) and `/api/revenuecat/webhook` (any user, checked with the Authorization header) use this function. Webhook bodies are never trusted; the subscriber is always re-read.
 - **Prices:** users are charged the store and Web Billing prices, and the app displays them. `tier_configs.price_cents` (admin panel) is only a fallback label, shown when RevenueCat can't be reached.
 - **One store per subscription:** a subscription can only be changed in the store that sold it. If the active subscription comes from another store, the buy buttons are disabled and a "managed through …" notice is shown.
+
+## Promo codes
+
+Promo codes give **Standard or Premium free for N months**, with no store and no card. Create them in the admin panel under *Kampanjekoder*: tier, months, optional max uses, optional last day to redeem, and a note.
+
+- **Redeeming:** the *Have a promo code?* card on the subscription screen calls `POST /api/promo/redeem`. [`lib/promo-codes.ts`](../lib/promo-codes.ts) checks the code and writes a `subscriptions` row with `provider = 'PROMO'`, `externalId = promo:<codeId>:<userId>` and `current_period_end = now + N months`. It then runs `recomputeUserTier()`, so a promo works like any other subscription: the highest active tier wins. RevenueCat sync only touches `rc:` rows, so it never overwrites a promo grant.
+- **Rules:**
+  - Each user can redeem a code once.
+  - `max_redemptions` is enforced under a row lock, so it can't be oversold.
+  - A code that doesn't raise the user's tier is refused (`ALREADY_HAS_TIER`). A paying Standard user can still redeem a Premium code.
+  - Deactivating a code stops new redemptions, but grants already made keep running.
+- **Expiry:** promo grants have no webhook. `getUserDailyTestStatus()` (and so `/api/auth/me` and exam start) re-derives the tier whenever the stored tier isn't FREE, so an expired grant drops back to FREE on the next request.
+- **Buying while on a promo:** a promo grant is not "managed elsewhere", so the buy buttons stay enabled. A purchase simply adds a store subscription alongside it.
+- **Not on iOS:** App Store guideline 3.1.1 doesn't allow unlocking features with our own codes inside the iOS app, so the card is hidden there. iOS users redeem on the web, and the access follows their account into the iOS app.
+- **Partial discounts (not built yet):** the store charges the price, so "50 % off Premium for 3 months" has to be a store-side offer:
+  - App Store promotional or offer codes
+  - Google Play developer-determined offers
+  - a discounted Web Billing product
+  The planned design is to put those in a separate RevenueCat offering (e.g. `promo_50_3m`), store its identifier on the promo code, and have `src/lib/purchases.ts` buy from `Purchases.getOfferings().all[id]` instead of `default`. `discount_percent` already exists in `promo_codes`, but the admin API only accepts `100` until then.

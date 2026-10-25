@@ -1,6 +1,7 @@
 import { db } from '@/src/db';
 import { tierConfigs, systemConfigs, referralRewards, examSessions, users } from '@/src/db/schema';
 import { eq, and, or, gte, lt, sql } from 'drizzle-orm';
+import { refreshUserTier } from '@/lib/entitlements';
 
 export interface TierPolicy {
   tier: 'FREE' | 'STANDARD' | 'PREMIUM';
@@ -178,7 +179,11 @@ function getOsloOffsetMs(date: Date): number {
 export async function getUserDailyTestStatus(userId: string) {
   // 1. Fetch user to check tier
   const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  const tier: 'FREE' | 'STANDARD' | 'PREMIUM' = user?.subscriptionTier || 'FREE';
+  let tier: 'FREE' | 'STANDARD' | 'PREMIUM' = user?.subscriptionTier || 'FREE';
+  // An expired subscription or promo grant leaves a stale paid tier behind, so re-check paid users
+  if (user && tier !== 'FREE') {
+    tier = await refreshUserTier(userId, tier);
+  }
 
   // 2. Fetch tier policy
   const tierPolicies = await getTierConfigs();

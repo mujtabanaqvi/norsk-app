@@ -448,6 +448,27 @@ export const en: Translations = {
       'The subscription renews automatically every month at the current price unless you cancel at least 24 hours before the end of the period. You can manage or cancel it at any time in {store}.',
     termsLink: 'Terms',
     privacyLink: 'Privacy',
+    promo: {
+      title: 'Have a promo code?',
+      body: 'Enter your code to get access for free. No card needed.',
+      label: 'Promo code',
+      placeholder: 'E.g. SPRING2026',
+      apply: 'Apply code',
+      successTitle: 'Promo code applied!',
+      successBody: 'You have {tier} for free until {date}.',
+      activeUntil: 'Free access from a promo code until {date}.',
+      errors: {
+        INVALID_CODE: "That doesn't look like a valid code.",
+        NOT_FOUND: 'No promo code matches that code.',
+        INACTIVE: 'This promo code is no longer active.',
+        NOT_STARTED: "This promo code can't be used yet.",
+        EXPIRED: 'This promo code has expired.',
+        EXHAUSTED: 'This promo code has been fully used.',
+        ALREADY_REDEEMED: "You've already used this promo code.",
+        ALREADY_HAS_TIER: 'You already have this plan or a higher one.',
+        UNSUPPORTED_DISCOUNT: "This promo code can't be used in the app yet.",
+      },
+    },
   },
 
   payment: {

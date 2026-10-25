@@ -21,7 +21,9 @@ export interface UserProfile {
   referralCode: string;
   /** Sent to the App Store / Play as appAccountToken / obfuscatedAccountId. */
   /** Which payment provider the current paid tier comes from, if any. */
-  activeSubscriptionProvider?: 'STRIPE' | 'APPLE' | 'GOOGLE' | null;
+  activeSubscriptionProvider?: 'STRIPE' | 'APPLE' | 'GOOGLE' | 'PROMO' | null;
+  /** When that subscription's current period (or promo grant) ends (ISO). */
+  activeSubscriptionEndsAt?: string | null;
 }
 
 export interface DailyTestStatus {

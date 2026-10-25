@@ -22,6 +22,16 @@ export class AuthenticationError extends Error {
 const JWT_SECRET = process.env.JWT_SECRET || 'norsk-app-dev-secret-key-change-in-prod';
 
 /**
+ * Unverified identities (raw `x-user-id` header, `user_`/`candidate_`/`test_` tokens) let a caller
+ * act as any user, so they are only honoured outside production.
+ */
+export function allowUnverifiedIdentity(env: string | undefined = process.env.NODE_ENV): boolean {
+  return env !== 'production';
+}
+
+const UNVERIFIED_TOKEN_PREFIXES = ['candidate_', 'user_', 'test_'];
+
+/**
  * Generate a JWT token for a user
  */
 export function signUserToken(user: { id: string; email: string; role?: string }): string {
@@ -54,7 +64,7 @@ import { auth as betterAuthInstance } from './better-auth';
  * Supports:
  * 1. Better Auth session (via cookies/headers)
  * 2. Bearer JWT / API Token header
- * 3. x-user-id header (for backward compatibility / dev testing)
+ * 3. x-user-id header (dev testing only, see allowUnverifiedIdentity)
  */
 export async function authenticateUser(
   request: Request | NextRequest
@@ -106,7 +116,7 @@ export async function authenticateUser(
       };
     } catch {
       // Fallback for mock/candidate token in dev/tests (e.g. user_xxx or candidate_xxx)
-      if (cleanToken.startsWith('candidate_') || cleanToken.startsWith('user_') || cleanToken.startsWith('test_')) {
+      if (allowUnverifiedIdentity() && UNVERIFIED_TOKEN_PREFIXES.some((prefix) => cleanToken.startsWith(prefix))) {
         return { userId: cleanToken };
       }
       throw new AuthenticationError('Invalid authentication token');
@@ -115,7 +125,7 @@ export async function authenticateUser(
 
   // Header-based fallback (e.g. from reverse proxy, mobile client gateway, or dev runner)
   const headerUserId = request.headers.get('x-user-id');
-  if (headerUserId && headerUserId.trim().length > 0) {
+  if (allowUnverifiedIdentity() && headerUserId && headerUserId.trim().length > 0) {
     return { userId: headerUserId.trim() };
   }
 

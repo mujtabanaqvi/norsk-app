@@ -50,6 +50,13 @@
       "when": 1792667815978,
       "tag": "0006_revenuecat",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1792955507653,
+      "tag": "0007_promo_codes",
+      "breakpoints": true
     }
   ]
 }

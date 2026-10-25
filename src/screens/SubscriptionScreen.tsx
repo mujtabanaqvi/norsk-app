@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
-import { fetchTierConfigs } from '../api';
+import { ApiError, fetchTierConfigs, redeemPromoCode } from '../api';
 import {
   buySubscription,
   getSubscriptionPackages,
@@ -24,18 +24,23 @@ import {
 import type { PaidTier } from '../lib/iap-products';
 import { useAuth } from '../hooks/useAuth';
 import { useLocale } from '../hooks/useLocale';
-import { Screen, AppHeader, Card, Badge, Button, Icon } from '../components/ui';
+import { Screen, AppHeader, Card, Badge, Button, Icon, FormField } from '../components/ui';
+import { LOCALE_TAGS, hasTranslation, type TranslationKey } from '../i18n';
 import { colors, space, type } from '../theme';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Subscription'>;
 
 export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const { user, refreshProfile } = useAuth();
-  const { t, strings } = useLocale();
+  const { t, strings, locale } = useLocale();
   const [plans, setPlans] = useState<any>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [storePrices, setStorePrices] = useState<Partial<Record<PaidTier, string>>>({});
+  const [promoCode, setPromoCode] = useState('');
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoSuccess, setPromoSuccess] = useState<string | null>(null);
+  const [isRedeeming, setIsRedeeming] = useState(false);
 
   // Show RevenueCat's localized store / Web Billing price, which is what the user is actually charged.
   // Packages are only available once App.tsx has identified the logged-in user to RevenueCat.
@@ -69,7 +74,12 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const activeProvider = user?.activeSubscriptionProvider ?? null;
   // RevenueCat unifies entitlements, but a subscription can still only be changed in the store that sold it.
   const thisPlatformProvider = Platform.OS === 'ios' ? 'APPLE' : Platform.OS === 'android' ? 'GOOGLE' : 'STRIPE';
-  const managedElsewhere = activeProvider !== null && activeProvider !== thisPlatformProvider;
+  // A promo grant isn't a store subscription, so it never blocks buying a plan
+  const managedElsewhere = activeProvider !== null && activeProvider !== 'PROMO' && activeProvider !== thisPlatformProvider;
+  // Apple doesn't allow unlocking features with our own codes in the iOS app; iOS users redeem on the web
+  const canRedeemPromo = Boolean(user) && Platform.OS !== 'ios';
+  const formatDate = (iso: string) =>
+    new Date(iso).toLocaleDateString(LOCALE_TAGS[locale], { day: 'numeric', month: 'long', year: 'numeric' });
   const storeLabel = (provider: string) =>
     provider === 'APPLE'
       ? t('subscription.storeApple')
@@ -109,6 +119,29 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
       }
     } finally {
       setIsProcessing(false);
+    }
+  };
+
+  const handleRedeemPromo = async () => {
+    if (!promoCode.trim()) return;
+    setIsRedeeming(true);
+    setPromoError(null);
+    setPromoSuccess(null);
+    try {
+      const result = await redeemPromoCode(promoCode);
+      await refreshProfile();
+      setPromoCode('');
+      setPromoSuccess(
+        t('subscription.promo.successBody', {
+          tier: result.grantedTier === 'PREMIUM' ? 'Premium' : 'Standard',
+          date: formatDate(result.expiresAt),
+        })
+      );
+    } catch (err: any) {
+      const key = `subscription.promo.errors.${err instanceof ApiError ? err.code : ''}`;
+      setPromoError(hasTranslation(key) ? t(key as TranslationKey) : err.message || t('common.unknownError'));
+    } finally {
+      setIsRedeeming(false);
     }
   };
 
@@ -191,6 +224,15 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   <Icon name="information-circle-outline" size={20} color={colors.navy} />
                   <Text style={styles.noticeText}>
                     {t('subscription.managedBy', { store: storeLabel(activeProvider) })}
+                  </Text>
+                </Card>
+              )}
+
+              {activeProvider === 'PROMO' && user?.activeSubscriptionEndsAt && (
+                <Card style={styles.noticeCard}>
+                  <Icon name="gift-outline" size={20} color={colors.navy} />
+                  <Text style={styles.noticeText}>
+                    {t('subscription.promo.activeUntil', { date: formatDate(user.activeSubscriptionEndsAt) })}
                   </Text>
                 </Card>
               )}
@@ -310,6 +352,46 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                   onPress={() => handleSubscribe('PREMIUM')}
                 />
               </Card>
+
+              {canRedeemPromo && (
+                <Card style={styles.planCard}>
+                  <Text style={styles.planName}>{t('subscription.promo.title')}</Text>
+                  <Text style={[styles.subtitle, styles.promoBody]}>{t('subscription.promo.body')}</Text>
+                  <FormField
+                    label={t('subscription.promo.label')}
+                    placeholder={t('subscription.promo.placeholder')}
+                    value={promoCode}
+                    onChangeText={(value) => {
+                      setPromoCode(value);
+                      setPromoError(null);
+                    }}
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    returnKeyType="done"
+                    onSubmitEditing={handleRedeemPromo}
+                    error={promoError}
+                  />
+                  {promoSuccess && (
+                    <View style={styles.promoSuccess}>
+                      <Icon name="checkmark-circle" size={18} color={colors.success} />
+                      <Text style={styles.featureText}>
+                        <Text style={styles.promoSuccessTitle}>{t('subscription.promo.successTitle')} </Text>
+                        {promoSuccess}
+                      </Text>
+                    </View>
+                  )}
+                  <Button
+                    title={t('subscription.promo.apply')}
+                    variant="secondary"
+                    size="lg"
+                    fullWidth
+                    icon="gift-outline"
+                    disabled={!promoCode.trim() || isRedeeming || isProcessing}
+                    loading={isRedeeming}
+                    onPress={handleRedeemPromo}
+                  />
+                </Card>
+              )}
 
               <View style={styles.footer}>
                 {isPurchasingSupported && (
@@ -445,6 +527,19 @@ const styles = StyleSheet.create({
     ...type.body,
     color: colors.text,
     flex: 1,
+  },
+  promoBody: {
+    marginTop: space.xs,
+    marginBottom: space.lg,
+  },
+  promoSuccess: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginBottom: space.lg,
+  },
+  promoSuccessTitle: {
+    fontWeight: '700',
   },
   noticeCard: {
     flexDirection: 'row',

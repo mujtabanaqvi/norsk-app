@@ -53,7 +53,7 @@ export default function AdminPortalPage() {
   const [isSavingTheme, setIsSavingTheme] = useState<boolean>(false);
 
   // Tab navigation
-  const [activeTab, setActiveTab] = useState<'EXAMS' | 'CONFIG'>('EXAMS');
+  const [activeTab, setActiveTab] = useState<'EXAMS' | 'CONFIG' | 'PROMO'>('EXAMS');
 
   // Config tab state
   const [tierPolicies, setTierPolicies] = useState<any>(null);
@@ -670,6 +670,21 @@ export default function AdminPortalPage() {
           >
             ⚙️ Abonnement &amp; Verveinnstillinger
           </button>
+          <button
+            onClick={() => setActiveTab('PROMO')}
+            style={{
+              padding: '10px 18px',
+              borderRadius: '8px',
+              border: 'none',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '14px',
+              backgroundColor: activeTab === 'PROMO' ? '#0284C7' : '#1E293B',
+              color: activeTab === 'PROMO' ? '#FFFFFF' : '#94A3B8',
+            }}
+          >
+            🎟️ Kampanjekoder
+          </button>
         </div>
 
         {/* Metrics Row */}
@@ -1160,6 +1175,18 @@ export default function AdminPortalPage() {
           </div>
         )}
         </div>
+        ) : activeTab === 'PROMO' ? (
+          <PromoCodesPanel
+            request={adminJsonRequest}
+            onError={(message) => {
+              setSuccessBanner(null);
+              setGlobalError(message);
+            }}
+            onSuccess={(message) => {
+              setGlobalError(null);
+              setSuccessBanner(message);
+            }}
+          />
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
               <div
@@ -1576,6 +1603,288 @@ function ReferralConfigCard({
           </div>
         </div>
       </form>
+    </div>
+  );
+}
+
+interface AdminPromoCode {
+  id: string;
+  code: string;
+  tier: 'STANDARD' | 'PREMIUM';
+  discountPercent: number;
+  durationMonths: number;
+  maxRedemptions: number | null;
+  redemptionCount: number;
+  validFrom: string | null;
+  expiresAt: string | null;
+  isActive: boolean;
+  note: string | null;
+  createdAt: string;
+}
+
+interface PromoCodesPanelProps {
+  request: (url: string, method: string, body?: unknown) => Promise<any>;
+  onError: (message: string) => void;
+  onSuccess: (message: string) => void;
+}
+
+/** `<input type="date">` value → end of that day in the admin's timezone, so the code works all day. */
+function endOfDayIso(date: string): string | null {
+  return date ? new Date(`${date}T23:59:59`).toISOString() : null;
+}
+
+function formatAdminDate(iso: string | null): string {
+  return iso ? new Date(iso).toLocaleDateString('nb-NO', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
+}
+
+function PromoCodesPanel({ request, onError, onSuccess }: PromoCodesPanelProps) {
+  const [codes, setCodes] = useState<AdminPromoCode[]>([]);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+  const [code, setCode] = useState<string>('');
+  const [tier, setTier] = useState<'STANDARD' | 'PREMIUM'>('PREMIUM');
+  const [durationMonths, setDurationMonths] = useState<number>(1);
+  const [maxRedemptions, setMaxRedemptions] = useState<string>('');
+  const [expiresAt, setExpiresAt] = useState<string>('');
+  const [note, setNote] = useState<string>('');
+
+  const loadCodes = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const data = await request('/api/admin/promo-codes', 'GET');
+      setCodes(Array.isArray(data.promoCodes) ? data.promoCodes : []);
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Kunne ikke laste kampanjekoder');
+    } finally {
+      setIsLoading(false);
+    }
+    // `request` closes over the admin secret, which can't change while this tab is open
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    loadCodes();
+  }, [loadCodes]);
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSaving(true);
+    try {
+      const data = await request('/api/admin/promo-codes', 'POST', {
+        code: code.trim() || undefined,
+        tier,
+        discountPercent: 100,
+        durationMonths,
+        maxRedemptions: maxRedemptions ? parseInt(maxRedemptions, 10) : null,
+        expiresAt: endOfDayIso(expiresAt),
+        note: note.trim() || null,
+      });
+      onSuccess(`Kampanjekode «${data.promoCode.code}» ble opprettet.`);
+      setCode('');
+      setMaxRedemptions('');
+      setExpiresAt('');
+      setNote('');
+      await loadCodes();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Kunne ikke opprette kampanjekode');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleToggleActive = async (promo: AdminPromoCode) => {
+    try {
+      await request(`/api/admin/promo-codes/${promo.id}`, 'PATCH', { isActive: !promo.isActive });
+      onSuccess(`«${promo.code}» er ${promo.isActive ? 'deaktivert' : 'aktivert'}.`);
+      await loadCodes();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Kunne ikke oppdatere kampanjekode');
+    }
+  };
+
+  const handleDelete = async (promo: AdminPromoCode) => {
+    if (!window.confirm(`Slette kampanjekoden «${promo.code}»?`)) return;
+    try {
+      await request(`/api/admin/promo-codes/${promo.id}`, 'DELETE');
+      onSuccess(`«${promo.code}» ble slettet.`);
+      await loadCodes();
+    } catch (err) {
+      onError(err instanceof Error ? err.message : 'Kunne ikke slette kampanjekode');
+    }
+  };
+
+  const cellStyle: React.CSSProperties = {
+    padding: '10px 12px',
+    borderBottom: '1px solid #334155',
+    fontSize: '14px',
+    textAlign: 'left',
+  };
+  const headStyle: React.CSSProperties = {
+    ...cellStyle,
+    color: '#94A3B8',
+    fontSize: '12px',
+    fontWeight: 600,
+    textTransform: 'uppercase',
+  };
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+      <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #334155' }}>
+        <h2 style={{ fontSize: '20px', fontWeight: 800, margin: '0 0 6px 0' }}>Ny kampanjekode</h2>
+        <p style={{ color: '#94A3B8', fontSize: '14px', margin: '0 0 20px 0' }}>
+          Gir Standard eller Premium gratis i et valgt antall måneder, uten betalingskort. Koden kan brukes på nett og
+          Android (Apple tillater ikke egne koder i iOS-appen). Delvis rabatt støttes ikke ennå.
+        </p>
+
+        <form onSubmit={handleCreate}>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
+              gap: '16px',
+              alignItems: 'end',
+            }}
+          >
+            <div>
+              <label style={styles.label}>Kode (tom = generer):</label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                placeholder="F.eks. VAAR2026"
+                maxLength={32}
+                style={{ ...styles.input, marginBottom: 0 }}
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Plan:</label>
+              <select
+                value={tier}
+                onChange={(e) => setTier(e.target.value as 'STANDARD' | 'PREMIUM')}
+                style={{ ...styles.select, marginBottom: 0 }}
+              >
+                <option value="STANDARD">Standard</option>
+                <option value="PREMIUM">Premium</option>
+              </select>
+            </div>
+            <div>
+              <label style={styles.label}>Rabatt:</label>
+              <input type="text" value="100 %" disabled style={{ ...styles.input, marginBottom: 0, opacity: 0.6 }} />
+            </div>
+            <div>
+              <label style={styles.label}>Varighet (måneder):</label>
+              <input
+                type="number"
+                min="1"
+                max="24"
+                value={durationMonths}
+                onChange={(e) => setDurationMonths(Math.min(24, Math.max(1, parseInt(e.target.value, 10) || 1)))}
+                style={{ ...styles.input, marginBottom: 0 }}
+                required
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Maks antall bruk (tom = ubegrenset):</label>
+              <input
+                type="number"
+                min="1"
+                value={maxRedemptions}
+                onChange={(e) => setMaxRedemptions(e.target.value)}
+                style={{ ...styles.input, marginBottom: 0 }}
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Kan brukes til og med (valgfri):</label>
+              <input
+                type="date"
+                value={expiresAt}
+                onChange={(e) => setExpiresAt(e.target.value)}
+                style={{ ...styles.input, marginBottom: 0 }}
+              />
+            </div>
+            <div>
+              <label style={styles.label}>Notat (valgfri):</label>
+              <input
+                type="text"
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder="F.eks. Influencer-kampanje"
+                style={{ ...styles.input, marginBottom: 0 }}
+              />
+            </div>
+            <div>
+              <button type="submit" disabled={isSaving} style={{ ...styles.primaryButton, width: '100%' }}>
+                {isSaving ? 'Oppretter...' : 'Opprett kode'}
+              </button>
+            </div>
+          </div>
+        </form>
+      </div>
+
+      <div style={{ backgroundColor: '#1E293B', padding: '24px', borderRadius: '12px', border: '1px solid #334155' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+          <h2 style={{ fontSize: '20px', fontWeight: 800, margin: 0 }}>Kampanjekoder</h2>
+          <button
+            onClick={loadCodes}
+            disabled={isLoading}
+            style={{ ...styles.secondaryButton, padding: '8px 14px', fontSize: '13px' }}
+          >
+            {isLoading ? 'Oppdaterer...' : '↻ Oppfrisk'}
+          </button>
+        </div>
+
+        {codes.length === 0 ? (
+          <div style={{ padding: '24px 0', textAlign: 'center', color: '#94A3B8' }}>
+            {isLoading ? 'Laster inn kampanjekoder...' : 'Ingen kampanjekoder ennå.'}
+          </div>
+        ) : (
+          <div style={{ overflowX: 'auto' }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+              <thead>
+                <tr>
+                  <th style={headStyle}>Kode</th>
+                  <th style={headStyle}>Plan</th>
+                  <th style={headStyle}>Måneder</th>
+                  <th style={headStyle}>Brukt</th>
+                  <th style={headStyle}>Utløper</th>
+                  <th style={headStyle}>Notat</th>
+                  <th style={headStyle}>Status</th>
+                  <th style={headStyle}></th>
+                </tr>
+              </thead>
+              <tbody>
+                {codes.map((promo) => (
+                  <tr key={promo.id}>
+                    <td style={{ ...cellStyle, fontFamily: 'monospace', fontWeight: 700 }}>{promo.code}</td>
+                    <td style={{ ...cellStyle, color: promo.tier === 'PREMIUM' ? '#F59E0B' : '#38BDF8' }}>
+                      {promo.tier === 'PREMIUM' ? 'Premium' : 'Standard'}
+                    </td>
+                    <td style={cellStyle}>{promo.durationMonths}</td>
+                    <td style={cellStyle}>
+                      {promo.redemptionCount} / {promo.maxRedemptions ?? '∞'}
+                    </td>
+                    <td style={cellStyle}>{formatAdminDate(promo.expiresAt)}</td>
+                    <td style={{ ...cellStyle, color: '#94A3B8' }}>{promo.note || '—'}</td>
+                    <td style={{ ...cellStyle, color: promo.isActive ? '#4ADE80' : '#94A3B8' }}>
+                      {promo.isActive ? 'Aktiv' : 'Inaktiv'}
+                    </td>
+                    <td style={{ ...cellStyle, whiteSpace: 'nowrap' }}>
+                      <button onClick={() => handleToggleActive(promo)} style={styles.actionButton}>
+                        {promo.isActive ? 'Deaktiver' : 'Aktiver'}
+                      </button>{' '}
+                      {promo.redemptionCount === 0 && (
+                        <button onClick={() => handleDelete(promo)} style={styles.actionButtonDanger}>
+                          Slett
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

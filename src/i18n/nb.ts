@@ -456,6 +456,27 @@ export const nb = {
       'Abonnementet fornyes automatisk hver måned til gjeldende pris, med mindre du avslutter det senest 24 timer før periodens slutt. Du kan administrere og avslutte abonnementet når som helst i {store}.',
     termsLink: 'Vilkår',
     privacyLink: 'Personvern',
+    promo: {
+      title: 'Har du en kampanjekode?',
+      body: 'Skriv inn koden for å få tilgang gratis. Du trenger ikke betalingskort.',
+      label: 'Kampanjekode',
+      placeholder: 'F.eks. VÅR2026',
+      apply: 'Bruk kode',
+      successTitle: 'Kampanjekoden er aktivert!',
+      successBody: 'Du har {tier} gratis til {date}.',
+      activeUntil: 'Gratis tilgang via kampanjekode til {date}.',
+      errors: {
+        INVALID_CODE: 'Det ser ikke ut som en gyldig kode.',
+        NOT_FOUND: 'Fant ingen kampanjekode med denne koden.',
+        INACTIVE: 'Denne kampanjekoden er ikke lenger aktiv.',
+        NOT_STARTED: 'Denne kampanjekoden kan ikke brukes ennå.',
+        EXPIRED: 'Denne kampanjekoden har utløpt.',
+        EXHAUSTED: 'Denne kampanjekoden er brukt opp.',
+        ALREADY_REDEEMED: 'Du har allerede brukt denne kampanjekoden.',
+        ALREADY_HAS_TIER: 'Du har allerede denne planen eller en høyere.',
+        UNSUPPORTED_DISCOUNT: 'Denne kampanjekoden kan ikke brukes i appen ennå.',
+      },
+    },
   },
 
   payment: {

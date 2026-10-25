@@ -548,3 +548,24 @@ export async function syncSubscription(): Promise<PaidTierResult> {
   }
   return data;
 }
+
+export interface PromoRedemptionResponse {
+  tier: 'FREE' | 'STANDARD' | 'PREMIUM';
+  grantedTier: 'STANDARD' | 'PREMIUM';
+  expiresAt: string;
+}
+
+/** Redeem a promo code for the logged-in user; the error's `code` is a PromoErrorCode. */
+export async function redeemPromoCode(code: string): Promise<PromoRedemptionResponse> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/promo/redeem`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ code }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    // This route puts its machine-readable code in `code`, not `error`.
+    throw new ApiError(res.status, { ...data, error: data.code ?? data.error }, tr('common.unknownError'));
+  }
+  return data;
+}

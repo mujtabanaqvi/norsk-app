@@ -4,7 +4,7 @@ import { users } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { getUserDailyTestStatus } from '@/lib/tier-policy';
-import { getActiveSubscriptionProvider } from '@/lib/entitlements';
+import { getActiveSubscription } from '@/lib/entitlements';
 
 export async function GET(req: NextRequest) {
   try {
@@ -30,13 +30,17 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'User Not Found' }, { status: 404 });
     }
 
-    const [testQuota, activeSubscriptionProvider] = await Promise.all([
-      getUserDailyTestStatus(user.id),
-      getActiveSubscriptionProvider(user.id),
-    ]);
+    // Sequential: the quota check re-derives the tier (e.g. an expired promo), which the rest relies on
+    const testQuota = await getUserDailyTestStatus(user.id);
+    const activeSubscription = await getActiveSubscription(user.id);
 
     return NextResponse.json({
-      user: { ...user, activeSubscriptionProvider },
+      user: {
+        ...user,
+        subscriptionTier: testQuota.tier,
+        activeSubscriptionProvider: activeSubscription?.provider ?? null,
+        activeSubscriptionEndsAt: activeSubscription?.currentPeriodEnd.toISOString() ?? null,
+      },
       testQuota,
     });
   } catch (error) {

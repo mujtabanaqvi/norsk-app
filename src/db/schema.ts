@@ -35,7 +35,8 @@ export const subscriptionStatusEnum = pgEnum('subscription_status', [
   'PAST_DUE',
   'CANCELED',
 ]);
-export const paymentProviderEnum = pgEnum('payment_provider', ['STRIPE', 'APPLE', 'GOOGLE']);
+// PROMO = free access granted by redeeming a promo code (no store involved)
+export const paymentProviderEnum = pgEnum('payment_provider', ['STRIPE', 'APPLE', 'GOOGLE', 'PROMO']);
 
 // Transcript structure stored in JSONB
 export interface TranscriptEntry {
@@ -313,7 +314,7 @@ export const subscriptions = pgTable('subscriptions', {
     .references(() => users.id, { onDelete: 'cascade' }),
   // Store the subscription was bought in (STRIPE = RevenueCat Web Billing); all of them are synced from RevenueCat
   provider: paymentProviderEnum('provider').notNull().default('STRIPE'),
-  // `rc:<userId>:<productId>`, one row per RevenueCat subscription
+  // `rc:<userId>:<productId>`, one row per RevenueCat subscription; `promo:<promoCodeId>:<userId>` for promo grants
   externalId: varchar('external_id', { length: 512 }).notNull(),
   productId: varchar('product_id', { length: 255 }),
   environment: varchar('environment', { length: 16 }).notNull().default('production'),
@@ -375,6 +376,48 @@ export const systemConfigs = pgTable('system_configs', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+/**
+ * 11. promo_codes Table (Admin-created codes that grant a paid tier for a number of months)
+ */
+export const promoCodes = pgTable('promo_codes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  code: varchar('code', { length: 32 }).notNull().unique(), // stored uppercase
+  tier: subscriptionTierEnum('tier').notNull(),
+  // Only 100 is redeemable today; partial discounts will need a store-side offer
+  discountPercent: integer('discount_percent').notNull().default(100),
+  durationMonths: integer('duration_months').notNull(),
+  maxRedemptions: integer('max_redemptions'), // null = unlimited
+  redemptionCount: integer('redemption_count').notNull().default(0),
+  validFrom: timestamp('valid_from', { withTimezone: true }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  isActive: boolean('is_active').notNull().default(true),
+  note: text('note'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+/**
+ * 12. promo_redemptions Table (One row per user per redeemed code)
+ */
+export const promoRedemptions = pgTable(
+  'promo_redemptions',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    promoCodeId: uuid('promo_code_id')
+      .notNull()
+      .references(() => promoCodes.id, { onDelete: 'cascade' }),
+    userId: varchar('user_id', { length: 128 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    subscriptionId: uuid('subscription_id').references(() => subscriptions.id, { onDelete: 'set null' }),
+    redeemedAt: timestamp('redeemed_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_promo_redemptions_code_user').on(table.promoCodeId, table.userId),
+    index('idx_promo_redemptions_user_id').on(table.userId),
+  ]
+);
+
 // Drizzle Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   oauthAccounts: many(oauthAccounts),
@@ -382,6 +425,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   sessions: many(examSessions),
   earnedRewards: many(referralRewards, { relationName: 'referrer' }),
   referredRewards: many(referralRewards, { relationName: 'referred' }),
+  promoRedemptions: many(promoRedemptions),
   referredBy: one(users, {
     fields: [users.referredByUserId],
     references: [users.id],
@@ -413,6 +457,25 @@ export const referralRewardsRelations = relations(referralRewards, ({ one }) => 
     fields: [referralRewards.referredUserId],
     references: [users.id],
     relationName: 'referred',
+  }),
+}));
+
+export const promoCodesRelations = relations(promoCodes, ({ many }) => ({
+  redemptions: many(promoRedemptions),
+}));
+
+export const promoRedemptionsRelations = relations(promoRedemptions, ({ one }) => ({
+  promoCode: one(promoCodes, {
+    fields: [promoRedemptions.promoCodeId],
+    references: [promoCodes.id],
+  }),
+  user: one(users, {
+    fields: [promoRedemptions.userId],
+    references: [users.id],
+  }),
+  subscription: one(subscriptions, {
+    fields: [promoRedemptions.subscriptionId],
+    references: [subscriptions.id],
   }),
 }));
 
@@ -501,3 +564,9 @@ export type NewLearningProfile = typeof learningProfiles.$inferInsert;
 
 export type UsageLedgerEntry = typeof usageLedger.$inferSelect;
 export type NewUsageLedgerEntry = typeof usageLedger.$inferInsert;
+
+export type PromoCode = typeof promoCodes.$inferSelect;
+export type NewPromoCode = typeof promoCodes.$inferInsert;
+
+export type PromoRedemption = typeof promoRedemptions.$inferSelect;
+export type NewPromoRedemption = typeof promoRedemptions.$inferInsert;
