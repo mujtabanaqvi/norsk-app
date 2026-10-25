@@ -332,6 +332,30 @@ export async function finishExamSession(sessionId: string): Promise<FinishExamRe
   return res.json();
 }
 
+/** Cancel an exam without evaluation (Del 1 only). The session is deleted and uses no daily slot. */
+export async function cancelExamSession(sessionId: string): Promise<void> {
+  const userId = await getOrCreateUserId();
+  const res = await fetchWithTimeout(
+    `${activeApiBaseUrl}/api/exam/${encodeURIComponent(sessionId)}/cancel`,
+    {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'x-user-id': userId,
+      },
+    }
+  );
+
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new ApiError(
+      res.status,
+      body,
+      body.message || body.error || tr('network.cancelExam', { status: res.status })
+    );
+  }
+}
+
 export async function fetchExamResults(sessionId: string): Promise<ExamResultsResponse> {
   const userId = await getOrCreateUserId();
   const res = await fetchWithTimeout(

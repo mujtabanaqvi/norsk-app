@@ -11,6 +11,7 @@ import {
 import {
   submitExamTurn,
   finishExamSession,
+  cancelExamSession,
   resolveAudioUrl,
 } from '../api';
 import { getAuthToken } from '../identity';
@@ -552,6 +553,24 @@ export function useExamTurns({
     }
   }, [onExamComplete, releaseRecorder, sessionId]);
 
+  /**
+   * Cancel the exam without evaluation (Del 1 only). The server deletes the session, so it
+   * doesn't use a daily test slot. Throws if the server refuses (e.g. Del 2 already started).
+   */
+  const cancelExam = useCallback(async () => {
+    if (activePlayerRef.current) {
+      try {
+        activePlayerRef.current.pause();
+        activePlayerRef.current.remove();
+      } catch {
+        // Ignore
+      }
+      activePlayerRef.current = null;
+    }
+    await releaseRecorder();
+    await cancelExamSession(sessionId);
+  }, [releaseRecorder, sessionId]);
+
   const dismissError = useCallback(() => {
     setErrorMessage(null);
     setPhase('listening');
@@ -575,6 +594,7 @@ export function useExamTurns({
     skipCurrentSpeech,
     endHumanDiscussion,
     endExamEarly,
+    cancelExam,
     dismissError,
   };
 }

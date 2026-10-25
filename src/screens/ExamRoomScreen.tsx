@@ -70,6 +70,7 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
     skipCurrentSpeech,
     endHumanDiscussion,
     endExamEarly,
+    cancelExam,
     dismissError,
   } = useExamTurns({
     sessionId,
@@ -163,6 +164,57 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
     );
   };
 
+  // Cancelling (no assessment, no daily slot used) is only possible before the Del 2 discussion
+  const [isCancelling, setIsCancelling] = useState<boolean>(false);
+  const canCancel = stage === 'DEL_1' && phase !== 'thinking' && phase !== 'done' && !isCancelling;
+
+  const runCancelExam = async () => {
+    setIsCancelling(true);
+    try {
+      await cancelExam();
+      hasNavigatedRef.current = true;
+      if (navigation.canGoBack()) {
+        navigation.goBack();
+      } else {
+        navigation.navigate('ExamSetup');
+      }
+    } catch (err) {
+      setIsCancelling(false);
+      const message = err instanceof Error ? err.message : t('network.cancelExam', { status: '' });
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        window.alert(message);
+      } else {
+        Alert.alert(t('room.cancelFailedTitle'), message);
+      }
+    }
+  };
+
+  const handleConfirmCancelExam = () => {
+    if (!canCancel) return;
+
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      if (window.confirm(t('room.cancelConfirmBody'))) {
+        runCancelExam();
+      }
+      return;
+    }
+
+    Alert.alert(
+      t('room.cancelConfirmTitle'),
+      t('room.cancelConfirmBody'),
+      [
+        { text: t('room.cancelKeepGoing'), style: 'cancel' },
+        {
+          text: t('room.cancelConfirmAction'),
+          style: 'destructive',
+          onPress: () => {
+            runCancelExam();
+          },
+        },
+      ]
+    );
+  };
+
   const toggleDrawer = () => {
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setIsDrawerExpanded(!isDrawerExpanded);
@@ -219,6 +271,27 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
           <View style={styles.levelBadge}>
             <Text style={styles.levelBadgeText}>{level}</Text>
           </View>
+
+          <Pressable
+            onPress={handleConfirmCancelExam}
+            disabled={!canCancel}
+            style={({ pressed }) => [
+              styles.cancelButton,
+              pressed && styles.cancelButtonPressed,
+              !canCancel && styles.cancelButtonDisabled,
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={t('room.cancelExam')}
+            accessibilityState={{ disabled: !canCancel }}
+            hitSlop={6}
+          >
+            {isCancelling ? (
+              <ActivityIndicator size="small" color={colors.white} />
+            ) : (
+              <Icon name="close" size={16} color={colors.white} />
+            )}
+            <Text style={styles.endButtonText}>{t('room.cancelShort')}</Text>
+          </Pressable>
 
           <Pressable
             onPress={handleConfirmEndExam}
@@ -800,6 +873,23 @@ const styles = StyleSheet.create({
   },
   endButtonPressed: {
     backgroundColor: colors.redPressed,
+  },
+  cancelButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: colors.navyLight,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.navySoft,
+  },
+  cancelButtonPressed: {
+    backgroundColor: colors.navy,
+  },
+  cancelButtonDisabled: {
+    opacity: 0.4,
   },
   endButtonText: {
     color: colors.white,

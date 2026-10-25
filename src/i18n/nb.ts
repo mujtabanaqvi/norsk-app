@@ -257,6 +257,14 @@ export const nb = {
     endConfirmBody:
       'Er du sikker på at du vil avslutte prøven? Sensoren vil umiddelbart generere vurderingen din.',
     endConfirmAction: 'Avslutt og få vurdering',
+    cancelExam: 'Avbryt prøve uten vurdering',
+    cancelShort: 'Avbryt',
+    cancelConfirmTitle: 'Avbryt prøve',
+    cancelConfirmBody:
+      'Vil du avbryte prøven uten vurdering? Den blir slettet og teller ikke med i dagens tester.',
+    cancelConfirmAction: 'Avbryt prøve',
+    cancelKeepGoing: 'Fortsett prøven',
+    cancelFailedTitle: 'Kunne ikke avbryte',
     micPermission:
       'Mikrofontilgang er nødvendig for muntlig prøve. Vennligst gi tilgang i innstillingene.',
     micStartFailed: 'Kunne ikke starte mikrofonopptak.',
@@ -634,6 +642,7 @@ export const nb = {
 
   /** Keyed by the API's machine-readable `error` code. */
   apiErrors: {
+    CANCEL_NOT_ALLOWED: 'Prøven kan bare avbrytes før samtalen i del 2 starter.',
     INVALID_CREDENTIALS: 'Feil e-post eller passord',
     EMAIL_NOT_VERIFIED: 'Du må bekrefte e-postadressen din før du kan logge inn.',
     EMAIL_TAKEN: 'E-postadressen er allerede registrert. Prøv å logge inn.',
@@ -666,6 +675,7 @@ export const nb = {
     submitTurn: 'Feil ved innsending ({status})',
     uploadAudio: 'Kunne ikke sende lydopptak ({status})',
     finishExam: 'Kunne ikke avslutte prøve ({status})',
+    cancelExam: 'Kunne ikke avbryte prøve ({status})',
     sessionNotFound: 'Eksamensesjonen ble ikke funnet.',
     fetchResult: 'Kunne ikke hente resultat ({status})',
     registerFailed: 'Registrering mislyktes',

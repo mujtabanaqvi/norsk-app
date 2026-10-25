@@ -34,6 +34,8 @@ export interface DailyTestStatus {
   remainingToday: number;
   canStartTest: boolean;
   resetsAt: string;
+  /** Next Oslo midnight as an ISO timestamp. */
+  resetsAtIso?: string;
 }
 
 export interface RegisterParams {

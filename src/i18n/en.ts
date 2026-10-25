@@ -249,6 +249,14 @@ export const en: Translations = {
     endConfirmBody:
       'Are you sure you want to end the test? The examiner will immediately generate your assessment.',
     endConfirmAction: 'End and get assessment',
+    cancelExam: 'Cancel test without assessment',
+    cancelShort: 'Cancel',
+    cancelConfirmTitle: 'Cancel test',
+    cancelConfirmBody:
+      'Cancel the test without an assessment? It will be deleted and will not count towards your tests today.',
+    cancelConfirmAction: 'Cancel test',
+    cancelKeepGoing: 'Continue test',
+    cancelFailedTitle: 'Could not cancel',
     micPermission:
       'Microphone access is required for the oral test. Please allow access in your settings.',
     micStartFailed: 'Could not start the microphone recording.',
@@ -621,6 +629,7 @@ export const en: Translations = {
   },
 
   apiErrors: {
+    CANCEL_NOT_ALLOWED: 'The test can only be cancelled before the discussion in Part 2 starts.',
     INVALID_CREDENTIALS: 'Wrong email or password',
     EMAIL_NOT_VERIFIED: 'You need to verify your email address before you can log in.',
     EMAIL_TAKEN: 'This email address is already registered. Try logging in.',
@@ -652,6 +661,7 @@ export const en: Translations = {
     submitTurn: 'Error while sending ({status})',
     uploadAudio: 'Could not send the audio recording ({status})',
     finishExam: 'Could not finish the test ({status})',
+    cancelExam: 'Could not cancel the test ({status})',
     sessionNotFound: 'The exam session was not found.',
     fetchResult: 'Could not load the result ({status})',
     registerFailed: 'Registration failed',

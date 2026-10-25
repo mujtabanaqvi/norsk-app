@@ -137,6 +137,9 @@ Finalizes an exam session, writes an atomic transaction to `exam_sessions`, `usa
 }
 ```
 
+### `POST /api/exam/[sessionId]/cancel`
+Cancels an exam without evaluation. Only allowed while the session is `ACTIVE` and still in Del 1 (`DEL1_MONOLOGUE`). The session row is deleted, so it never uses a daily test slot; its AI usage (`engineState.usage`) is still added to the `user_quotas` cost totals. Audio seconds already used are not refunded. Returns `200 { "sessionId": "...", "status": "CANCELLED" }`. Errors: `403` (not the owner), `404` (not found / already cancelled), `409 CANCEL_NOT_ALLOWED` (Del 2 has started or the exam is finished).
+
 ---
 
 ## 6. `GET /api/exam/[sessionId]/results`

@@ -3,7 +3,7 @@ import { db } from '@/src/db';
 import { users, referralRewards } from '@/src/db/schema';
 import { eq, desc } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
-import { getReferralSettings } from '@/lib/tier-policy';
+import { getReferralSettings, isRewardActiveToday } from '@/lib/tier-policy';
 import { getWebsiteBaseUrl } from '@/lib/public-links';
 
 // Served by the marketing website (snakkly-frontend-website, app/r/[code]); opens the app via Universal/App Links.
@@ -45,7 +45,7 @@ export async function GET(req: NextRequest) {
       .orderBy(desc(referralRewards.createdAt));
 
     const now = new Date();
-    const activeRewards = rewards.filter((r) => new Date(r.expiresAt) > now);
+    const activeRewards = rewards.filter((r) => isRewardActiveToday(r, now));
 
     return NextResponse.json({
       referralCode: user.referralCode,

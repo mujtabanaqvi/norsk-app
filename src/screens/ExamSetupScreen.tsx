@@ -131,6 +131,9 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     return navigation.addListener('focus', loadProgress);
   }, [navigation, loadProgress]);
 
+  // Keep the "tests today" card current after returning from an exam
+  useEffect(() => navigation.addListener('focus', () => { refreshProfile(); }), [navigation, refreshProfile]);
+
   // Themes that have at least one question set for the selected CEFR level (B1 or B2)
   const filteredThemes = useMemo(() => {
     return themes.filter((t) => (t.setCounts?.[targetLevel] ?? 0) > 0);

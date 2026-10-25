@@ -1,6 +1,6 @@
 import { db } from '@/src/db';
 import { tierConfigs, systemConfigs, referralRewards, examSessions, users } from '@/src/db/schema';
-import { eq, and, gte, lte, sql } from 'drizzle-orm';
+import { eq, and, or, gte, lt, sql } from 'drizzle-orm';
 
 export interface TierPolicy {
   tier: 'FREE' | 'STANDARD' | 'PREMIUM';
@@ -39,6 +39,9 @@ export const DEFAULT_REFERRAL_CONFIG = {
   bonusDailyTests: 2, // +2 extra tests per day
   durationDays: 7, // for 7 days
 };
+
+// An ACTIVE exam with no activity for this long is treated as left early and stops using a daily slot
+export const ABANDONED_AFTER_MS = 30 * 60 * 1000;
 
 /**
  * Get tier configuration for all tiers or a specific tier
@@ -85,19 +88,34 @@ export async function getReferralSettings(): Promise<{ bonusDailyTests: number; 
 }
 
 /**
+ * A reward counts for the whole Oslo calendar day if it is active at any point during it,
+ * so a bonus that expires mid-day doesn't shrink the limit after tests were already taken.
+ */
+export function isRewardActiveToday(
+  reward: { startsAt: Date | string; expiresAt: Date | string },
+  now = new Date()
+): boolean {
+  const startOfDay = getStartOfCalendarDayOslo(now);
+  const endOfDay = getEndOfCalendarDayOslo(now);
+  return new Date(reward.startsAt) < endOfDay && new Date(reward.expiresAt) >= startOfDay;
+}
+
+/**
  * Calculate the user's active referral bonus tests per day for today
  */
-export async function getActiveReferralBonusTests(userId: string): Promise<{ bonusTests: number; activeRewardsCount: number }> {
+export async function getActiveReferralBonusTests(
+  userId: string,
+  now = new Date()
+): Promise<{ bonusTests: number; activeRewardsCount: number }> {
   try {
-    const now = new Date();
     const activeRewards = await db
       .select()
       .from(referralRewards)
       .where(
         and(
           eq(referralRewards.referrerUserId, userId),
-          lte(referralRewards.startsAt, now),
-          gte(referralRewards.expiresAt, now)
+          lt(referralRewards.startsAt, getEndOfCalendarDayOslo(now)),
+          gte(referralRewards.expiresAt, getStartOfCalendarDayOslo(now))
         )
       );
 
@@ -120,10 +138,33 @@ export function getStartOfCalendarDayOslo(date = new Date()): Date {
     day: '2-digit',
   }).format(date); // outputs "YYYY-MM-DD"
 
-  // Create Date at 00:00:00 Oslo time
-  // Using Date.parse with offset or constructing ISO string
-  const startOfDay = new Date(`${osloDateString}T00:00:00Z`);
-  return startOfDay;
+  // Midnight UTC on that date, shifted back by Oslo's offset (+01:00 or +02:00).
+  // DST changes happen at 02:00/03:00, so the offset at UTC midnight is the one in effect at Oslo midnight.
+  const utcMidnight = new Date(`${osloDateString}T00:00:00Z`);
+  return new Date(utcMidnight.getTime() - getOsloOffsetMs(utcMidnight));
+}
+
+/**
+ * Get end of calendar day in Europe/Oslo timezone (= start of the next day, exclusive)
+ */
+export function getEndOfCalendarDayOslo(date = new Date()): Date {
+  // +36h always lands on the next Oslo day, even on 23/25-hour DST days
+  const start = getStartOfCalendarDayOslo(date);
+  return getStartOfCalendarDayOslo(new Date(start.getTime() + 36 * 60 * 60 * 1000));
+}
+
+function getOsloOffsetMs(date: Date): number {
+  const offsetName = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'Europe/Oslo',
+    timeZoneName: 'longOffset',
+  })
+    .formatToParts(date)
+    .find((part) => part.type === 'timeZoneName')?.value; // e.g. "GMT+02:00" ("GMT" when zero)
+
+  const match = offsetName?.match(/GMT([+-])(\d{2}):(\d{2})/);
+  if (!match) return 0;
+  const minutes = parseInt(match[2], 10) * 60 + parseInt(match[3], 10);
+  return (match[1] === '-' ? -minutes : minutes) * 60 * 1000;
 }
 
 /**
@@ -138,13 +179,21 @@ export async function getUserDailyTestStatus(userId: string) {
   const tierPolicies = await getTierConfigs();
   const baseLimit = tierPolicies[tier]?.dailyTestLimit ?? DEFAULT_TIER_CONFIGS.FREE.dailyTestLimit;
 
-  // 3. Fetch active referral bonuses
-  const { bonusTests, activeRewardsCount } = await getActiveReferralBonusTests(userId);
+  // 3. Fetch referral bonuses active at any point today
+  const now = new Date();
+  const { bonusTests, activeRewardsCount } = await getActiveReferralBonusTests(userId, now);
   const totalAllowedToday = baseLimit + bonusTests;
 
-  // 4. Count tests started by this user today (calendar day)
-  // We consider sessions in status ACTIVE or COMPLETED started today
-  const startOfDay = getStartOfCalendarDayOslo();
+  // 4. Count tests started by this user today (Oslo calendar day) that are finished or still in
+  // progress. Failed attempts and ones left early (no activity for ABANDONED_AFTER_MS) don't count,
+  // matching the history screen, which lists only finished exams.
+  const startOfDay = getStartOfCalendarDayOslo(now);
+  const activeSince = new Date(now.getTime() - ABANDONED_AFTER_MS);
+  // Last activity = newest transcript entry (epoch ms), falling back to the start time
+  const lastActivityAt = sql`greatest(
+    ${examSessions.startedAt},
+    to_timestamp(coalesce((${examSessions.transcriptJson} -> -1 ->> 'timestamp')::bigint, 0) / 1000.0)
+  )`;
   const [usageCountResult] = await db
     .select({
       count: sql<number>`cast(count(*) as integer)`,
@@ -153,7 +202,11 @@ export async function getUserDailyTestStatus(userId: string) {
     .where(
       and(
         eq(examSessions.userId, userId),
-        gte(examSessions.startedAt, startOfDay)
+        gte(examSessions.startedAt, startOfDay),
+        or(
+          eq(examSessions.status, 'COMPLETED'),
+          and(eq(examSessions.status, 'ACTIVE'), sql`${lastActivityAt} >= ${activeSince}`)
+        )
       )
     );
 
@@ -171,5 +224,6 @@ export async function getUserDailyTestStatus(userId: string) {
     remainingToday,
     canStartTest: remainingToday > 0,
     resetsAt: 'midnight Europe/Oslo',
+    resetsAtIso: getEndOfCalendarDayOslo(now).toISOString(),
   };
 }
