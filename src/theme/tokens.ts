@@ -11,17 +11,18 @@ export const colors = {
   redSoft: '#FCEBEE',
   navy: '#00205B',
   navyLight: '#1B3A78',
-  navySoft: '#E9EDF5',
+  navySoft: '#DCE3F0',
   white: '#FFFFFF',
   gold: '#C98A00',
   goldSoft: '#FFF5DB',
 
   // Surfaces
   bg: '#FFFDFA',
-  surface: '#FFFFFF',
-  surfaceMuted: '#F0F2F7',
-  border: '#E3E7EF',
-  borderStrong: '#CDD3DF',
+  // Cards use a light Norwegian-blue tint (the navy counterpart of redSoft) so they stand out from the page.
+  surface: '#EEF2F9',
+  surfaceMuted: '#E3E9F3',
+  border: '#D8E0ED',
+  borderStrong: '#C2CDDF',
 
   // Text
   text: '#00205B',
