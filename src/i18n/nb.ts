@@ -295,7 +295,7 @@ export const nb = {
     stepRubric: 'B1/B2-rubrikk',
     stepCorrections: 'Rettelser',
     loadingNote:
-      'Dette tar vanligvis 10–25 sekunder mens GPT-4o analyserer grammatikk, uttale og flyt i samtalen.',
+      'Dette tar vanligvis 10–25 sekunder mens KI analyserer grammatikk, uttale og flyt i samtalen.',
     loadFailedTitle: 'Kunne ikke laste resultater',
     backToStart: 'Tilbake til start',
     noEvalTitle: 'Ingen vurdering tilgjengelig',

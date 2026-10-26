@@ -287,7 +287,7 @@ export const en: Translations = {
     stepRubric: 'B1/B2 rubric',
     stepCorrections: 'Corrections',
     loadingNote:
-      'This usually takes 10–25 seconds while GPT-4o analyses grammar, pronunciation and fluency in the conversation.',
+      'This usually takes 10–25 seconds while AI analyses grammar, pronunciation and fluency in the conversation.',
     loadFailedTitle: 'Could not load results',
     backToStart: 'Back to start',
     noEvalTitle: 'No assessment available',
