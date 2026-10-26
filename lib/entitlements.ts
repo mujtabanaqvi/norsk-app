@@ -14,6 +14,9 @@ export interface EntitlementRow {
   status: SubscriptionStatus;
   currentPeriodEnd: Date;
   provider?: PaymentProvider;
+  /** The user cancelled: the subscription won't renew and ends at currentPeriodEnd. */
+  cancelAtPeriodEnd?: boolean;
+  productId?: string | null;
 }
 
 /** A subscription grants its tier while it is active (or trialing) and its paid period has not ended. */
@@ -92,6 +95,8 @@ async function loadEntitlementRows(userId: string): Promise<EntitlementRow[]> {
       status: subscriptions.status,
       currentPeriodEnd: subscriptions.currentPeriodEnd,
       provider: subscriptions.provider,
+      cancelAtPeriodEnd: subscriptions.cancelAtPeriodEnd,
+      productId: subscriptions.productId,
     })
     .from(subscriptions)
     .where(eq(subscriptions.userId, userId));
@@ -125,10 +130,22 @@ export async function getActiveSubscriptionProvider(userId: string): Promise<Pay
   return pickActiveProvider(await loadEntitlementRows(userId));
 }
 
-/** Provider and end date of the subscription granting the user's tier (null when on FREE). */
-export async function getActiveSubscription(
-  userId: string
-): Promise<{ provider: PaymentProvider | null; currentPeriodEnd: Date } | null> {
+export interface ActiveSubscription {
+  provider: PaymentProvider | null;
+  currentPeriodEnd: Date;
+  cancelAtPeriodEnd: boolean;
+  productId: string | null;
+}
+
+/** The subscription granting the user's tier (null when on FREE). */
+export async function getActiveSubscription(userId: string): Promise<ActiveSubscription | null> {
   const row = pickActiveSubscription(await loadEntitlementRows(userId));
-  return row ? { provider: row.provider ?? null, currentPeriodEnd: row.currentPeriodEnd } : null;
+  return row
+    ? {
+        provider: row.provider ?? null,
+        currentPeriodEnd: row.currentPeriodEnd,
+        cancelAtPeriodEnd: row.cancelAtPeriodEnd ?? false,
+        productId: row.productId ?? null,
+      }
+    : null;
 }

@@ -166,13 +166,65 @@ export async function restorePurchases(): Promise<PaidTierResult> {
   return syncSubscription();
 }
 
+async function openUrl(url: string): Promise<void> {
+  if (Platform.OS === 'web') {
+    // The URL is opened after an await, so a popup blocker may refuse the new tab: navigate instead.
+    if (!window.open(url, '_blank', 'noopener')) window.location.assign(url);
+    return;
+  }
+  await Linking.openURL(url);
+}
+
 /** Opens the place the active subscription is managed: App Store, Google Play or the Web Billing customer portal. */
 export async function openManageSubscriptions(): Promise<void> {
   const { managementURL } = await Purchases.getCustomerInfo();
   if (!managementURL) throw new Error('No subscription management URL');
-  if (Platform.OS === 'web') {
-    window.open(managementURL, '_blank', 'noopener');
-    return;
+  await openUrl(managementURL);
+}
+
+const ANDROID_PACKAGE = 'com.snakkly.app';
+const APPLE_SUBSCRIPTIONS_URL = 'https://apps.apple.com/account/subscriptions';
+
+/**
+ * - `opened`: the store's / customer portal's cancel page was opened.
+ * - `cancelOnIPhone`: an App Store subscription seen from Android or web; it can only be cancelled on an Apple device.
+ * - `cancelOnWebsite`: a web subscription seen from the iOS / Android app; it is cancelled on the website.
+ */
+export type CancelOutcome = 'opened' | 'cancelOnIPhone' | 'cancelOnWebsite';
+
+/**
+ * Takes the user to where their subscription can be cancelled. Stores don't let apps cancel subscriptions,
+ * so this opens the store that sold it (App Store, Google Play or the Web Billing customer portal),
+ * from whichever platform the user is on when that is possible.
+ */
+export async function openCancelSubscription(
+  provider: 'STRIPE' | 'APPLE' | 'GOOGLE',
+  productId: string | null | undefined
+): Promise<CancelOutcome> {
+  if (provider === 'APPLE') {
+    if (Platform.OS !== 'ios') return 'cancelOnIPhone';
+    if (configured) {
+      try {
+        await Purchases.showManageSubscriptions();
+        return 'opened';
+      } catch {
+        // Fall back to the App Store page below.
+      }
+    }
+    await openUrl(APPLE_SUBSCRIPTIONS_URL);
+    return 'opened';
   }
-  await Linking.openURL(managementURL);
+
+  if (provider === 'GOOGLE') {
+    // Play product ids come through RevenueCat as `<product id>:<base plan>`.
+    const sku = productId?.split(':')[0];
+    const query = sku ? `?sku=${encodeURIComponent(sku)}&package=${ANDROID_PACKAGE}` : '';
+    await openUrl(`https://play.google.com/store/account/subscriptions${query}`);
+    return 'opened';
+  }
+
+  // Web Billing: the customer portal is only reachable through the web app's RevenueCat session.
+  if (Platform.OS !== 'web' || !configured) return 'cancelOnWebsite';
+  await openManageSubscriptions();
+  return 'opened';
 }

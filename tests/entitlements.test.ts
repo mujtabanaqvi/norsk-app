@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pickEffectiveTier, pickActiveProvider, type EntitlementRow } from '../lib/entitlements';
+import { pickEffectiveTier, pickActiveProvider, pickActiveSubscription, type EntitlementRow } from '../lib/entitlements';
 import { IAP_PRODUCT_IDS, tierForProductId } from '../src/lib/iap-products';
 
 const NOW = new Date('2026-10-21T12:00:00Z');
@@ -38,6 +38,17 @@ test('Entitlements: past-due and inactive subscriptions do not entitle; trialing
   assert.equal(pickEffectiveTier([{ tier: 'PREMIUM', status: 'PAST_DUE', currentPeriodEnd: FUTURE }], NOW), 'FREE');
   assert.equal(pickEffectiveTier([{ tier: 'PREMIUM', status: 'INACTIVE', currentPeriodEnd: FUTURE }], NOW), 'FREE');
   assert.equal(pickEffectiveTier([{ tier: 'STANDARD', status: 'TRIALING', currentPeriodEnd: FUTURE }], NOW), 'STANDARD');
+});
+
+test('Entitlements: a cancelled store sub still entitles until its period ends and keeps its cancel flag', () => {
+  const rows: EntitlementRow[] = [
+    { tier: 'STANDARD', status: 'ACTIVE', currentPeriodEnd: FUTURE, provider: 'PROMO' },
+    { tier: 'STANDARD', status: 'ACTIVE', currentPeriodEnd: FUTURE, provider: 'GOOGLE', cancelAtPeriodEnd: true },
+  ];
+  assert.equal(pickEffectiveTier(rows, NOW), 'STANDARD');
+  const active = pickActiveSubscription(rows, NOW);
+  assert.equal(active?.provider, 'GOOGLE');
+  assert.equal(active?.cancelAtPeriodEnd, true);
 });
 
 test('IAP products: product ids map to tiers', () => {

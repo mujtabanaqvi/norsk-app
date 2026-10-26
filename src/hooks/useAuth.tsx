@@ -24,6 +24,10 @@ export interface UserProfile {
   activeSubscriptionProvider?: 'STRIPE' | 'APPLE' | 'GOOGLE' | 'PROMO' | null;
   /** When that subscription's current period (or promo grant) ends (ISO). */
   activeSubscriptionEndsAt?: string | null;
+  /** The user cancelled that subscription: it won't renew and ends at activeSubscriptionEndsAt. */
+  activeSubscriptionCancelsAtPeriodEnd?: boolean;
+  /** Store product id of that subscription (e.g. `snakkly.standard.monthly:monthly` on Play). */
+  activeSubscriptionProductId?: string | null;
 }
 
 export interface DailyTestStatus {

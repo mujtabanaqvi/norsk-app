@@ -448,6 +448,25 @@ export const nb = {
     manage: 'Administrer abonnement',
     managedBy: 'Abonnementet ditt administreres via {store}. Endre eller avslutt det der.',
     storeWeb: 'nettsiden',
+    yourPlan: {
+      title: 'Ditt abonnement',
+      renewsOn: 'Fornyes automatisk {date}.',
+      cancelledUntil: 'Abonnementet er avsluttet. Du beholder {tier} til {date}.',
+      billedThrough: 'Betales via {store}.',
+      cancel: 'Avslutt abonnement',
+      confirmTitle: 'Avslutte {tier}?',
+      confirmBody:
+        'Du beholder {tier} til {date}, og blir ikke trukket igjen. Selve avslutningen gjøres hos {store}, som åpnes nå.',
+      confirmAction: 'Fortsett til avslutning',
+      keep: 'Behold abonnementet',
+      cancelOnIPhoneTitle: 'Avslutt på iPhone eller iPad',
+      cancelOnIPhoneBody:
+        'Abonnementet er kjøpt i App Store. Åpne Innstillinger → [navnet ditt] → Abonnementer på iPhone eller iPad, velg Snakkly og trykk «Avslutt abonnement».',
+      cancelOnWebsiteTitle: 'Avslutt på nettsiden',
+      cancelOnWebsiteBody:
+        'Abonnementet er kjøpt på nettsiden. Logg inn på Snakkly i nettleseren, åpne Abonnement og trykk «Avslutt abonnement».',
+      promoNoCancel: 'Gratis tilgang via kampanjekode til {date}. Ingenting å avslutte – den utløper av seg selv.',
+    },
     storeApple: 'App Store',
     storeGoogle: 'Google Play',
     storeUnavailable: 'Butikken er ikke tilgjengelig akkurat nå. Prøv igjen senere.',
@@ -464,7 +483,6 @@ export const nb = {
       apply: 'Bruk kode',
       successTitle: 'Kampanjekoden er aktivert!',
       successBody: 'Du har {tier} gratis til {date}.',
-      activeUntil: 'Gratis tilgang via kampanjekode til {date}.',
       errors: {
         INVALID_CODE: 'Det ser ikke ut som en gyldig kode.',
         NOT_FOUND: 'Fant ingen kampanjekode med denne koden.',

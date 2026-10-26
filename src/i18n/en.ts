@@ -440,6 +440,25 @@ export const en: Translations = {
     manage: 'Manage subscription',
     managedBy: 'Your subscription is managed through {store}. Change or cancel it there.',
     storeWeb: 'the website',
+    yourPlan: {
+      title: 'Your subscription',
+      renewsOn: 'Renews automatically on {date}.',
+      cancelledUntil: 'Your subscription is cancelled. You keep {tier} until {date}.',
+      billedThrough: 'Billed through {store}.',
+      cancel: 'Cancel subscription',
+      confirmTitle: 'Cancel {tier}?',
+      confirmBody:
+        "You keep {tier} until {date} and won't be charged again. The cancellation itself is done in {store}, which opens now.",
+      confirmAction: 'Continue to cancel',
+      keep: 'Keep subscription',
+      cancelOnIPhoneTitle: 'Cancel on your iPhone or iPad',
+      cancelOnIPhoneBody:
+        'This subscription was bought in the App Store. On your iPhone or iPad, open Settings → [your name] → Subscriptions, choose Snakkly and tap "Cancel Subscription".',
+      cancelOnWebsiteTitle: 'Cancel on the website',
+      cancelOnWebsiteBody:
+        'This subscription was bought on the website. Log in to Snakkly in your browser, open Subscription and tap "Cancel subscription".',
+      promoNoCancel: 'Free access from a promo code until {date}. Nothing to cancel – it ends by itself.',
+    },
     storeApple: 'the App Store',
     storeGoogle: 'Google Play',
     storeUnavailable: 'The store is not available right now. Please try again later.',
@@ -456,7 +475,6 @@ export const en: Translations = {
       apply: 'Apply code',
       successTitle: 'Promo code applied!',
       successBody: 'You have {tier} for free until {date}.',
-      activeUntil: 'Free access from a promo code until {date}.',
       errors: {
         INVALID_CODE: "That doesn't look like a valid code.",
         NOT_FOUND: 'No promo code matches that code.',

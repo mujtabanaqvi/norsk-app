@@ -6,15 +6,17 @@ import {
   ScrollView,
   ActivityIndicator,
   Alert,
+  AppState,
   Platform,
 } from 'react-native';
 import type { NativeStackScreenProps } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '../types/exam';
-import { ApiError, fetchTierConfigs, redeemPromoCode } from '../api';
+import { ApiError, fetchTierConfigs, redeemPromoCode, syncSubscription } from '../api';
 import {
   buySubscription,
   getSubscriptionPackages,
   isPurchasingSupported,
+  openCancelSubscription,
   openManageSubscriptions,
   OwnedByOtherAccountError,
   PaymentPendingError,
@@ -71,6 +73,26 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Cancelling happens in the store or customer portal: when the user comes back, pull the new state
+  // from RevenueCat right away instead of waiting for the webhook.
+  useEffect(() => {
+    if (!user) return;
+    const resync = () => {
+      syncSubscription()
+        .catch(() => {})
+        .then(() => refreshProfile());
+    };
+    if (Platform.OS === 'web') {
+      window.addEventListener('focus', resync);
+      return () => window.removeEventListener('focus', resync);
+    }
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') resync();
+    });
+    return () => subscription.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
+
   const activeProvider = user?.activeSubscriptionProvider ?? null;
   // RevenueCat unifies entitlements, but a subscription can still only be changed in the store that sold it.
   const thisPlatformProvider = Platform.OS === 'ios' ? 'APPLE' : Platform.OS === 'android' ? 'GOOGLE' : 'STRIPE';
@@ -80,6 +102,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   const canRedeemPromo = Boolean(user) && Platform.OS !== 'ios';
   const formatDate = (iso: string) =>
     new Date(iso).toLocaleDateString(LOCALE_TAGS[locale], { day: 'numeric', month: 'long', year: 'numeric' });
+  const tierName = (tier: string) => (tier === 'PREMIUM' ? 'Premium' : 'Standard');
   const storeLabel = (provider: string) =>
     provider === 'APPLE'
       ? t('subscription.storeApple')
@@ -153,6 +176,32 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
+  const handleCancel = () => {
+    if (!activeProvider || activeProvider === 'PROMO') return;
+    const provider = activeProvider;
+    const params = {
+      tier: tierName(currentTier),
+      date: user?.activeSubscriptionEndsAt ? formatDate(user.activeSubscriptionEndsAt) : '',
+      store: storeLabel(provider),
+    };
+    const goToCancel = async () => {
+      try {
+        const outcome = await openCancelSubscription(provider, user?.activeSubscriptionProductId);
+        if (outcome === 'cancelOnIPhone') {
+          Alert.alert(t('subscription.yourPlan.cancelOnIPhoneTitle'), t('subscription.yourPlan.cancelOnIPhoneBody'));
+        } else if (outcome === 'cancelOnWebsite') {
+          Alert.alert(t('subscription.yourPlan.cancelOnWebsiteTitle'), t('subscription.yourPlan.cancelOnWebsiteBody'));
+        }
+      } catch (err: any) {
+        Alert.alert(t('common.error'), err.message || t('subscription.storeUnavailable'));
+      }
+    };
+    Alert.alert(t('subscription.yourPlan.confirmTitle', params), t('subscription.yourPlan.confirmBody', params), [
+      { text: t('subscription.yourPlan.keep'), style: 'cancel' },
+      { text: t('subscription.yourPlan.confirmAction'), style: 'destructive', onPress: goToCancel },
+    ]);
+  };
+
   const handleRestore = async () => {
     setIsProcessing(true);
     try {
@@ -195,6 +244,8 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
   };
 
   const currentTier = user?.subscriptionTier || 'FREE';
+  const endsAt = user?.activeSubscriptionEndsAt ? formatDate(user.activeSubscriptionEndsAt) : null;
+  const isCancelled = Boolean(user?.activeSubscriptionCancelsAtPeriodEnd);
 
   return (
     <Screen>
@@ -228,12 +279,51 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
                 </Card>
               )}
 
-              {activeProvider === 'PROMO' && user?.activeSubscriptionEndsAt && (
-                <Card style={styles.noticeCard}>
-                  <Icon name="gift-outline" size={20} color={colors.navy} />
-                  <Text style={styles.noticeText}>
-                    {t('subscription.promo.activeUntil', { date: formatDate(user.activeSubscriptionEndsAt) })}
-                  </Text>
+              {currentTier !== 'FREE' && activeProvider && endsAt && (
+                <Card style={styles.planCard}>
+                  <View style={styles.planTitleGroup}>
+                    <Text style={styles.planName}>{t('subscription.yourPlan.title')}</Text>
+                    <Badge label={tierName(currentTier)} tone={currentTier === 'PREMIUM' ? 'gold' : 'navy'} />
+                  </View>
+                  {activeProvider === 'PROMO' ? (
+                    <View style={styles.yourPlanRow}>
+                      <Icon name="gift-outline" size={18} color={colors.navy} />
+                      <Text style={styles.featureText}>{t('subscription.yourPlan.promoNoCancel', { date: endsAt })}</Text>
+                    </View>
+                  ) : (
+                    <>
+                      <View style={styles.yourPlanRow}>
+                        <Icon
+                          name={isCancelled ? 'alert-circle-outline' : 'refresh-outline'}
+                          size={18}
+                          color={isCancelled ? colors.red : colors.navy}
+                        />
+                        <Text style={styles.featureText}>
+                          {isCancelled
+                            ? t('subscription.yourPlan.cancelledUntil', { tier: tierName(currentTier), date: endsAt })
+                            : t('subscription.yourPlan.renewsOn', { date: endsAt })}
+                        </Text>
+                      </View>
+                      <View style={styles.yourPlanRow}>
+                        <Icon name="card-outline" size={18} color={colors.navy} />
+                        <Text style={styles.featureText}>
+                          {t('subscription.yourPlan.billedThrough', { store: storeLabel(activeProvider) })}
+                        </Text>
+                      </View>
+                      {!isCancelled && (
+                        <Button
+                          title={t('subscription.yourPlan.cancel')}
+                          variant="secondary"
+                          size="lg"
+                          fullWidth
+                          icon="close-circle-outline"
+                          disabled={isProcessing}
+                          onPress={handleCancel}
+                          style={styles.cancelButton}
+                        />
+                      )}
+                    </>
+                  )}
                 </Card>
               )}
 
@@ -540,6 +630,15 @@ const styles = StyleSheet.create({
   },
   promoSuccessTitle: {
     fontWeight: '700',
+  },
+  yourPlanRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space.sm,
+    marginTop: space.sm,
+  },
+  cancelButton: {
+    marginTop: space.lg,
   },
   noticeCard: {
     flexDirection: 'row',

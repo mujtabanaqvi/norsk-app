@@ -40,6 +40,8 @@ export async function GET(req: NextRequest) {
         subscriptionTier: testQuota.tier,
         activeSubscriptionProvider: activeSubscription?.provider ?? null,
         activeSubscriptionEndsAt: activeSubscription?.currentPeriodEnd.toISOString() ?? null,
+        activeSubscriptionCancelsAtPeriodEnd: activeSubscription?.cancelAtPeriodEnd ?? false,
+        activeSubscriptionProductId: activeSubscription?.productId ?? null,
       },
       testQuota,
     });
