@@ -73,8 +73,9 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Cancelling happens in the store or customer portal: when the user comes back, pull the new state
-  // from RevenueCat right away instead of waiting for the webhook.
+  // Pull the subscription from RevenueCat when the screen opens (a late or missed renewal webhook would
+  // otherwise show a stale or expired plan) and again when the user comes back from cancelling in the
+  // store or customer portal.
   useEffect(() => {
     if (!user) return;
     const resync = () => {
@@ -82,6 +83,7 @@ export const SubscriptionScreen: React.FC<Props> = ({ navigation }) => {
         .catch(() => {})
         .then(() => refreshProfile());
     };
+    resync();
     if (Platform.OS === 'web') {
       window.addEventListener('focus', resync);
       return () => window.removeEventListener('focus', resync);

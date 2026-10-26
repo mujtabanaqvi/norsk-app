@@ -112,7 +112,7 @@ In RevenueCat's Play Store app settings (after 4.1), open **Google developer not
 - Click **Send test notification**; RevenueCat should show it as received.
 
 ### 2.5 License testers
-Play Console → **Settings → License testing**: add the Google accounts that will test. Their purchases are free and renew every few minutes. They must opt in to the internal track and install the app **from Play**; a locally installed build can't load products.
+Play Console → **Settings → License testing**: add the Google accounts that will test. Their purchases are free and renew every few minutes: a monthly test subscription renews every 5 minutes and Google ends it after 6 renewals (about 30 minutes), after which the app correctly shows the user as Free again. Test *Cancel subscription* within that window. They must opt in to the internal track and install the app **from Play**; a locally installed build can't load products.
 
 ---
 
