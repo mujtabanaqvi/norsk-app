@@ -39,3 +39,5 @@ credentials/
 .expo/
 /android/
 /ios/
+next-env.d.ts
+next-env.d.ts
