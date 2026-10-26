@@ -242,6 +242,13 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const stageNumber = stage === 'DEL_1' ? 1 : stage === 'DEL_2' ? 2 : 3;
 
+  // The prompt card takes the colour of whoever is speaking, red for the candidate's task
+  const promptAccent = isExaminerSpeaking
+    ? colors.navy
+    : isAiCoCandidateSpeaking
+      ? colors.navyLight
+      : colors.red;
+
   return (
     <SafeAreaView edges={['top']} style={styles.topSafeArea}>
       <StatusBar barStyle="light-content" backgroundColor={colors.navy} />
@@ -342,14 +349,20 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
         <View style={styles.mainArea}>
           <View style={styles.contentWrapper}>
             {/* Current Task / Active Speech Card — long prompts scroll inside the card */}
-            <Card style={styles.promptBannerCard}>
+            <Card
+              style={[
+                styles.promptBannerCard,
+                phase === 'speaking' && styles.promptBannerCardSpeaking,
+                { borderLeftColor: promptAccent },
+              ]}
+            >
               <View style={styles.promptBannerHeader}>
                 <Icon
                   name={phase === 'speaking' ? 'volume-high-outline' : 'document-text-outline'}
                   size={18}
-                  color={colors.red}
+                  color={promptAccent}
                 />
-                <Text style={styles.promptBannerLabel}>
+                <Text style={[styles.promptBannerLabel, { color: promptAccent }]}>
                   {phase === 'speaking'
                     ? activeAiSpeaker === 'co_candidate'
                       ? t('room.coCandidateSays')
@@ -370,15 +383,16 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             <View style={styles.examTable}>
               <Text style={styles.seatLabel}>{t('room.seatAcross')}</Text>
               <SeatTile
-                style={styles.examinerSeat}
+                style={[styles.examinerSeat, isExaminerSpeaking && styles.examinerSeatSpeaking]}
                 avatar="S"
-                avatarColor={colors.navy}
+                avatarColor={isExaminerSpeaking ? colors.navyLight : colors.navy}
                 name={t('room.examinerName')}
                 role={t('room.examinerRole')}
                 badgeLabel={isExaminerSpeaking ? t('room.speakingNow') : t('room.listening')}
-                badgeTone={isExaminerSpeaking ? 'solidNavy' : 'neutral'}
+                badgeTone={isExaminerSpeaking ? 'navy' : 'neutral'}
                 active={isExaminerSpeaking}
                 activeColor={colors.navy}
+                filled
               />
 
               <View style={styles.tableEdge}>
@@ -560,24 +574,34 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             </Pressable>
 
             {phase === 'speaking' && (
-              <View style={styles.micStateBox}>
-                <View style={styles.speakingBadgeCircle}>
+              <View style={styles.speakingRow}>
+                <View
+                  style={[
+                    styles.speakingBadgeSmall,
+                    {
+                      backgroundColor:
+                        activeAiSpeaker === 'co_candidate' ? colors.navyLight : colors.navy,
+                    },
+                  ]}
+                >
                   <Waveform
                     active={true}
                     color={colors.white}
-                    accentColor={colors.navy}
-                    height={22}
-                    barWidth={4}
+                    accentColor={colors.red}
+                    height={16}
+                    barWidth={3}
                   />
                 </View>
-                <Text style={styles.micStatusTitle}>
-                  {activeAiSpeaker === 'co_candidate'
-                    ? t('room.peerTalking')
-                    : t('room.examinerTalking')}
-                </Text>
-                <Text style={styles.micStatusSubtext} numberOfLines={2}>
-                  {t('room.listenHint')}
-                </Text>
+                <View style={styles.speakingTextCol}>
+                  <Text style={styles.speakingTitle} numberOfLines={1}>
+                    {activeAiSpeaker === 'co_candidate'
+                      ? t('room.peerTalking')
+                      : t('room.examinerTalking')}
+                  </Text>
+                  <Text style={styles.speakingSubtext} numberOfLines={1}>
+                    {t('room.listenHint')}
+                  </Text>
+                </View>
                 <Button
                   title={t('room.skipSpeech')}
                   variant="outline"
@@ -705,6 +729,8 @@ interface SeatTileProps {
   /** Animates the waveform; defaults to `active`. */
   speaking?: boolean;
   activeColor: string;
+  /** When active, fill the tile with `activeColor` instead of only outlining it. */
+  filled?: boolean;
   /** Seat is present but not part of the current exam part. */
   dimmed?: boolean;
   onPress?: () => void;
@@ -723,11 +749,13 @@ const SeatTile: React.FC<SeatTileProps> = ({
   active,
   speaking = active,
   activeColor,
+  filled = false,
   dimmed = false,
   onPress,
   disabled,
   style,
 }) => {
+  const onDark = active && filled;
   const body = (
     <>
       <View style={styles.participantHeader}>
@@ -737,10 +765,16 @@ const SeatTile: React.FC<SeatTileProps> = ({
           </Text>
         </View>
         <View style={styles.participantMeta}>
-          <Text style={styles.participantName} numberOfLines={1}>
+          <Text
+            style={[styles.participantName, onDark && styles.participantNameOnDark]}
+            numberOfLines={1}
+          >
             {name}
           </Text>
-          <Text style={styles.participantRole} numberOfLines={1}>
+          <Text
+            style={[styles.participantRole, onDark && styles.participantRoleOnDark]}
+            numberOfLines={1}
+          >
             {role}
           </Text>
         </View>
@@ -749,7 +783,7 @@ const SeatTile: React.FC<SeatTileProps> = ({
         <Badge label={badgeLabel} tone={badgeTone} />
         <Waveform
           active={speaking}
-          color={active ? activeColor : colors.borderStrong}
+          color={onDark ? colors.white : active ? activeColor : colors.borderStrong}
           accentColor={active ? colors.red : colors.borderStrong}
           height={18}
           barWidth={3}
@@ -760,6 +794,7 @@ const SeatTile: React.FC<SeatTileProps> = ({
   const tileStyle = [
     styles.participantTile,
     active && { borderColor: activeColor, borderWidth: 1.5 },
+    onDark && { backgroundColor: activeColor },
     dimmed && styles.participantDimmed,
     style,
   ];
@@ -937,6 +972,8 @@ const styles = StyleSheet.create({
   },
   mainArea: {
     flex: 1,
+    // Never let the room content draw over the mic dock
+    overflow: 'hidden',
     paddingHorizontal: space.lg,
     paddingTop: space.md,
     paddingBottom: space.sm,
@@ -955,9 +992,15 @@ const styles = StyleSheet.create({
     // Shrinks first when space is tight; text scrolls inside instead of the page.
     flexShrink: 1,
     minHeight: 72,
+    overflow: 'hidden',
+  },
+  promptBannerCardSpeaking: {
+    backgroundColor: colors.navySoft,
+    borderColor: colors.navySoft,
   },
   promptScroll: {
     flexGrow: 0,
+    flexShrink: 1,
   },
   promptBannerHeader: {
     flexDirection: 'row',
@@ -976,6 +1019,7 @@ const styles = StyleSheet.create({
   },
   examTable: {
     gap: 6,
+    flexShrink: 0,
   },
   seatLabel: {
     ...type.overline,
@@ -985,20 +1029,22 @@ const styles = StyleSheet.create({
   examinerSeat: {
     alignSelf: 'center',
     width: '78%',
-    backgroundColor: colors.navySoft,
-    borderColor: colors.navySoft,
+    borderColor: colors.navy,
+    borderLeftWidth: 4,
+  },
+  examinerSeatSpeaking: {
+    ...shadow.raised,
   },
   tableEdge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: space.sm,
-    marginTop: 2,
+    marginVertical: space.xxs,
   },
   tableEdgeLine: {
     flex: 1,
-    height: 2,
-    borderRadius: 1,
-    backgroundColor: colors.borderStrong,
+    height: 1,
+    backgroundColor: colors.border,
   },
   candidatesRow: {
     flexDirection: 'row',
@@ -1051,6 +1097,12 @@ const styles = StyleSheet.create({
     ...type.caption,
     fontSize: 11,
     lineHeight: 15,
+  },
+  participantNameOnDark: {
+    color: colors.white,
+  },
+  participantRoleOnDark: {
+    color: colors.navySoft,
   },
   participantFooter: {
     flexDirection: 'row',
@@ -1127,13 +1179,35 @@ const styles = StyleSheet.create({
   micStateBoxStatic: {
     paddingVertical: space.md,
   },
-  speakingBadgeCircle: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: colors.red,
+  speakingRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: space.sm,
+    paddingVertical: space.xs,
+  },
+  speakingBadgeSmall: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  speakingTextCol: {
+    flex: 1,
+    minWidth: 160,
+  },
+  speakingTitle: {
+    ...type.bodyStrong,
+    fontSize: 14,
+    lineHeight: 19,
+  },
+  speakingSubtext: {
+    ...type.caption,
+    fontSize: 12,
+    lineHeight: 16,
+    color: colors.textSecondary,
   },
   heroMicButton: {
     width: 84,
