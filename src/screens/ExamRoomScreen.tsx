@@ -242,13 +242,6 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
 
   const stageNumber = stage === 'DEL_1' ? 1 : stage === 'DEL_2' ? 2 : 3;
 
-  // The prompt card takes the colour of whoever is speaking, red for the candidate's task
-  const promptAccent = isExaminerSpeaking
-    ? colors.navy
-    : isAiCoCandidateSpeaking
-      ? colors.navyLight
-      : colors.red;
-
   return (
     <SafeAreaView edges={['top']} style={styles.topSafeArea}>
       <StatusBar barStyle="light-content" backgroundColor={colors.navy} />
@@ -326,18 +319,33 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                 : pillStage === 'DEL_2'
                   ? t('room.pillDel2')
                   : t('room.pillDel3');
+            // "Del 1: Monolog" is too long for a third of a phone's width, so stack part and name
+            const [partLabel, ...nameParts] = label.split(':');
+            const nameLabel = nameParts.join(':').trim();
             return (
               <View
                 key={pillStage}
                 style={[styles.phasePill, isActive && styles.phasePillActive]}
               >
-                {isActive && <View style={styles.phaseDot} />}
-                <Text
-                  style={[styles.phasePillText, isActive && styles.phasePillTextActive]}
-                  numberOfLines={1}
-                >
-                  {label}
-                </Text>
+                <View style={styles.phasePillPartRow}>
+                  {isActive && <View style={styles.phaseDot} />}
+                  <Text
+                    style={[styles.phasePillPart, isActive && styles.phasePillTextActive]}
+                    numberOfLines={1}
+                  >
+                    {partLabel}
+                  </Text>
+                </View>
+                {nameLabel !== '' && (
+                  <Text
+                    style={[styles.phasePillText, isActive && styles.phasePillTextActive]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                  >
+                    {nameLabel}
+                  </Text>
+                )}
               </View>
             );
           })}
@@ -353,16 +361,15 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
               style={[
                 styles.promptBannerCard,
                 phase === 'speaking' && styles.promptBannerCardSpeaking,
-                { borderLeftColor: promptAccent },
               ]}
             >
               <View style={styles.promptBannerHeader}>
                 <Icon
                   name={phase === 'speaking' ? 'volume-high-outline' : 'document-text-outline'}
                   size={18}
-                  color={promptAccent}
+                  color={colors.red}
                 />
-                <Text style={[styles.promptBannerLabel, { color: promptAccent }]}>
+                <Text style={styles.promptBannerLabel}>
                   {phase === 'speaking'
                     ? activeAiSpeaker === 'co_candidate'
                       ? t('room.coCandidateSays')
@@ -385,13 +392,13 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
               <SeatTile
                 style={[styles.examinerSeat, isExaminerSpeaking && styles.examinerSeatSpeaking]}
                 avatar="S"
-                avatarColor={isExaminerSpeaking ? colors.navyLight : colors.navy}
+                avatarColor={isExaminerSpeaking ? colors.redPressed : colors.navy}
                 name={t('room.examinerName')}
                 role={t('room.examinerRole')}
                 badgeLabel={isExaminerSpeaking ? t('room.speakingNow') : t('room.listening')}
-                badgeTone={isExaminerSpeaking ? 'navy' : 'neutral'}
+                badgeTone={isExaminerSpeaking ? 'red' : 'neutral'}
                 active={isExaminerSpeaking}
-                activeColor={colors.navy}
+                activeColor={colors.red}
                 filled
               />
 
@@ -416,9 +423,9 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
                             ? t('room.listening')
                             : t('room.waiting')
                       }
-                      badgeTone={isAiCoCandidateSpeaking ? 'solidNavy' : 'neutral'}
+                      badgeTone={isAiCoCandidateSpeaking ? 'solidRed' : 'neutral'}
                       active={isAiCoCandidateSpeaking}
-                      activeColor={colors.navyLight}
+                      activeColor={colors.red}
                       dimmed={stage !== 'DEL_2'}
                     />
                     <SeatTile
@@ -576,18 +583,12 @@ export const ExamRoomScreen: React.FC<Props> = ({ route, navigation }) => {
             {phase === 'speaking' && (
               <View style={styles.speakingRow}>
                 <View
-                  style={[
-                    styles.speakingBadgeSmall,
-                    {
-                      backgroundColor:
-                        activeAiSpeaker === 'co_candidate' ? colors.navyLight : colors.navy,
-                    },
-                  ]}
+                  style={styles.speakingBadgeSmall}
                 >
                   <Waveform
                     active={true}
                     color={colors.white}
-                    accentColor={colors.red}
+                    accentColor={colors.white}
                     height={16}
                     barWidth={3}
                   />
@@ -784,7 +785,7 @@ const SeatTile: React.FC<SeatTileProps> = ({
         <Waveform
           active={speaking}
           color={onDark ? colors.white : active ? activeColor : colors.borderStrong}
-          accentColor={active ? colors.red : colors.borderStrong}
+          accentColor={onDark ? colors.white : active ? colors.red : colors.borderStrong}
           height={18}
           barWidth={3}
         />
@@ -939,17 +940,23 @@ const styles = StyleSheet.create({
   },
   phasePill: {
     flex: 1,
-    flexDirection: 'row',
+    minWidth: 0,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 5,
-    paddingVertical: 5,
-    paddingHorizontal: 6,
-    borderRadius: radius.pill,
+    gap: 1,
+    paddingVertical: 6,
+    paddingHorizontal: space.sm,
+    borderRadius: radius.md,
     backgroundColor: colors.navyLight,
   },
   phasePillActive: {
     backgroundColor: colors.red,
+  },
+  phasePillPartRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    maxWidth: '100%',
   },
   phaseDot: {
     width: 6,
@@ -957,10 +964,19 @@ const styles = StyleSheet.create({
     borderRadius: 3,
     backgroundColor: colors.white,
   },
-  phasePillText: {
-    fontSize: 11,
-    fontWeight: '600',
+  phasePillPart: {
+    flexShrink: 1,
+    fontSize: 12,
+    fontWeight: '700',
     color: colors.navySoft,
+  },
+  phasePillText: {
+    maxWidth: '100%',
+    fontSize: 11,
+    lineHeight: 14,
+    fontWeight: '500',
+    color: colors.navySoft,
+    textAlign: 'center',
   },
   phasePillTextActive: {
     color: colors.white,
@@ -995,8 +1011,8 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   promptBannerCardSpeaking: {
-    backgroundColor: colors.navySoft,
-    borderColor: colors.navySoft,
+    backgroundColor: colors.redSoft,
+    borderColor: colors.redSoft,
   },
   promptScroll: {
     flexGrow: 0,
@@ -1029,10 +1045,17 @@ const styles = StyleSheet.create({
   examinerSeat: {
     alignSelf: 'center',
     width: '78%',
+    // participantTile's flex: 1 is meant for the side-by-side candidate row. In this column it
+    // gives a 0 height basis, which collapses the tile to a thin bar. Spelled out rather than
+    // `flex: 0` because react-native-web maps that to CSS `flex: 0` (basis 0%), which collapses too.
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
     borderColor: colors.navy,
     borderLeftWidth: 4,
   },
   examinerSeatSpeaking: {
+    borderColor: colors.red,
     ...shadow.raised,
   },
   tableEdge: {
@@ -1191,6 +1214,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
+    backgroundColor: colors.red,
     alignItems: 'center',
     justifyContent: 'center',
   },
