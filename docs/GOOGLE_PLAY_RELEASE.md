@@ -206,7 +206,7 @@ Use a **license tester** account (Play Console → Setup → License testing) th
 
 1. Install Snakkly from the internal testing opt-in link (step 5.4) and log in as a **free** user.
 2. Open the subscription screen. Both plans show the **Play price** in NOK, not the `tier_configs` fallback. If the fallback shows, see Troubleshooting.
-3. Buy **Standard**. The Play purchase sheet opens, then PaymentResult shows "Standard". The tier badge updates, and RevenueCat → Customers shows the user (App User ID = our `users.id`) with the `standard` entitlement.
+3. Buy **Standard**. The Play purchase sheet opens, then PaymentResult shows "Standard". The tier badge updates, and RevenueCat → Customers shows the user (App User ID = our `"user".id`) with the `standard` entitlement.
 4. Buy **Premium**. This replaces the Standard subscription (Play subscriptions page shows only one), and the tier becomes Premium.
 5. **Manage subscription** opens Google Play's subscription page. Cancel there. The app keeps Premium until the period ends, then drops to Free (via the RevenueCat webhook).
 6. **Restore purchases** on a second Snakkly account on the same device. You should see the "owned by another account" message, and the second account stays Free.

@@ -17,6 +17,7 @@ import {
 import { generateLine } from '@/src/server/personas';
 import { transcribe } from '@/src/server/speech';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
+import { getEffectiveTier, hasUnlimitedAudio } from '@/lib/tier-policy';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -281,7 +282,8 @@ export async function POST(
       })
       .where(eq(examSessions.id, session.id));
 
-    if (secondsToDeduct > 0) {
+    // Paid tiers don't draw down the pool (usage is still tracked in engineState / the ledger)
+    if (secondsToDeduct > 0 && !hasUnlimitedAudio(await getEffectiveTier(session.userId))) {
       await db
         .update(userQuotas)
         .set({

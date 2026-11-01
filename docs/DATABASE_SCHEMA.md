@@ -159,7 +159,9 @@ Granular audit records of resource consumption per session and source.
 | `estimated_cost_usd` | `NUMERIC(10, 6)` | `NOT NULL` | Calculated cost in USD for this record. |
 | `created_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Audit timestamp. |
 
-### 2.5 `user` (alias `users`)
+### 2.5 `user` (Drizzle alias `users`)
+
+> The table is named `user`, which is a reserved word in PostgreSQL. In raw SQL always quote it: `SELECT * FROM "user"`. Unquoted, `FROM user` returns the current database role instead of this table. `users` is only a TypeScript alias in `src/db/schema.ts`; no `users` table exists.
 Core user profile, Better Auth account records, referral identities, and subscription tiers.
 
 | Column | Type | Constraints | Description |
@@ -192,8 +194,8 @@ Tracks active bonus tests awarded for successful referrals.
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Reward identifier. |
-| `referrer_user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)` | Recipient user ID. |
-| `referred_user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)` | Referred friend user ID. |
+| `referrer_user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> "user"(id)` | Recipient user ID. |
+| `referred_user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> "user"(id)` | Referred friend user ID. |
 | `bonus_tests_per_day` | `INTEGER` | `NOT NULL`, `DEFAULT 1` | Extra daily tests granted. |
 | `starts_at` | `TIMESTAMPTZ` | `NOT NULL` | Activation timestamp. |
 | `expires_at` | `TIMESTAMPTZ` | `NOT NULL` | Expiration timestamp. |
@@ -214,7 +216,7 @@ Paid subscriptions synced from RevenueCat (`lib/revenuecat.ts`), plus free grant
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | `PRIMARY KEY` | Row id. |
-| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)`, cascade delete | Owner (= RevenueCat App User ID). |
+| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> "user"(id)`, cascade delete | Owner (= RevenueCat App User ID). |
 | `provider` | `payment_provider` | `NOT NULL` | Store that sold it: `'APPLE'`, `'GOOGLE'` or `'STRIPE'` (RevenueCat Web Billing), or `'PROMO'` for a redeemed promo code. |
 | `external_id` | `VARCHAR(512)` | `NOT NULL`, unique with `provider` | `rc:<userId>:<productId>`, or `promo:<promoCodeId>:<userId>`. |
 | `product_id` | `VARCHAR(255)` | `NULLABLE` | Store product id, e.g. `snakkly.premium.monthly`. |
@@ -248,7 +250,7 @@ One row per user per redeemed code.
 | :--- | :--- | :--- | :--- |
 | `id` | `UUID` | `PRIMARY KEY` | Row id. |
 | `promo_code_id` | `UUID` | `NOT NULL`, `FK -> promo_codes(id)`, cascade delete | Code redeemed. |
-| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> users(id)`, cascade delete | Who redeemed it. Unique with `promo_code_id`. |
+| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> "user"(id)`, cascade delete | Who redeemed it. Unique with `promo_code_id`. |
 | `subscription_id` | `UUID` | `NULLABLE`, `FK -> subscriptions(id)`, set null on delete | The `PROMO` subscription row it created. |
 | `redeemed_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Redemption time. |
 

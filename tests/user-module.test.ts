@@ -7,6 +7,7 @@ import {
   getStartOfCalendarDayOslo,
   getEndOfCalendarDayOslo,
   isRewardActiveToday,
+  hasUnlimitedAudio,
 } from '../lib/tier-policy';
 
 describe('User Module Unit Tests', () => {
@@ -34,6 +35,12 @@ describe('User Module Unit Tests', () => {
     assert.strictEqual(DEFAULT_TIER_CONFIGS.FREE.priceCents, 0);
     assert.strictEqual(DEFAULT_TIER_CONFIGS.STANDARD.priceCents, 14900);
     assert.strictEqual(DEFAULT_TIER_CONFIGS.PREMIUM.priceCents, 29900);
+  });
+
+  it('should exempt only paid tiers from the audio-seconds gate', () => {
+    assert.strictEqual(hasUnlimitedAudio('FREE'), false);
+    assert.strictEqual(hasUnlimitedAudio('STANDARD'), true);
+    assert.strictEqual(hasUnlimitedAudio('PREMIUM'), true);
   });
 
   it('should have default referral reward settings configured', () => {

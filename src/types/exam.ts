@@ -122,6 +122,8 @@ export interface ExamEvaluation {
 export interface UserQuota {
   remainingAudioSeconds: number;
   totalCostUsd?: string;
+  /** Paid tiers: the audio pool doesn't gate starting an exam */
+  audioUnlimited?: boolean;
 }
 
 /**

@@ -246,7 +246,7 @@ Before any test:
 ## How the code works (reference)
 
 - **Client:** [`src/lib/purchases.ts`](../src/lib/purchases.ts) wraps the SDK.
-  - `App.tsx` calls `configurePurchases(user.id)` after login, so the RevenueCat App User ID is always our `users.id`.
+  - `App.tsx` calls `configurePurchases(user.id)` after login, so the RevenueCat App User ID is always our `"user".id`.
   - `SubscriptionScreen` calls `buySubscription(tier)`. That function finds the package by its identifier (`standard` / `premium`), calls `Purchases.purchasePackage()` and then `POST /api/revenuecat/sync`, and the screen opens **PaymentResult**.
   - On Android, switching plans replaces the old Play subscription with time proration.
   - *Manage subscription* opens `customerInfo.managementURL`: the App Store page, Google Play, or the Web Billing portal.

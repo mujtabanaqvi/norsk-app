@@ -52,6 +52,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
   const [themes, setThemes] = useState<ExamTheme[]>([]);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
+  const [audioUnlimited, setAudioUnlimited] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -97,6 +98,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       if (data.quota && typeof data.quota.remainingAudioSeconds === 'number') {
         setRemainingSeconds(data.quota.remainingAudioSeconds);
       }
+      setAudioUnlimited(!!data.quota?.audioUnlimited);
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('setup.fetchError');
       setFetchError(msg);
@@ -109,6 +111,12 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   useEffect(() => {
     loadExamCatalog();
   }, [loadExamCatalog]);
+
+  // Quietly re-check quota on focus so it updates after an exam or a subscription change
+  useEffect(
+    () => navigation.addListener('focus', () => { loadExamCatalog(true); }),
+    [navigation, loadExamCatalog]
+  );
 
   /**
    * Small progress summary from the learning profile. Non-blocking: if it fails the card
@@ -171,7 +179,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   }, [remainingSeconds, t]);
 
   const hasInsufficientQuota =
-    remainingSeconds !== null && remainingSeconds < MIN_REQUIRED_QUOTA_SECONDS;
+    !audioUnlimited && remainingSeconds !== null && remainingSeconds < MIN_REQUIRED_QUOTA_SECONDS;
 
   /**
    * Friendly upsell when today's tests are used up. Premium is the top tier, so it only

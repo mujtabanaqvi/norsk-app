@@ -95,9 +95,12 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Check if remainingAudioSeconds < 180
+    const { getUserDailyTestStatus, hasUnlimitedAudio } = await import('@/lib/tier-policy');
+    const dailyStatus = await getUserDailyTestStatus(userId);
+
+    // Check if remainingAudioSeconds < 180 (paid tiers are only limited by daily tests)
     const remainingAudioSeconds = quota?.remainingAudioSeconds ?? 0;
-    if (remainingAudioSeconds < 180) {
+    if (!hasUnlimitedAudio(dailyStatus.tier) && remainingAudioSeconds < 180) {
       return NextResponse.json(
         { error: 'Insufficient audio quota remaining.' },
         { status: 402 }
@@ -105,8 +108,6 @@ export async function POST(req: NextRequest) {
     }
 
     // Check daily test limit (free tier limit + active referral bonuses vs tests used today)
-    const { getUserDailyTestStatus } = await import('@/lib/tier-policy');
-    const dailyStatus = await getUserDailyTestStatus(userId);
     if (!dailyStatus.canStartTest) {
       return NextResponse.json(
         {

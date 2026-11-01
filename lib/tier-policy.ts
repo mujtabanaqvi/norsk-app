@@ -174,16 +174,28 @@ function getOsloOffsetMs(date: Date): number {
 }
 
 /**
+ * The user's current tier. An expired subscription or promo grant leaves a stale paid tier
+ * behind, so paid users are re-checked.
+ */
+export async function getEffectiveTier(userId: string): Promise<'FREE' | 'STANDARD' | 'PREMIUM'> {
+  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+  const tier = user?.subscriptionTier || 'FREE';
+  return user && tier !== 'FREE' ? refreshUserTier(userId, tier) : tier;
+}
+
+/**
+ * Paid tiers are limited only by their daily test count; the audio-seconds pool applies to FREE.
+ */
+export function hasUnlimitedAudio(tier: 'FREE' | 'STANDARD' | 'PREMIUM'): boolean {
+  return tier !== 'FREE';
+}
+
+/**
  * Compute full quota & daily test limits for a user
  */
 export async function getUserDailyTestStatus(userId: string) {
   // 1. Fetch user to check tier
-  const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
-  let tier: 'FREE' | 'STANDARD' | 'PREMIUM' = user?.subscriptionTier || 'FREE';
-  // An expired subscription or promo grant leaves a stale paid tier behind, so re-check paid users
-  if (user && tier !== 'FREE') {
-    tier = await refreshUserTier(userId, tier);
-  }
+  const tier = await getEffectiveTier(userId);
 
   // 2. Fetch tier policy
   const tierPolicies = await getTierConfigs();

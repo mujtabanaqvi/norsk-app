@@ -43,11 +43,12 @@ The computed costs are formatted to 6 decimal places and stored in `estimated_co
 ## 2. Quota Enforcement Logic
 
 ### Session Start Threshold:
-- Candidates require strictly **more than 180 remaining seconds** (`remainingAudioSeconds > 180`) to start an exam session.
-- If `user_quotas.remainingAudioSeconds <= 180`, `POST /api/exam/start` rejects the request with **HTTP 402 Payment Required** (`INSUFFICIENT_QUOTA`).
+- FREE candidates require at least **180 remaining seconds** (`remainingAudioSeconds >= 180`) to start an exam session.
+- If a FREE user's `user_quotas.remainingAudioSeconds < 180`, `POST /api/exam/start` rejects the request with **HTTP 402 Payment Required** (`INSUFFICIENT_QUOTA`).
+- Paid tiers (`STANDARD`, `PREMIUM`) are exempt: they are limited only by their daily test count. `GET /api/exam/topics` and `GET /api/quota` report this as `audioUnlimited: true`.
 
 ### Consumption Deduction:
-- Each candidate turn in `POST /api/exam/[sessionId]/turn` deducts the rounded audio seconds (`Math.ceil(sttSeconds)`) from `user_quotas.remaining_audio_seconds` using `GREATEST(0, remaining_audio_seconds - deductedSeconds)` to prevent negative balances.
+- For FREE users, each candidate turn in `POST /api/exam/[sessionId]/turn` deducts the rounded audio seconds (`Math.ceil(sttSeconds)`) from `user_quotas.remaining_audio_seconds` using `GREATEST(0, remaining_audio_seconds - deductedSeconds)` to prevent negative balances.
 - Token counts, synthesized characters, and STT seconds are accumulated in `exam_sessions.engine_state` across turns.
 
 ---

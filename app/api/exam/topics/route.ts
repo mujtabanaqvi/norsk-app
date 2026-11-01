@@ -3,6 +3,7 @@ import { eq, and, asc } from 'drizzle-orm';
 import { db } from '@/src/db';
 import { examThemes, examTopics, userQuotas } from '@/src/db/schema';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
+import { getEffectiveTier, hasUnlimitedAudio } from '@/lib/tier-policy';
 
 export async function GET(req: NextRequest) {
   try {
@@ -89,12 +90,15 @@ export async function GET(req: NextRequest) {
       }
     }
 
+    const audioUnlimited = hasUnlimitedAudio(await getEffectiveTier(userId));
+
     // 5. Return themes and quota
     return NextResponse.json({
       themes,
       quota: {
         remainingAudioSeconds: quota ? quota.remainingAudioSeconds : 1800,
         totalCostUsd: quota ? quota.totalCostUsd : '0',
+        audioUnlimited,
       },
     });
   } catch (error) {

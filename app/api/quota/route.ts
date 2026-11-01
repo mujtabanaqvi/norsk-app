@@ -4,8 +4,10 @@ import { eq, sql } from 'drizzle-orm';
 import { db } from '@/src/db';
 import { userQuotas } from '@/src/db/schema';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
+import { verifyAdminRequest } from '@/lib/admin-auth';
 
 const topUpSchema = z.object({
+  userId: z.string().uuid('userId must be a UUID'),
   additionalSeconds: z.number().int().positive('additionalSeconds must be a positive integer'),
 });
 
@@ -20,8 +22,9 @@ export async function GET(req: NextRequest) {
       .where(eq(userQuotas.userId, user.userId))
       .limit(1);
 
-    const { getUserDailyTestStatus } = await import('@/lib/tier-policy');
+    const { getUserDailyTestStatus, hasUnlimitedAudio } = await import('@/lib/tier-policy');
     const dailyTestStatus = await getUserDailyTestStatus(user.userId);
+    const audioUnlimited = hasUnlimitedAudio(dailyTestStatus.tier);
 
     if (!quota) {
       return NextResponse.json({
@@ -31,6 +34,7 @@ export async function GET(req: NextRequest) {
         totalLlmTokensUsed: 0,
         totalTokensUsed: 0,
         totalCostUsd: '0.000000',
+        audioUnlimited,
         hasSufficientQuotaForExam: dailyTestStatus.canStartTest,
         dailyTestStatus,
       });
@@ -43,7 +47,9 @@ export async function GET(req: NextRequest) {
       totalLlmTokensUsed: quota.totalLlmTokensUsed,
       totalTokensUsed: quota.totalLlmTokensUsed,
       totalCostUsd: quota.totalCostUsd,
-      hasSufficientQuotaForExam: quota.remainingAudioSeconds >= 180 && dailyTestStatus.canStartTest,
+      audioUnlimited,
+      hasSufficientQuotaForExam:
+        (audioUnlimited || quota.remainingAudioSeconds >= 180) && dailyTestStatus.canStartTest,
       dailyTestStatus,
     });
   } catch (error) {
@@ -54,10 +60,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST: Top-up seconds for user (e.g. after In-App Purchase)
+// POST: Admin-only top-up of a user's seconds (e.g. support credit)
 export async function POST(req: NextRequest) {
+  const auth = verifyAdminRequest(req);
+  if (!auth.authorized) {
+    return auth.errorResponse!;
+  }
+
   try {
-    const user = await authenticateUser(req);
     const body = await req.json().catch(() => ({}));
     const parsed = topUpSchema.safeParse(body);
 
@@ -68,12 +78,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const { additionalSeconds } = parsed.data;
+    const { userId, additionalSeconds } = parsed.data;
 
     const [updated] = await db
       .insert(userQuotas)
       .values({
-        userId: user.userId,
+        userId,
         remainingAudioSeconds: 1800 + additionalSeconds,
         totalLlmTokensUsed: 0,
         totalCostUsd: '0.000000',
@@ -94,10 +104,7 @@ export async function POST(req: NextRequest) {
       remainingAudioSeconds: updated.remainingAudioSeconds,
       remainingSeconds: updated.remainingAudioSeconds,
     });
-  } catch (error) {
-    if (error instanceof AuthenticationError) {
-      return NextResponse.json({ error: 'Unauthorized', message: error.message }, { status: 401 });
-    }
+  } catch {
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }
