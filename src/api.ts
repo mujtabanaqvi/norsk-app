@@ -204,7 +204,8 @@ export async function startExamSession(params: {
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    // This route puts its machine-readable code in `code` (e.g. DAILY_LIMIT_REACHED), not `error`.
+    // This route puts its machine-readable code in `code` (e.g. DAILY_LIMIT_REACHED,
+    // AUDIO_QUOTA_EXHAUSTED), not `error`.
     throw new ApiError(
       res.status,
       { ...body, error: body.code ?? body.error },
@@ -389,6 +390,7 @@ export class ApiError extends Error {
   fieldErrors?: Record<string, string>;
   email?: string;
   retryAfterSeconds?: number;
+  remainingAudioSeconds?: number;
 
   constructor(status: number, data: any, fallbackMessage: string) {
     const localized = localizedApiMessage(data);
@@ -403,6 +405,7 @@ export class ApiError extends Error {
         : data?.fieldErrors;
     this.email = data?.email;
     this.retryAfterSeconds = data?.retryAfterSeconds;
+    this.remainingAudioSeconds = data?.remainingAudioSeconds;
   }
 }
 

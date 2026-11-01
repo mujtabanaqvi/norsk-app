@@ -102,7 +102,15 @@ export async function POST(req: NextRequest) {
     const remainingAudioSeconds = quota?.remainingAudioSeconds ?? 0;
     if (!hasUnlimitedAudio(dailyStatus.tier) && remainingAudioSeconds < 180) {
       return NextResponse.json(
-        { error: 'Insufficient audio quota remaining.' },
+        {
+          error: 'Insufficient audio quota remaining.',
+          message:
+            remainingAudioSeconds <= 0
+              ? 'Gratis taletid er brukt opp. Oppgrader abonnementet ditt for å fortsette å øve.'
+              : 'Du har ikke nok gratis taletid igjen til en prøve (minst 3 minutter). Oppgrader abonnementet ditt for å fortsette å øve.',
+          code: 'AUDIO_QUOTA_EXHAUSTED',
+          remainingAudioSeconds,
+        },
         { status: 402 }
       );
     }

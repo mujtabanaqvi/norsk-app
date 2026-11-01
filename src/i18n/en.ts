@@ -130,13 +130,20 @@ export const en: Translations = {
     loginRequiredBody: 'You need to be logged in to take an oral test.',
     chooseThemeTitle: 'Choose a theme',
     noThemesForLevel: 'No exam themes are available for the selected level.',
-    insufficientTitle: 'Not enough speaking time',
+    insufficientTitle: 'Not enough speaking time left',
     insufficientBody:
-      'You only have {quota} left. At least {minutes} minutes are required to start an oral test.',
+      'You have {quota} of free speaking time left, but a test needs at least {minutes} minutes. Upgrade to keep practising. Paid plans are not limited by speaking time.',
+    quotaUsedUpTitle: 'Free speaking time used up',
+    quotaUsedUpBody:
+      "You've used all the speaking time included in the free plan. Upgrade to keep practising. Paid plans are not limited by speaking time.",
+    quotaUpgrade: 'See subscriptions',
+    quotaLater: 'Not now',
     fallbackTopic: 'Oral test',
     startFailed: 'Could not start the oral test',
     startFailedTitle: 'Could not start the test',
-    lowQuotaBanner: 'Low speaking time. You need at least {minutes} minutes to complete a full test.',
+    lowQuotaBanner:
+      'Only {quota} of free speaking time left. A test needs at least {minutes} minutes. Tap to upgrade.',
+    quotaUsedUpBanner: 'Your free speaking time is used up. Tap to see subscriptions.',
     loading: 'Loading available themes and speaking time...',
     connectionError: 'Connection error',
     quotaOverline: 'SPEAKING TIME',
@@ -691,6 +698,7 @@ export const en: Translations = {
     EXPIRED: 'The code has expired. Request a new code.',
     TOO_MANY_ATTEMPTS: 'Too many failed attempts. Request a new code.',
     RESEND_COOLDOWN: 'Wait {seconds} seconds before requesting a new code.',
+    AUDIO_QUOTA_EXHAUSTED: 'Your free speaking time is used up. Upgrade to keep practising.',
   },
 
   network: {

@@ -137,14 +137,20 @@ export const nb = {
     loginRequiredBody: 'Du må være logget inn for å ta en muntlig prøve.',
     chooseThemeTitle: 'Velg tema',
     noThemesForLevel: 'Ingen tilgjengelige eksamenstemaer for valgt nivå.',
-    insufficientTitle: 'Utilstrekkelig taletid',
+    insufficientTitle: 'Ikke nok taletid igjen',
     insufficientBody:
-      'Du har kun {quota} igjen. Minimum {minutes} minutter kreves for å starte en muntlig prøve.',
+      'Du har {quota} gratis taletid igjen, men en prøve krever minst {minutes} minutter. Oppgrader for å fortsette å øve. Betalte abonnementer er ikke begrenset av taletid.',
+    quotaUsedUpTitle: 'Gratis taletid er brukt opp',
+    quotaUsedUpBody:
+      'Du har brukt all taletiden som er inkludert i gratisversjonen. Oppgrader for å fortsette å øve. Betalte abonnementer er ikke begrenset av taletid.',
+    quotaUpgrade: 'Se abonnementer',
+    quotaLater: 'Ikke nå',
     fallbackTopic: 'Muntlig prøve',
     startFailed: 'Oppstart av muntlig prøve mislyktes',
     startFailedTitle: 'Kunne ikke starte prøven',
     lowQuotaBanner:
-      'Lav talekvote. Du trenger minst {minutes} minutter for å gjennomføre en full prøve.',
+      'Bare {quota} gratis taletid igjen. En prøve krever minst {minutes} minutter. Trykk for å oppgradere.',
+    quotaUsedUpBanner: 'Gratis taletid er brukt opp. Trykk for å se abonnementer.',
     loading: 'Henter tilgjengelige temaer og talekvote...',
     connectionError: 'Tilkoblingsfeil',
     quotaOverline: 'TALEKVOTE',
@@ -703,6 +709,7 @@ export const nb = {
     EXPIRED: 'Koden har utløpt. Be om en ny kode.',
     TOO_MANY_ATTEMPTS: 'For mange feil forsøk. Be om en ny kode.',
     RESEND_COOLDOWN: 'Vent {seconds} sekunder før du ber om en ny kode.',
+    AUDIO_QUOTA_EXHAUSTED: 'Gratis taletid er brukt opp. Oppgrader for å fortsette å øve.',
   },
 
   /** Client-side fallbacks in src/api.ts when the server gives no message. */

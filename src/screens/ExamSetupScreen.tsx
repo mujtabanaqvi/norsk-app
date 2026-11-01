@@ -166,20 +166,49 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   /**
    * Format audio quota seconds into user-friendly minutes & seconds
    */
-  const formattedQuota = useMemo(() => {
-    if (remainingSeconds === null) return '-- min';
-    const minutes = Math.floor(remainingSeconds / 60);
-    const seconds = remainingSeconds % 60;
-    if (minutes === 0) {
-      return t('setup.quotaSec', { sec: seconds });
-    }
-    return seconds > 0
-      ? t('setup.quotaMinSec', { min: minutes, sec: seconds })
-      : t('setup.quotaMin', { min: minutes });
-  }, [remainingSeconds, t]);
+  const formatQuota = useCallback(
+    (totalSeconds: number) => {
+      const minutes = Math.floor(totalSeconds / 60);
+      const seconds = totalSeconds % 60;
+      if (minutes === 0) {
+        return t('setup.quotaSec', { sec: seconds });
+      }
+      return seconds > 0
+        ? t('setup.quotaMinSec', { min: minutes, sec: seconds })
+        : t('setup.quotaMin', { min: minutes });
+    },
+    [t]
+  );
+
+  const formattedQuota = useMemo(
+    () => (remainingSeconds === null ? '-- min' : formatQuota(remainingSeconds)),
+    [remainingSeconds, formatQuota]
+  );
 
   const hasInsufficientQuota =
     !audioUnlimited && remainingSeconds !== null && remainingSeconds < MIN_REQUIRED_QUOTA_SECONDS;
+  const isQuotaUsedUp = hasInsufficientQuota && remainingSeconds <= 0;
+
+  /**
+   * Explains that the free speaking time is (nearly) used up and offers the subscription screen,
+   * since paid tiers aren't limited by speaking time.
+   */
+  const showQuotaExhausted = (seconds: number) => {
+    const usedUp = seconds <= 0;
+    Alert.alert(
+      usedUp ? t('setup.quotaUsedUpTitle') : t('setup.insufficientTitle'),
+      usedUp
+        ? t('setup.quotaUsedUpBody')
+        : t('setup.insufficientBody', {
+            quota: formatQuota(seconds),
+            minutes: MIN_REQUIRED_QUOTA_SECONDS / 60,
+          }),
+      [
+        { text: t('setup.quotaLater'), style: 'cancel' },
+        { text: t('setup.quotaUpgrade'), onPress: () => navigation.navigate('Subscription') },
+      ]
+    );
+  };
 
   /**
    * Friendly upsell when today's tests are used up. Premium is the top tier, so it only
@@ -213,13 +242,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
     }
 
     if (hasInsufficientQuota) {
-      Alert.alert(
-        t('setup.insufficientTitle'),
-        t('setup.insufficientBody', {
-          quota: formattedQuota,
-          minutes: MIN_REQUIRED_QUOTA_SECONDS / 60,
-        })
-      );
+      showQuotaExhausted(remainingSeconds);
       return;
     }
 
@@ -256,6 +279,13 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
         // Our cached count was stale; sync it so the card shows the limit too.
         refreshProfile();
         showDailyLimitReached();
+        return;
+      }
+      if (err instanceof ApiError && err.code === 'AUDIO_QUOTA_EXHAUSTED') {
+        // Our cached balance was stale (e.g. used on another device); sync it so the banner shows too.
+        const seconds = err.remainingAudioSeconds ?? 0;
+        setRemainingSeconds(seconds);
+        showQuotaExhausted(seconds);
         return;
       }
       const message = err instanceof Error ? err.message : t('setup.startFailed');
@@ -486,12 +516,22 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
       {/* Insufficient Quota Warning Banner */}
       {hasInsufficientQuota && (
-        <View style={styles.warningBanner}>
+        <Pressable
+          style={styles.warningBanner}
+          onPress={() => navigation.navigate('Subscription')}
+          accessibilityRole="button"
+        >
           <Icon name="warning-outline" size={18} color={colors.warning} />
           <Text style={styles.warningBannerText}>
-            {t('setup.lowQuotaBanner', { minutes: MIN_REQUIRED_QUOTA_SECONDS / 60 })}
+            {isQuotaUsedUp
+              ? t('setup.quotaUsedUpBanner')
+              : t('setup.lowQuotaBanner', {
+                  quota: formattedQuota,
+                  minutes: MIN_REQUIRED_QUOTA_SECONDS / 60,
+                })}
           </Text>
-        </View>
+          <Icon name="chevron-forward" size={16} color={colors.warning} />
+        </Pressable>
       )}
 
       {isLoading ? (
@@ -865,7 +905,8 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             icon="mic"
             fullWidth
             loading={isStarting}
-            disabled={isStarting || !selectedThemeId || hasInsufficientQuota}
+            // Low quota stays tappable so the user gets an explanation instead of a dead button
+            disabled={isStarting || !selectedThemeId}
             onPress={handleStartExam}
           />
         </View>
