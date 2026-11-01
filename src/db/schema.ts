@@ -257,7 +257,11 @@ export const user = pgTable('user', {
   subscriptionTier: subscriptionTierEnum('subscription_tier').notNull().default('FREE'),
   referralCode: varchar('referral_code', { length: 32 }).notNull().unique(),
   referredByUserId: varchar('referred_by_user_id', { length: 128 }),
-});
+  // Set by an admin: the user is signed out and can't sign in again until reactivated (null = active)
+  deactivatedAt: timestamp('deactivated_at', { withTimezone: true }),
+}, (table) => [
+  index('idx_user_created_at').on(table.createdAt),
+]);
 
 export const session = pgTable('session', {
   id: text('id').primaryKey(),

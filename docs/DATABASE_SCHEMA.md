@@ -175,6 +175,7 @@ Core user profile, Better Auth account records, referral identities, and subscri
 | `subscription_tier` | `subscription_tier` | `NOT NULL`, `DEFAULT 'FREE'` | `'FREE'`, `'STANDARD'`, or `'PREMIUM'`. |
 | `referral_code` | `VARCHAR(32)` | `NOT NULL`, `UNIQUE` | Unique 8-char referral code. |
 | `referred_by_user_id`| `VARCHAR(128)` | `NULLABLE` | Referrer user ID if referred during signup. |
+| `deactivated_at`     | `TIMESTAMPTZ`  | `NULLABLE` | Set by an admin; blocks sign-in and all authenticated requests. `NULL` = active. Indexed alongside `created_at`. |
 
 ### 2.6 `tier_configs`
 Configurable subscription limits, monthly pricing, and feature bullets.

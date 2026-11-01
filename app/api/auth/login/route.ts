@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/better-auth';
 import { db } from '@/src/db';
-import { users } from '@/src/db/schema';
+import { session, users } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
-import { signUserToken } from '@/lib/auth';
+import { ACCOUNT_DEACTIVATED_MESSAGE, signUserToken } from '@/lib/auth';
 import { loginSchema } from '@/src/validation/auth';
 import { apiError, validationError, betterAuthErrorCode } from '@/lib/api-errors';
 import { issueVerification } from '@/lib/email-verification';
@@ -36,6 +36,12 @@ export async function POST(req: NextRequest) {
       .from(users)
       .where(eq(users.id, signInRes.user.id))
       .limit(1);
+
+    if (userRecord?.deactivatedAt) {
+      // signInEmail already created a Better Auth session; don't leave it behind
+      await db.delete(session).where(eq(session.userId, userRecord.id));
+      return apiError(403, 'ACCOUNT_DEACTIVATED', ACCOUNT_DEACTIVATED_MESSAGE);
+    }
 
     const token = signUserToken({
       id: signInRes.user.id,

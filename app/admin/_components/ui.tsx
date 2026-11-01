@@ -381,6 +381,8 @@ interface ConfirmOptions {
   message: string;
   confirmLabel?: string;
   danger?: boolean;
+  /** The confirm button stays disabled until this exact text (case-insensitive) is typed. */
+  requireText?: string;
 }
 
 /** Promise-based replacement for `window.confirm`. Render `dialog` once in the component tree. */
@@ -388,9 +390,14 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
   const [pending, setPending] = useState<(ConfirmOptions & { resolve: (ok: boolean) => void }) | null>(
     null
   );
+  const [typed, setTyped] = useState('');
 
   const confirm = useCallback(
-    (options: ConfirmOptions) => new Promise<boolean>((resolve) => setPending({ ...options, resolve })),
+    (options: ConfirmOptions) =>
+      new Promise<boolean>((resolve) => {
+        setTyped('');
+        setPending({ ...options, resolve });
+      }),
     []
   );
 
@@ -398,6 +405,9 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
     pending?.resolve(ok);
     setPending(null);
   };
+
+  const textMatches =
+    !pending?.requireText || typed.trim().toLowerCase() === pending.requireText.trim().toLowerCase();
 
   useEscapeAndScrollLock(pending !== null, () => close(false));
 
@@ -407,6 +417,22 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
       <div className={s.dialog} role="alertdialog" aria-modal aria-label={pending.title}>
         <h2 className={s.dialogTitle}>{pending.title}</h2>
         <p className={s.dialogText}>{pending.message}</p>
+        {pending.requireText && (
+          <label className={s.dialogText} style={{ display: 'block' }}>
+            Skriv <strong className={s.mono}>{pending.requireText}</strong> for å bekrefte:
+            <input
+              className={s.field}
+              style={{ marginTop: 8 }}
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && textMatches) close(true);
+              }}
+              autoFocus
+              autoComplete="off"
+            />
+          </label>
+        )}
         <div className={s.dialogActions}>
           <button type="button" className={s.btn} onClick={() => close(false)}>
             Avbryt
@@ -415,7 +441,8 @@ export function useConfirm(): [(options: ConfirmOptions) => Promise<boolean>, Re
             type="button"
             className={cx(s.btn, pending.danger ? s.btnDanger : s.btnPrimary)}
             onClick={() => close(true)}
-            autoFocus
+            disabled={!textMatches}
+            autoFocus={!pending.requireText}
           >
             {pending.confirmLabel ?? 'Bekreft'}
           </button>

@@ -59,6 +59,24 @@ export function verifyUserToken(token: string): { sub: string; email?: string; r
 
 import { auth as betterAuthInstance } from './better-auth';
 
+export const ACCOUNT_DEACTIVATED_MESSAGE = 'Kontoen din er deaktivert. Kontakt support for hjelp.';
+
+/** True when an admin has deactivated the account (see lib/user-admin.ts). */
+export async function isUserDeactivated(userId: string): Promise<boolean> {
+  const [row] = await db
+    .select({ deactivatedAt: users.deactivatedAt })
+    .from(users)
+    .where(eq(users.id, userId))
+    .limit(1);
+  return Boolean(row?.deactivatedAt);
+}
+
+async function assertUserActive(userId: string): Promise<void> {
+  if (await isUserDeactivated(userId)) {
+    throw new AuthenticationError(ACCOUNT_DEACTIVATED_MESSAGE);
+  }
+}
+
 /**
  * Authenticates the user from incoming Next.js API Request.
  * Supports:
@@ -70,21 +88,23 @@ export async function authenticateUser(
   request: Request | NextRequest
 ): Promise<AuthenticatedUser> {
   // 1. Try Better Auth session resolution
+  let sessionData: Awaited<ReturnType<typeof betterAuthInstance.api.getSession>> = null;
   try {
-    const sessionData = await betterAuthInstance.api.getSession({
+    sessionData = await betterAuthInstance.api.getSession({
       headers: request.headers,
     });
-    if (sessionData && sessionData.user) {
-      return {
-        userId: sessionData.user.id,
-        email: sessionData.user.email,
-        name: sessionData.user.name,
-        role: (sessionData.user as any).role || 'USER',
-        subscriptionTier: (sessionData.user as any).subscriptionTier || 'FREE',
-      };
-    }
   } catch {
     // Continue to Bearer / header fallback
+  }
+  if (sessionData && sessionData.user) {
+    await assertUserActive(sessionData.user.id);
+    return {
+      userId: sessionData.user.id,
+      email: sessionData.user.email,
+      name: sessionData.user.name,
+      role: (sessionData.user as any).role || 'USER',
+      subscriptionTier: (sessionData.user as any).subscriptionTier || 'FREE',
+    };
   }
 
   let token: string | null = null;
@@ -107,13 +127,9 @@ export async function authenticateUser(
     }
     const cleanToken = token.trim();
 
+    let payload: ReturnType<typeof verifyUserToken>;
     try {
-      const payload = verifyUserToken(cleanToken);
-      return {
-        userId: payload.sub,
-        email: payload.email,
-        role: payload.role,
-      };
+      payload = verifyUserToken(cleanToken);
     } catch {
       // Fallback for mock/candidate token in dev/tests (e.g. user_xxx or candidate_xxx)
       if (allowUnverifiedIdentity() && UNVERIFIED_TOKEN_PREFIXES.some((prefix) => cleanToken.startsWith(prefix))) {
@@ -121,6 +137,13 @@ export async function authenticateUser(
       }
       throw new AuthenticationError('Invalid authentication token');
     }
+    // JWTs are valid for 30 days, so a deactivated user's already-issued token is cut off here
+    await assertUserActive(payload.sub);
+    return {
+      userId: payload.sub,
+      email: payload.email,
+      role: payload.role,
+    };
   }
 
   // Header-based fallback (e.g. from reverse proxy, mobile client gateway, or dev runner)

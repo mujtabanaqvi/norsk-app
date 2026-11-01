@@ -136,6 +136,25 @@ export async function fetchSubscriber(appUserId: string): Promise<RevenueCatSubs
 }
 
 /**
+ * Erase the RevenueCat customer (used when an admin deletes a user). This does not cancel billing
+ * in Google Play / App Store; the user has to cancel there. Returns false when no key is configured.
+ */
+export async function deleteSubscriber(appUserId: string): Promise<boolean> {
+  const apiKey = process.env.REVENUECAT_SECRET_API_KEY;
+  if (!apiKey) return false;
+
+  const res = await fetch(`${REVENUECAT_API}/subscribers/${encodeURIComponent(appUserId)}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${apiKey}`, Accept: 'application/json' },
+    cache: 'no-store',
+  });
+  if (!res.ok && res.status !== 404) {
+    throw new Error(`RevenueCat DELETE /subscribers failed with ${res.status}`);
+  }
+  return true;
+}
+
+/**
  * Pull the user's subscriptions from RevenueCat into our database and return the recomputed tier.
  * Returns null when no Snakkly user has this id (e.g. a webhook for a deleted account).
  */

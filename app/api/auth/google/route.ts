@@ -5,7 +5,7 @@ import crypto from 'crypto';
 import { db } from '@/src/db';
 import { users, account, userQuotas } from '@/src/db/schema';
 import { eq, and } from 'drizzle-orm';
-import { signUserToken } from '@/lib/auth';
+import { ACCOUNT_DEACTIVATED_MESSAGE, signUserToken } from '@/lib/auth';
 import { referralCodeSchema } from '@/src/validation/auth';
 import { apiError, validationError } from '@/lib/api-errors';
 import { onEmailVerified } from '@/lib/email-verification';
@@ -165,6 +165,9 @@ export async function POST(req: NextRequest) {
 
     if (!userRecord) {
       return apiError(404, 'USER_NOT_FOUND', 'Brukerkontoen finnes ikke');
+    }
+    if (userRecord.deactivatedAt) {
+      return apiError(403, 'ACCOUNT_DEACTIVATED', ACCOUNT_DEACTIVATED_MESSAGE);
     }
 
     const token = signUserToken({

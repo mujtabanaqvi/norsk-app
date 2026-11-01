@@ -8,15 +8,17 @@ import { ExamsPanel } from './_components/ExamsPanel';
 import { ThemesPanel } from './_components/ThemesPanel';
 import { ConfigPanel } from './_components/ConfigPanel';
 import { PromoCodesPanel } from './_components/PromoCodesPanel';
+import { UsersPanel } from './_components/UsersPanel';
 import type { AdminExamTheme, AdminExamTopic, ExamFilterPreset } from './_components/types';
 
 const SESSION_STORAGE_KEY = 'norsk_admin_secret';
 
-type Section = 'exams' | 'themes' | 'config' | 'promo';
+type Section = 'exams' | 'themes' | 'users' | 'config' | 'promo';
 
 const SECTIONS: Array<{ id: Section; label: string; icon: string }> = [
   { id: 'exams', label: 'Eksamener', icon: '📚' },
   { id: 'themes', label: 'Temaer', icon: '🗂' },
+  { id: 'users', label: 'Brukere', icon: '👥' },
   { id: 'config', label: 'Abonnement & verving', icon: '⚙️' },
   { id: 'promo', label: 'Kampanjekoder', icon: '🎟' },
 ];
@@ -38,6 +40,7 @@ export default function AdminPortalPage() {
   const [themes, setThemes] = useState<AdminExamTheme[]>([]);
   const [isLoadingThemes, setIsLoadingThemes] = useState<boolean>(false);
   const [promoCount, setPromoCount] = useState<number | null>(null);
+  const [userCount, setUserCount] = useState<number | null>(null);
 
   const [section, setSection] = useState<Section>(sectionFromHash);
   // Filters to open the exam list with when navigating from another section; the key remounts the panel.
@@ -172,6 +175,7 @@ export default function AdminPortalPage() {
     setExams([]);
     setThemes([]);
     setPromoCount(null);
+    setUserCount(null);
   };
 
   const showExams = (preset: ExamFilterPreset) => {
@@ -184,6 +188,7 @@ export default function AdminPortalPage() {
   const navCounts: Partial<Record<Section, number | null>> = {
     exams: exams.length,
     themes: themes.length,
+    users: userCount,
     promo: promoCount,
   };
 
@@ -208,7 +213,7 @@ export default function AdminPortalPage() {
           />
           <h1 style={{ fontSize: 22, fontWeight: 800, margin: '0 0 6px' }}>Admin</h1>
           <p style={{ fontSize: 14, color: '#8B9AB4', lineHeight: 1.5, margin: '0 0 20px' }}>
-            Logg inn for å administrere oppgavesett, temaer, abonnement og kampanjekoder.
+            Logg inn for å administrere oppgavesett, temaer, brukere, abonnement og kampanjekoder.
           </p>
 
           {authError && <div className={s.formError}>{authError}</div>}
@@ -310,6 +315,9 @@ export default function AdminPortalPage() {
               onReload={reloadExamsAndThemes}
               onShowExams={showExams}
             />
+          )}
+          {section === 'users' && (
+            <UsersPanel request={adminJsonRequest} notify={notify} onCountChange={setUserCount} />
           )}
           {section === 'config' && <ConfigPanel request={adminJsonRequest} notify={notify} />}
           {section === 'promo' && (

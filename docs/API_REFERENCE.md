@@ -194,6 +194,12 @@ Protected by the `x-admin-secret` header (checked against `process.env.ADMIN_SEC
 - **`PATCH /api/admin/themes/[id]`**: Updates title, slug, description, sort order or `isActive`.
 - **`DELETE /api/admin/themes/[id]`**: Deletes the theme; its question sets and sessions keep existing with `theme_id = NULL`.
 
+### 10.1c Users (`/api/admin/users`)
+- **`GET /api/admin/users`**: Server-side paged list. Query: `page`, `pageSize` (max 100), `q` (name/email, case-insensitive substring), `tier` (`ALL|FREE|STANDARD|PREMIUM`), `provider` (`ALL|STRIPE|APPLE|GOOGLE|PROMO|NONE`, by currently entitling subscription), `status` (`ALL|ACTIVE|DEACTIVATED`), `verified` (`ALL|YES|NO`), `sort` (`newest|oldest|lastActive`). Invalid values fall back to defaults. Returns `{ users, total, page, pageSize }`; each user includes `activeProvider`, `examCount`, `lastExamAt`.
+- **`GET /api/admin/users/[id]`**: Detail: subscriptions, sign-in methods, usage/cost, exam counts by status, referrals, promo redemptions, `hasActivePaidSubscription`.
+- **`PATCH /api/admin/users/[id]`**: `{ isActive: boolean }`. Deactivating sets `user.deactivated_at`, deletes the user's Better Auth sessions, and makes every authenticated endpoint return `401` (JWTs included). Login, Google sign-in and email verification return `403 ACCOUNT_DEACTIVATED`.
+- **`DELETE /api/admin/users/[id]`**: `{ confirmEmail }` must match the user's email. Permanently deletes the user and all their data (exam sessions, usage ledger, quota, learning profile, verification codes, subscriptions, sessions, accounts, referral rewards, promo redemptions; referred users are unlinked). If the user ever had a store subscription, the RevenueCat customer is deleted too (best effort). Store billing is **not** cancelled.
+
 ### 10.2 Configuration Management (`/api/admin/config`)
 - **`GET /api/admin/config`**: Returns current tier policies (`tiers`) and referral parameters (`referral: { bonusDailyTests, durationDays }`).
 - **`PUT /api/admin/config`**: Updates a tier limit, fallback price label (users are charged the store / Web Billing price), and feature array (`tier`, `dailyTestLimit`, `priceCents`, `currency`, `features: string[]`), or updates referral bonus parameters (`bonusDailyTests`, `durationDays`). Saves directly to `tier_configs` and `system_configs`.

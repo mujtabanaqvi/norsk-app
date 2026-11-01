@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { db } from '@/src/db';
 import { users } from '@/src/db/schema';
 import { eq } from 'drizzle-orm';
-import { signUserToken } from '@/lib/auth';
+import { ACCOUNT_DEACTIVATED_MESSAGE, signUserToken } from '@/lib/auth';
 import { emailSchema, verifyEmailSchema } from '@/src/validation/auth';
 import { apiError, validationError } from '@/lib/api-errors';
 import { verifyByCode, verifyByToken, type VerifyResult } from '@/lib/email-verification';
@@ -38,6 +38,9 @@ export async function POST(req: NextRequest) {
     const [userRecord] = await db.select().from(users).where(eq(users.id, result.userId)).limit(1);
     if (!userRecord) {
       return apiError(404, 'USER_NOT_FOUND', 'Brukeren finnes ikke');
+    }
+    if (userRecord.deactivatedAt) {
+      return apiError(403, 'ACCOUNT_DEACTIVATED', ACCOUNT_DEACTIVATED_MESSAGE);
     }
 
     const token = signUserToken({

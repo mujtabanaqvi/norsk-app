@@ -40,7 +40,53 @@ export interface AdminPromoCode {
   createdAt: string;
 }
 
-export type AdminRequest = (url: string, method: string, body?: unknown) => Promise<any>;
+export type Tier = 'FREE' | 'STANDARD' | 'PREMIUM';
+export type PaymentProvider = 'STRIPE' | 'APPLE' | 'GOOGLE' | 'PROMO';
+
+export interface AdminUser {
+  id: string;
+  name: string;
+  email: string;
+  image: string | null;
+  emailVerified: boolean;
+  role: 'USER' | 'ADMIN';
+  subscriptionTier: Tier;
+  deactivatedAt: string | null;
+  createdAt: string;
+  /** Provider of the subscription currently granting the tier (null on FREE) */
+  activeProvider: PaymentProvider | null;
+  examCount: number;
+  lastExamAt: string | null;
+}
+
+export interface AdminUserDetail {
+  user: Omit<AdminUser, 'activeProvider' | 'examCount' | 'lastExamAt'> & { referralCode: string };
+  signInMethods: string[];
+  subscriptions: Array<{
+    id: string;
+    provider: PaymentProvider;
+    productId: string | null;
+    tier: Tier;
+    status: 'INACTIVE' | 'ACTIVE' | 'TRIALING' | 'PAST_DUE' | 'CANCELED';
+    environment: string;
+    currentPeriodEnd: string;
+    cancelAtPeriodEnd: boolean;
+  }>;
+  /** Auto-renewing store subscription: deleting the user does not stop the billing */
+  hasActivePaidSubscription: boolean;
+  usage: {
+    remainingAudioSeconds: number;
+    totalSttSecondsUsed: number;
+    totalLlmTokensUsed: number;
+    totalCostUsd: number;
+  } | null;
+  exams: Partial<Record<'ACTIVE' | 'COMPLETED' | 'FAILED', number>>;
+  referralCount: number;
+  referredBy: { id: string; name: string; email: string } | null;
+  promoRedemptions: Array<{ code: string; tier: Tier; redeemedAt: string }>;
+}
+
+export type AdminRequest =(url: string, method: string, body?: unknown) => Promise<any>;
 
 /** Filters the exam list can be opened with from other sections (e.g. clicking a theme's set count). */
 export interface ExamFilterPreset {

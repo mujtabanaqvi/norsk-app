@@ -57,6 +57,13 @@
       "when": 1792955507653,
       "tag": "0007_promo_codes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793569750457,
+      "tag": "0008_user_deactivation",
+      "breakpoints": true
     }
   ]
 }
