@@ -509,6 +509,10 @@ function UserDetailDrawer({ userId, request, notify, onClose, onChanged }: UserD
                 />
                 {detail.usage && (
                   <>
+                    <DetailRow
+                      label="Taletid i dag"
+                      value={`${Math.max(0, Math.round(detail.usage.audioUsedTodaySeconds / 60))} / ${Math.round(detail.usage.dailyAudioSeconds / 60)} min brukt`}
+                    />
                     <DetailRow label="Taletid brukt" value={`${Math.round(detail.usage.totalSttSecondsUsed / 60)} min`} />
                     <DetailRow label="LLM-tokens" value={detail.usage.totalLlmTokensUsed.toLocaleString('nb-NO')} />
                     <DetailRow label="Kostnad" value={`$${detail.usage.totalCostUsd.toFixed(2)}`} />

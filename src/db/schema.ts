@@ -9,6 +9,7 @@ import {
   boolean,
   jsonb,
   timestamp,
+  date,
   pgEnum,
   index,
   uniqueIndex,
@@ -159,7 +160,12 @@ export const examTopics = pgTable(
  */
 export const userQuotas = pgTable('user_quotas', {
   userId: varchar('user_id', { length: 128 }).primaryKey(),
+  /** @deprecated Old lifetime pool; daily allowance now comes from tier_configs.daily_audio_minutes */
   remainingAudioSeconds: integer('remaining_audio_seconds').notNull().default(1800),
+  /** Speaking seconds used on `audioUsageDay`; negative when an admin top-up exceeds usage */
+  audioSecondsUsedToday: integer('audio_seconds_used_today').notNull().default(0),
+  /** Europe/Oslo calendar day (YYYY-MM-DD) that `audioSecondsUsedToday` belongs to */
+  audioUsageDay: date('audio_usage_day', { mode: 'string' }),
   totalLlmTokensUsed: bigint('total_llm_tokens_used', { mode: 'number' })
     .notNull()
     .default(0),
@@ -340,6 +346,7 @@ export const subscriptions = pgTable('subscriptions', {
 export const tierConfigs = pgTable('tier_configs', {
   tier: subscriptionTierEnum('tier').primaryKey(),
   dailyTestLimit: integer('daily_test_limit').notNull(),
+  dailyAudioMinutes: integer('daily_audio_minutes').notNull().default(30),
   priceCents: integer('price_cents').notNull().default(0), // in NOK øre or EUR cents
   currency: varchar('currency', { length: 3 }).notNull().default('NOK'),
   featuresJson: jsonb('features_json').$type<string[]>(),

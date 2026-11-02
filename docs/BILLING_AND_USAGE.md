@@ -42,13 +42,19 @@ The computed costs are formatted to 6 decimal places and stored in `estimated_co
 
 ## 2. Quota Enforcement Logic
 
+### Daily Speaking-Time Allowance:
+- Every tier has a daily allowance in `tier_configs.daily_audio_minutes` (defaults: FREE 30, STANDARD 90, PREMIUM 180), editable in the admin panel under *Abonnement & verving*.
+- Usage is stored as `user_quotas.audio_seconds_used_today` together with `audio_usage_day` (Europe/Oslo `YYYY-MM-DD`). Usage from an earlier day counts as zero, so the allowance resets at **midnight Europe/Oslo** with no scheduled job. Remaining time is `allowance − used today` (`computeAudioRemaining` / `getUserAudioStatus` in `lib/tier-policy.ts`), so plan changes and admin edits apply immediately.
+- `user_quotas.remaining_audio_seconds` is the old lifetime pool and is no longer read.
+
 ### Session Start Threshold:
-- FREE candidates require at least **180 remaining seconds** (`remainingAudioSeconds >= 180`) to start an exam session.
-- If a FREE user's `user_quotas.remainingAudioSeconds < 180`, `POST /api/exam/start` rejects the request with **HTTP 402 Payment Required** (`INSUFFICIENT_QUOTA`).
-- Paid tiers (`STANDARD`, `PREMIUM`) are exempt: they are limited only by their daily test count. `GET /api/exam/topics` and `GET /api/quota` report this as `audioUnlimited: true`.
+- Every candidate needs at least **180 seconds** of today's allowance left to start an exam session.
+- Otherwise `POST /api/exam/start` rejects the request with **HTTP 402 Payment Required** (`AUDIO_QUOTA_EXHAUSTED`), including `remainingAudioSeconds`, `dailyAudioSeconds` and `resetsAtIso`.
+- `GET /api/exam/topics` and `GET /api/quota` return today's `remainingAudioSeconds`, `dailyAudioSeconds` and `audioResetsAtIso`. `audioUnlimited` is always `false` (kept for older app builds).
 
 ### Consumption Deduction:
-- For FREE users, each candidate turn in `POST /api/exam/[sessionId]/turn` deducts the rounded audio seconds (`Math.ceil(sttSeconds)`) from `user_quotas.remaining_audio_seconds` using `GREATEST(0, remaining_audio_seconds - deductedSeconds)` to prevent negative balances.
+- Each candidate turn in `POST /api/exam/[sessionId]/turn` adds the rounded audio seconds (`Math.ceil(sttSeconds)`) to today's usage via `recordAudioUsage`, starting over if the stored usage is from an earlier day.
+- Admin top-ups (`POST /api/quota`) subtract from today's usage, so they are extra time for **today only**.
 - Token counts, synthesized characters, and STT seconds are accumulated in `exam_sessions.engine_state` across turns.
 
 ---

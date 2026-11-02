@@ -137,23 +137,26 @@ export const nb = {
     loginRequiredBody: 'Du må være logget inn for å ta en muntlig prøve.',
     chooseThemeTitle: 'Velg tema',
     noThemesForLevel: 'Ingen tilgjengelige eksamenstemaer for valgt nivå.',
-    insufficientTitle: 'Ikke nok taletid igjen',
+    insufficientTitle: 'Ikke nok taletid igjen i dag',
     insufficientBody:
-      'Du har {quota} gratis taletid igjen, men en prøve krever minst {minutes} minutter. Oppgrader for å fortsette å øve. Betalte abonnementer er ikke begrenset av taletid.',
-    quotaUsedUpTitle: 'Gratis taletid er brukt opp',
+      'Du har {quota} taletid igjen i dag, men en prøve krever minst {minutes} minutter. Den nullstilles ved midnatt, eller oppgrader for å få mer taletid hver dag.',
+    insufficientBodyTopTier:
+      'Du har {quota} taletid igjen i dag, men en prøve krever minst {minutes} minutter. Den nullstilles ved midnatt.',
+    quotaUsedUpTitle: 'Dagens taletid er brukt opp',
     quotaUsedUpBody:
-      'Du har brukt all taletiden som er inkludert i gratisversjonen. Oppgrader for å fortsette å øve. Betalte abonnementer er ikke begrenset av taletid.',
+      'Du har brukt all taletiden for i dag. Den nullstilles ved midnatt, eller oppgrader for å få mer taletid hver dag.',
+    quotaUsedUpBodyTopTier: 'Du har brukt all taletiden for i dag. Den nullstilles ved midnatt.',
     quotaUpgrade: 'Se abonnementer',
     quotaLater: 'Ikke nå',
     fallbackTopic: 'Muntlig prøve',
     startFailed: 'Oppstart av muntlig prøve mislyktes',
     startFailedTitle: 'Kunne ikke starte prøven',
     lowQuotaBanner:
-      'Bare {quota} gratis taletid igjen. En prøve krever minst {minutes} minutter. Trykk for å oppgradere.',
-    quotaUsedUpBanner: 'Gratis taletid er brukt opp. Trykk for å se abonnementer.',
+      'Bare {quota} taletid igjen i dag. En prøve krever minst {minutes} minutter. Nullstilles ved midnatt.',
+    quotaUsedUpBanner: 'Dagens taletid er brukt opp. Den nullstilles ved midnatt.',
     loading: 'Henter tilgjengelige temaer og talekvote...',
     connectionError: 'Tilkoblingsfeil',
-    quotaOverline: 'TALEKVOTE',
+    quotaOverline: 'TALETID I DAG',
     quotaCaption: 'Tilgjengelig taletid',
     quotaMinSec: '{min} min {sec} sek',
     quotaMin: '{min} min',
@@ -709,7 +712,7 @@ export const nb = {
     EXPIRED: 'Koden har utløpt. Be om en ny kode.',
     TOO_MANY_ATTEMPTS: 'For mange feil forsøk. Be om en ny kode.',
     RESEND_COOLDOWN: 'Vent {seconds} sekunder før du ber om en ny kode.',
-    AUDIO_QUOTA_EXHAUSTED: 'Gratis taletid er brukt opp. Oppgrader for å fortsette å øve.',
+    AUDIO_QUOTA_EXHAUSTED: 'Dagens taletid er brukt opp. Den nullstilles ved midnatt.',
   },
 
   /** Client-side fallbacks in src/api.ts when the server gives no message. */

@@ -39,7 +39,7 @@ Welcome to the documentation for the **Norskprøven Muntlig B1/B2 Practice Simul
 
 ## Core Business Invariants
 
-1. **Minimum Quota to Start**: A FREE candidate must have at least **180 seconds** (`user_quotas.remainingAudioSeconds >= 180`) to start an exam session. Otherwise, `HTTP 402 Payment Required` (`INSUFFICIENT_QUOTA`) is returned. Paid tiers (`STANDARD`, `PREMIUM`) are exempt and limited only by their daily test count.
+1. **Minimum Quota to Start**: Every plan has a daily speaking-time allowance (`tier_configs.daily_audio_minutes`: FREE 30, STANDARD 90, PREMIUM 180 by default) that resets at midnight Europe/Oslo. A candidate needs at least **180 seconds** of today's allowance left to start an exam session. Otherwise, `HTTP 402 Payment Required` (`AUDIO_QUOTA_EXHAUSTED`) is returned.
 2. **Deterministic Exam State Machine**: Every exam session progresses deterministically through `DEL1_MONOLOGUE` → `DEL2_AI` (or `DEL2_HUMAN`) → `DEL3` → `DONE`, persisted in `exam_sessions.engine_state`.
 3. **Turn-Based Voice Pipeline**: Candidate audio is recorded with `expo-audio`, uploaded via `POST /api/exam/[sessionId]/turn`, transcribed in Norwegian, processed by the exam state machine and persona LLM, and played back via `GET /api/exam/[sessionId]/speech/[turnIndex]`.
 4. **Atomic Finish & Post-Exam Rubric Evaluation**: Calling `POST /api/exam/[sessionId]/finish` atomically marks the session `COMPLETED`, records usage in `usage_ledger`, updates `user_quotas`, and schedules `evaluateExamSession(sessionId)` via Next.js `after()`.

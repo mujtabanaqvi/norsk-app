@@ -9,6 +9,7 @@ import { getTierConfigs, getReferralSettings } from '@/lib/tier-policy';
 const updateTierSchema = z.object({
   tier: z.enum(['FREE', 'STANDARD', 'PREMIUM']),
   dailyTestLimit: z.number().int().min(1, 'Grense må være minst 1'),
+  dailyAudioMinutes: z.number().int().min(3, 'Taletid må være minst 3 minutter (nok til én prøve)'),
   priceCents: z.number().int().min(0, 'Pris kan ikke være negativ'),
   currency: z.string().default('NOK'),
   features: z.array(z.string()).optional(),
@@ -60,13 +61,14 @@ export async function PUT(req: NextRequest) {
         );
       }
 
-      const { tier, dailyTestLimit, priceCents, currency, features } = parsed.data;
+      const { tier, dailyTestLimit, dailyAudioMinutes, priceCents, currency, features } = parsed.data;
 
       await db
         .insert(tierConfigs)
         .values({
           tier,
           dailyTestLimit,
+          dailyAudioMinutes,
           priceCents,
           currency,
           featuresJson: features || [],
@@ -76,6 +78,7 @@ export async function PUT(req: NextRequest) {
           target: tierConfigs.tier,
           set: {
             dailyTestLimit,
+            dailyAudioMinutes,
             priceCents,
             currency,
             featuresJson: features || [],

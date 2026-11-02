@@ -52,7 +52,6 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
 
   const [themes, setThemes] = useState<ExamTheme[]>([]);
   const [remainingSeconds, setRemainingSeconds] = useState<number | null>(null);
-  const [audioUnlimited, setAudioUnlimited] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isStarting, setIsStarting] = useState<boolean>(false);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
@@ -98,7 +97,6 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       if (data.quota && typeof data.quota.remainingAudioSeconds === 'number') {
         setRemainingSeconds(data.quota.remainingAudioSeconds);
       }
-      setAudioUnlimited(!!data.quota?.audioUnlimited);
     } catch (err) {
       const msg = err instanceof Error ? err.message : t('setup.fetchError');
       setFetchError(msg);
@@ -186,28 +184,31 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   );
 
   const hasInsufficientQuota =
-    !audioUnlimited && remainingSeconds !== null && remainingSeconds < MIN_REQUIRED_QUOTA_SECONDS;
+    remainingSeconds !== null && remainingSeconds < MIN_REQUIRED_QUOTA_SECONDS;
   const isQuotaUsedUp = hasInsufficientQuota && remainingSeconds <= 0;
 
   /**
-   * Explains that the free speaking time is (nearly) used up and offers the subscription screen,
-   * since paid tiers aren't limited by speaking time.
+   * Explains that today's speaking time is (nearly) used up and resets at midnight. Premium is the
+   * top tier, so only lower tiers are offered the subscription screen.
    */
   const showQuotaExhausted = (seconds: number) => {
     const usedUp = seconds <= 0;
-    Alert.alert(
-      usedUp ? t('setup.quotaUsedUpTitle') : t('setup.insufficientTitle'),
-      usedUp
-        ? t('setup.quotaUsedUpBody')
-        : t('setup.insufficientBody', {
-            quota: formatQuota(seconds),
-            minutes: MIN_REQUIRED_QUOTA_SECONDS / 60,
-          }),
-      [
-        { text: t('setup.quotaLater'), style: 'cancel' },
-        { text: t('setup.quotaUpgrade'), onPress: () => navigation.navigate('Subscription') },
-      ]
-    );
+    const topTier = user?.subscriptionTier === 'PREMIUM';
+    const title = usedUp ? t('setup.quotaUsedUpTitle') : t('setup.insufficientTitle');
+    const body = usedUp
+      ? t(topTier ? 'setup.quotaUsedUpBodyTopTier' : 'setup.quotaUsedUpBody')
+      : t(topTier ? 'setup.insufficientBodyTopTier' : 'setup.insufficientBody', {
+          quota: formatQuota(seconds),
+          minutes: MIN_REQUIRED_QUOTA_SECONDS / 60,
+        });
+    if (topTier) {
+      Alert.alert(title, body);
+      return;
+    }
+    Alert.alert(title, body, [
+      { text: t('setup.quotaLater'), style: 'cancel' },
+      { text: t('setup.quotaUpgrade'), onPress: () => navigation.navigate('Subscription') },
+    ]);
   };
 
   /**
@@ -518,7 +519,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
       {hasInsufficientQuota && (
         <Pressable
           style={styles.warningBanner}
-          onPress={() => navigation.navigate('Subscription')}
+          onPress={() => showQuotaExhausted(remainingSeconds)}
           accessibilityRole="button"
         >
           <Icon name="warning-outline" size={18} color={colors.warning} />

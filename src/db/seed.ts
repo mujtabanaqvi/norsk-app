@@ -223,6 +223,7 @@ export async function seed() {
       .values({
         tier: config.tier,
         dailyTestLimit: config.dailyTestLimit,
+        dailyAudioMinutes: config.dailyAudioMinutes,
         priceCents: config.priceCents,
         currency: config.currency,
         featuresJson: config.features,
@@ -232,13 +233,14 @@ export async function seed() {
         target: tierConfigs.tier,
         set: {
           dailyTestLimit: config.dailyTestLimit,
+          dailyAudioMinutes: config.dailyAudioMinutes,
           priceCents: config.priceCents,
           currency: config.currency,
           featuresJson: config.features,
           updatedAt: new Date(),
         },
       });
-    console.log(`✓ Seeded tier config: ${config.tier} (${config.dailyTestLimit} tests/day, ${config.priceCents / 100} ${config.currency})`);
+    console.log(`✓ Seeded tier config: ${config.tier} (${config.dailyTestLimit} tests/day, ${config.dailyAudioMinutes} min/day, ${config.priceCents / 100} ${config.currency})`);
   }
 
   // 5. Seed system configurations (referral bonus and duration) from fallback defaults

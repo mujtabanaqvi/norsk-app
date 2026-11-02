@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { eq, sql } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import { db } from '@/src/db';
 import {
   examSessions,
   examTopics,
-  userQuotas,
   TranscriptEntry,
   SessionEngineState,
 } from '@/src/db/schema';
@@ -17,7 +16,7 @@ import {
 import { generateLine } from '@/src/server/personas';
 import { transcribe } from '@/src/server/speech';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
-import { getEffectiveTier, hasUnlimitedAudio } from '@/lib/tier-policy';
+import { recordAudioUsage } from '@/lib/tier-policy';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -282,15 +281,9 @@ export async function POST(
       })
       .where(eq(examSessions.id, session.id));
 
-    // Paid tiers don't draw down the pool (usage is still tracked in engineState / the ledger)
-    if (secondsToDeduct > 0 && !hasUnlimitedAudio(await getEffectiveTier(session.userId))) {
-      await db
-        .update(userQuotas)
-        .set({
-          remainingAudioSeconds: sql`GREATEST(0, ${userQuotas.remainingAudioSeconds} - ${secondsToDeduct})`,
-          updatedAt: new Date(),
-        })
-        .where(eq(userQuotas.userId, session.userId));
+    // Counts toward today's speaking allowance for every tier
+    if (secondsToDeduct > 0) {
+      await recordAudioUsage(session.userId, secondsToDeduct);
     }
 
     return NextResponse.json({

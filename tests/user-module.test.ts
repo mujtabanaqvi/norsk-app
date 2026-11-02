@@ -7,7 +7,8 @@ import {
   getStartOfCalendarDayOslo,
   getEndOfCalendarDayOslo,
   isRewardActiveToday,
-  hasUnlimitedAudio,
+  computeAudioRemaining,
+  getOsloDayKey,
 } from '../lib/tier-policy';
 
 describe('User Module Unit Tests', () => {
@@ -37,10 +38,33 @@ describe('User Module Unit Tests', () => {
     assert.strictEqual(DEFAULT_TIER_CONFIGS.PREMIUM.priceCents, 29900);
   });
 
-  it('should exempt only paid tiers from the audio-seconds gate', () => {
-    assert.strictEqual(hasUnlimitedAudio('FREE'), false);
-    assert.strictEqual(hasUnlimitedAudio('STANDARD'), true);
-    assert.strictEqual(hasUnlimitedAudio('PREMIUM'), true);
+  it('should give every tier a daily speaking-time allowance', () => {
+    assert.strictEqual(DEFAULT_TIER_CONFIGS.FREE.dailyAudioMinutes, 30);
+    assert.strictEqual(DEFAULT_TIER_CONFIGS.STANDARD.dailyAudioMinutes, 90);
+    assert.strictEqual(DEFAULT_TIER_CONFIGS.PREMIUM.dailyAudioMinutes, 180);
+  });
+
+  it('should compute speaking time left today and reset it on a new Oslo day', () => {
+    const today = '2026-11-02';
+    // Same day: allowance minus usage
+    assert.deepStrictEqual(computeAudioRemaining({ usedToday: 600, usageDay: today }, 5400, today), {
+      usedTodaySeconds: 600,
+      remainingAudioSeconds: 4800,
+    });
+    // Usage from yesterday (or never recorded) no longer counts
+    assert.strictEqual(computeAudioRemaining({ usedToday: 5400, usageDay: '2026-11-01' }, 5400, today).remainingAudioSeconds, 5400);
+    assert.strictEqual(computeAudioRemaining({ usedToday: 0, usageDay: null }, 1800, today).remainingAudioSeconds, 1800);
+    assert.strictEqual(computeAudioRemaining(undefined, 1800, today).remainingAudioSeconds, 1800);
+    // Admin top-up beyond usage adds time for today
+    assert.strictEqual(computeAudioRemaining({ usedToday: -600, usageDay: today }, 1800, today).remainingAudioSeconds, 2400);
+    // Never negative, even if the allowance was lowered below today's usage
+    assert.strictEqual(computeAudioRemaining({ usedToday: 2000, usageDay: today }, 1800, today).remainingAudioSeconds, 0);
+  });
+
+  it('should key the day by Oslo time, not UTC', () => {
+    // 23:30 UTC on Nov 1 is already Nov 2 in Oslo (UTC+1)
+    assert.strictEqual(getOsloDayKey(new Date('2026-11-01T23:30:00Z')), '2026-11-02');
+    assert.strictEqual(getOsloDayKey(new Date('2026-11-01T22:30:00Z')), '2026-11-01');
   });
 
   it('should have default referral reward settings configured', () => {

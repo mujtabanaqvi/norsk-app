@@ -130,23 +130,26 @@ export const en: Translations = {
     loginRequiredBody: 'You need to be logged in to take an oral test.',
     chooseThemeTitle: 'Choose a theme',
     noThemesForLevel: 'No exam themes are available for the selected level.',
-    insufficientTitle: 'Not enough speaking time left',
+    insufficientTitle: 'Not enough speaking time left today',
     insufficientBody:
-      'You have {quota} of free speaking time left, but a test needs at least {minutes} minutes. Upgrade to keep practising. Paid plans are not limited by speaking time.',
-    quotaUsedUpTitle: 'Free speaking time used up',
+      'You have {quota} of speaking time left today, but a test needs at least {minutes} minutes. It resets at midnight, or upgrade to get more speaking time every day.',
+    insufficientBodyTopTier:
+      'You have {quota} of speaking time left today, but a test needs at least {minutes} minutes. It resets at midnight.',
+    quotaUsedUpTitle: "Today's speaking time is used up",
     quotaUsedUpBody:
-      "You've used all the speaking time included in the free plan. Upgrade to keep practising. Paid plans are not limited by speaking time.",
+      "You've used all of today's speaking time. It resets at midnight, or upgrade to get more speaking time every day.",
+    quotaUsedUpBodyTopTier: "You've used all of today's speaking time. It resets at midnight.",
     quotaUpgrade: 'See subscriptions',
     quotaLater: 'Not now',
     fallbackTopic: 'Oral test',
     startFailed: 'Could not start the oral test',
     startFailedTitle: 'Could not start the test',
     lowQuotaBanner:
-      'Only {quota} of free speaking time left. A test needs at least {minutes} minutes. Tap to upgrade.',
-    quotaUsedUpBanner: 'Your free speaking time is used up. Tap to see subscriptions.',
+      'Only {quota} of speaking time left today. A test needs at least {minutes} minutes. Resets at midnight.',
+    quotaUsedUpBanner: "Today's speaking time is used up. It resets at midnight.",
     loading: 'Loading available themes and speaking time...',
     connectionError: 'Connection error',
-    quotaOverline: 'SPEAKING TIME',
+    quotaOverline: 'SPEAKING TIME TODAY',
     quotaCaption: 'Available speaking time',
     quotaMinSec: '{min} min {sec} sec',
     quotaMin: '{min} min',
@@ -698,7 +701,7 @@ export const en: Translations = {
     EXPIRED: 'The code has expired. Request a new code.',
     TOO_MANY_ATTEMPTS: 'Too many failed attempts. Request a new code.',
     RESEND_COOLDOWN: 'Wait {seconds} seconds before requesting a new code.',
-    AUDIO_QUOTA_EXHAUSTED: 'Your free speaking time is used up. Upgrade to keep practising.',
+    AUDIO_QUOTA_EXHAUSTED: "Today's speaking time is used up. It resets at midnight.",
   },
 
   network: {

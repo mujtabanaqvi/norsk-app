@@ -64,52 +64,32 @@ export async function POST(req: NextRequest) {
 
     const { themeId, topicId, level, coCandidateMode } = validationResult.data;
 
-    // 2. Fetch or create user quota row (default 1800s if none exists)
-    let [quota] = await db
-      .select()
-      .from(userQuotas)
-      .where(eq(userQuotas.userId, userId))
-      .limit(1);
+    // 2. Make sure the user has a quota row (usage totals and today's speaking time live there)
+    await db.insert(userQuotas).values({ userId }).onConflictDoNothing();
 
-    if (!quota) {
-      const [insertedQuota] = await db
-        .insert(userQuotas)
-        .values({
-          userId,
-          remainingAudioSeconds: 1800,
-          totalLlmTokensUsed: 0,
-          totalTtsCharactersUsed: 0,
-          totalSttSecondsUsed: '0',
-          totalCostUsd: '0',
-        })
-        .onConflictDoNothing()
-        .returning();
-
-      quota = insertedQuota;
-      if (!quota) {
-        [quota] = await db
-          .select()
-          .from(userQuotas)
-          .where(eq(userQuotas.userId, userId))
-          .limit(1);
-      }
-    }
-
-    const { getUserDailyTestStatus, hasUnlimitedAudio } = await import('@/lib/tier-policy');
+    const { getUserDailyTestStatus, getUserAudioStatus, MIN_AUDIO_SECONDS_TO_START } = await import(
+      '@/lib/tier-policy'
+    );
     const dailyStatus = await getUserDailyTestStatus(userId);
+    const audioStatus = await getUserAudioStatus(userId, dailyStatus.tier);
 
-    // Check if remainingAudioSeconds < 180 (paid tiers are only limited by daily tests)
-    const remainingAudioSeconds = quota?.remainingAudioSeconds ?? 0;
-    if (!hasUnlimitedAudio(dailyStatus.tier) && remainingAudioSeconds < 180) {
+    // Check today's speaking time (every tier has a daily allowance that resets at Oslo midnight)
+    const { remainingAudioSeconds } = audioStatus;
+    if (remainingAudioSeconds < MIN_AUDIO_SECONDS_TO_START) {
+      const upgradeHint =
+        dailyStatus.tier === 'PREMIUM' ? '' : ' Oppgrader abonnementet ditt for å få mer taletid.';
       return NextResponse.json(
         {
           error: 'Insufficient audio quota remaining.',
           message:
-            remainingAudioSeconds <= 0
-              ? 'Gratis taletid er brukt opp. Oppgrader abonnementet ditt for å fortsette å øve.'
-              : 'Du har ikke nok gratis taletid igjen til en prøve (minst 3 minutter). Oppgrader abonnementet ditt for å fortsette å øve.',
+            (remainingAudioSeconds <= 0
+              ? 'Dagens taletid er brukt opp. Den nullstilles ved midnatt.'
+              : 'Du har ikke nok taletid igjen i dag til en prøve (minst 3 minutter). Den nullstilles ved midnatt.') +
+            upgradeHint,
           code: 'AUDIO_QUOTA_EXHAUSTED',
           remainingAudioSeconds,
+          dailyAudioSeconds: audioStatus.dailyAudioSeconds,
+          resetsAtIso: audioStatus.resetsAtIso,
         },
         { status: 402 }
       );

@@ -17,6 +17,7 @@ import {
 import { verificationIdentifier } from './verification-codes';
 import { deleteSubscriber } from './revenuecat';
 import type { PaymentProvider } from './entitlements';
+import { getUserAudioStatus } from './tier-policy';
 
 // ---------- Request schemas (pure, unit-tested) ----------
 
@@ -200,6 +201,8 @@ export async function getUserDetail(userId: string) {
       : Promise.resolve([]),
   ]);
 
+  const audio = await getUserAudioStatus(userId, user.subscriptionTier);
+
   const now = Date.now();
   return {
     user: {
@@ -225,7 +228,9 @@ export async function getUserDetail(userId: string) {
     ),
     usage: quota
       ? {
-          remainingAudioSeconds: quota.remainingAudioSeconds,
+          remainingAudioSeconds: audio.remainingAudioSeconds,
+          audioUsedTodaySeconds: audio.usedTodaySeconds,
+          dailyAudioSeconds: audio.dailyAudioSeconds,
           totalSttSecondsUsed: Number(quota.totalSttSecondsUsed),
           totalLlmTokensUsed: quota.totalLlmTokensUsed,
           totalCostUsd: Number(quota.totalCostUsd),

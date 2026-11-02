@@ -1,11 +1,12 @@
 import { db } from '@/src/db';
-import { tierConfigs, systemConfigs, referralRewards, examSessions, users } from '@/src/db/schema';
+import { tierConfigs, systemConfigs, referralRewards, examSessions, users, userQuotas } from '@/src/db/schema';
 import { eq, and, or, gte, lt, sql } from 'drizzle-orm';
 import { refreshUserTier } from '@/lib/entitlements';
 
 export interface TierPolicy {
   tier: 'FREE' | 'STANDARD' | 'PREMIUM';
   dailyTestLimit: number;
+  dailyAudioMinutes: number;
   priceCents: number;
   currency: string;
   features: string[];
@@ -16,6 +17,7 @@ export const DEFAULT_TIER_CONFIGS: Record<'FREE' | 'STANDARD' | 'PREMIUM', TierP
   FREE: {
     tier: 'FREE',
     dailyTestLimit: 1, // Default free users: 1 test per 24 hours (calendar day)
+    dailyAudioMinutes: 30,
     priceCents: 0,
     currency: 'NOK',
     features: ['1 test per dag', 'B1 og B2 temaer', 'Full AI evaluering'],
@@ -23,6 +25,7 @@ export const DEFAULT_TIER_CONFIGS: Record<'FREE' | 'STANDARD' | 'PREMIUM', TierP
   STANDARD: {
     tier: 'STANDARD',
     dailyTestLimit: 5,
+    dailyAudioMinutes: 90,
     priceCents: 14900, // 149 NOK / mnd
     currency: 'NOK',
     features: ['5 tester per dag', 'B1 og B2 temaer', 'Prioritert AI stemme', 'Detaljert tilbakemelding'],
@@ -30,6 +33,7 @@ export const DEFAULT_TIER_CONFIGS: Record<'FREE' | 'STANDARD' | 'PREMIUM', TierP
   PREMIUM: {
     tier: 'PREMIUM',
     dailyTestLimit: 20, // Or practically unlimited daily practice
+    dailyAudioMinutes: 180,
     priceCents: 29900, // 299 NOK / mnd
     currency: 'NOK',
     features: ['Ubegrenset/20 tester per dag', 'Alt i Standard', 'Full historikk og uttaleanalyse', '24/7 tilgang'],
@@ -59,6 +63,7 @@ export async function getTierConfigs(): Promise<Record<'FREE' | 'STANDARD' | 'PR
       configs[row.tier] = {
         tier: row.tier,
         dailyTestLimit: row.dailyTestLimit,
+        dailyAudioMinutes: row.dailyAudioMinutes,
         priceCents: row.priceCents,
         currency: row.currency,
         features: row.featuresJson || DEFAULT_TIER_CONFIGS[row.tier]?.features || [],
@@ -133,16 +138,22 @@ export async function getActiveReferralBonusTests(
 }
 
 /**
- * Get start of calendar day (00:00:00) in Europe/Oslo timezone
+ * Europe/Oslo calendar day as YYYY-MM-DD
  */
-export function getStartOfCalendarDayOslo(date = new Date()): Date {
-  // Format to Europe/Oslo YYYY-MM-DD
-  const osloDateString = new Intl.DateTimeFormat('en-CA', {
+export function getOsloDayKey(date = new Date()): string {
+  return new Intl.DateTimeFormat('en-CA', {
     timeZone: 'Europe/Oslo',
     year: 'numeric',
     month: '2-digit',
     day: '2-digit',
   }).format(date); // outputs "YYYY-MM-DD"
+}
+
+/**
+ * Get start of calendar day (00:00:00) in Europe/Oslo timezone
+ */
+export function getStartOfCalendarDayOslo(date = new Date()): Date {
+  const osloDateString = getOsloDayKey(date);
 
   // Midnight UTC on that date, shifted back by Oslo's offset (+01:00 or +02:00).
   // DST changes happen at 02:00/03:00, so the offset at UTC midnight is the one in effect at Oslo midnight.
@@ -183,11 +194,72 @@ export async function getEffectiveTier(userId: string): Promise<'FREE' | 'STANDA
   return user && tier !== 'FREE' ? refreshUserTier(userId, tier) : tier;
 }
 
+// Speaking time needed to start an exam
+export const MIN_AUDIO_SECONDS_TO_START = 180;
+
 /**
- * Paid tiers are limited only by their daily test count; the audio-seconds pool applies to FREE.
+ * Seconds of speaking time left today. Usage recorded on an earlier day counts as zero, which is
+ * what resets the allowance at Oslo midnight.
  */
-export function hasUnlimitedAudio(tier: 'FREE' | 'STANDARD' | 'PREMIUM'): boolean {
-  return tier !== 'FREE';
+export function computeAudioRemaining(
+  usage: { usedToday: number; usageDay: string | null } | null | undefined,
+  dailySeconds: number,
+  todayKey: string
+): { usedTodaySeconds: number; remainingAudioSeconds: number } {
+  const usedTodaySeconds = usage && usage.usageDay === todayKey ? usage.usedToday : 0;
+  return { usedTodaySeconds, remainingAudioSeconds: Math.max(0, dailySeconds - usedTodaySeconds) };
+}
+
+/**
+ * The user's daily speaking-time allowance (from their tier) and what is left of it today
+ */
+export async function getUserAudioStatus(
+  userId: string,
+  tier?: 'FREE' | 'STANDARD' | 'PREMIUM',
+  now = new Date()
+) {
+  const [effectiveTier, tierPolicies, [quota]] = await Promise.all([
+    tier ?? getEffectiveTier(userId),
+    getTierConfigs(),
+    db
+      .select({ usedToday: userQuotas.audioSecondsUsedToday, usageDay: userQuotas.audioUsageDay })
+      .from(userQuotas)
+      .where(eq(userQuotas.userId, userId))
+      .limit(1),
+  ]);
+
+  const dailyAudioMinutes =
+    tierPolicies[effectiveTier]?.dailyAudioMinutes ?? DEFAULT_TIER_CONFIGS[effectiveTier].dailyAudioMinutes;
+  const dailyAudioSeconds = dailyAudioMinutes * 60;
+
+  return {
+    tier: effectiveTier,
+    dailyAudioSeconds,
+    ...computeAudioRemaining(quota, dailyAudioSeconds, getOsloDayKey(now)),
+    resetsAtIso: getEndOfCalendarDayOslo(now).toISOString(),
+  };
+}
+
+/**
+ * Add speaking seconds to today's usage, starting over if the stored usage is from an earlier day.
+ * A negative amount is an admin top-up (extra time for today only).
+ */
+export async function recordAudioUsage(userId: string, seconds: number, now = new Date()) {
+  const today = getOsloDayKey(now);
+  const [row] = await db
+    .insert(userQuotas)
+    .values({ userId, audioSecondsUsedToday: seconds, audioUsageDay: today, updatedAt: now })
+    .onConflictDoUpdate({
+      target: userQuotas.userId,
+      set: {
+        audioSecondsUsedToday: sql`CASE WHEN ${userQuotas.audioUsageDay} = ${today}
+          THEN ${userQuotas.audioSecondsUsedToday} + ${seconds} ELSE ${seconds} END`,
+        audioUsageDay: today,
+        updatedAt: now,
+      },
+    })
+    .returning({ usedToday: userQuotas.audioSecondsUsedToday });
+  return row?.usedToday ?? seconds;
 }
 
 /**

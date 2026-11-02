@@ -64,6 +64,13 @@
       "when": 1793569750457,
       "tag": "0008_user_deactivation",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1793626868038,
+      "tag": "0009_daily_audio_minutes",
+      "breakpoints": true
     }
   ]
 }

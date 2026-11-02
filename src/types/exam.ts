@@ -120,9 +120,13 @@ export interface ExamEvaluation {
  * User quota information from /api/exam/topics or /api/quota
  */
 export interface UserQuota {
+  /** Speaking time left today; resets at midnight Europe/Oslo */
   remainingAudioSeconds: number;
+  /** Today's allowance for the user's plan */
+  dailyAudioSeconds?: number;
+  audioResetsAtIso?: string;
   totalCostUsd?: string;
-  /** Paid tiers: the audio pool doesn't gate starting an exam */
+  /** Always false now; older app builds skipped the speaking-time check when true */
   audioUnlimited?: boolean;
 }
 

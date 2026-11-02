@@ -42,6 +42,8 @@ erDiagram
     user_quotas {
         varchar user_id PK
         integer remaining_audio_seconds
+        integer audio_seconds_used_today
+        date audio_usage_day
         bigint total_llm_tokens_used
         bigint total_tts_characters_used
         numeric total_stt_seconds_used
@@ -112,12 +114,14 @@ Question sets (Del 1 monologue, Del 2 discussion, Del 3 follow-up pool) for offi
 | `created_at` | `TIMESTAMPTZ`| `NOT NULL`, `DEFAULT now()` | Topic creation timestamp. |
 
 ### 2.2 `user_quotas`
-Tracks candidate audio seconds balance and cumulative provider billing metrics.
+Tracks today's speaking-time usage and cumulative provider billing metrics.
 
 | Column | Type | Constraints | Description |
 | :--- | :--- | :--- | :--- |
 | `user_id` | `VARCHAR(128)` | `PRIMARY KEY` | Candidate user ID. |
-| `remaining_audio_seconds` | `INTEGER` | `NOT NULL`, `DEFAULT 1800` | Practice balance in seconds. Must be > 180 to start exam. |
+| `remaining_audio_seconds` | `INTEGER` | `NOT NULL`, `DEFAULT 1800` | Deprecated lifetime pool; no longer read. |
+| `audio_seconds_used_today` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Speaking seconds used on `audio_usage_day`. Negative after an admin top-up larger than usage. |
+| `audio_usage_day` | `DATE` | `NULLABLE` | Europe/Oslo day the usage belongs to. An earlier day means nothing used today (daily reset). |
 | `total_llm_tokens_used` | `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative LLM prompt + completion tokens. |
 | `total_tts_characters_used`| `BIGINT` | `NOT NULL`, `DEFAULT 0` | Cumulative synthesized characters via ElevenLabs / OpenAI TTS. |
 | `total_stt_seconds_used` | `NUMERIC(10, 2)` | `NOT NULL`, `DEFAULT '0'` | Cumulative transcribed candidate speech seconds. |
@@ -184,6 +188,7 @@ Configurable subscription limits, monthly pricing, and feature bullets.
 | :--- | :--- | :--- | :--- |
 | `tier` | `subscription_tier` | `PRIMARY KEY` | Plan tier (`'FREE'`, `'STANDARD'`, `'PREMIUM'`). |
 | `daily_test_limit` | `INTEGER` | `NOT NULL` | Tests allowed per calendar day. |
+| `daily_audio_minutes` | `INTEGER` | `NOT NULL`, `DEFAULT 30` | Speaking minutes allowed per calendar day (Europe/Oslo); a test needs 3 left to start. |
 | `price_cents` | `INTEGER` | `NOT NULL`, `DEFAULT 0` | Fallback price label in NOK øre, shown only when RevenueCat prices can't be loaded. Users are charged the App Store / Google Play / Web Billing price. |
 | `currency` | `VARCHAR(3)` | `NOT NULL`, `DEFAULT 'NOK'` | ISO currency code. |
 | `features_json` | `JSONB` | `NULLABLE`, `$type<string[]>` | List of features and perks for marketing and app UI. |

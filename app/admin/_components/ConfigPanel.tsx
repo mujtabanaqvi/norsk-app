@@ -38,12 +38,19 @@ export function ConfigPanel({ request, notify }: ConfigPanelProps) {
     loadConfig();
   }, [loadConfig]);
 
-  const handleUpdateTier = async (tier: Tier, dailyLimit: number, priceCents: number, features: string[]) => {
+  const handleUpdateTier = async (
+    tier: Tier,
+    dailyLimit: number,
+    dailyAudioMinutes: number,
+    priceCents: number,
+    features: string[]
+  ) => {
     setIsSaving(true);
     try {
       await request('/api/admin/config', 'PUT', {
         tier,
         dailyTestLimit: dailyLimit,
+        dailyAudioMinutes,
         priceCents,
         features,
       });
@@ -73,7 +80,7 @@ export function ConfigPanel({ request, notify }: ConfigPanelProps) {
     <>
       <PageHeader
         title="Abonnement & verving"
-        subtitle="Daglige testgrenser, priser og inkluderte fordeler per plan, samt bonus for vervede venner."
+        subtitle="Daglige testgrenser, taleminutter (nullstilles ved midnatt), priser og inkluderte fordeler per plan, samt bonus for vervede venner."
         actions={
           <button type="button" className={s.btn} onClick={loadConfig} disabled={isLoading}>
             {isLoading ? 'Oppdaterer…' : '↻ Oppfrisk'}
@@ -98,11 +105,14 @@ export function ConfigPanel({ request, notify }: ConfigPanelProps) {
             accentColor={colors.muted}
             badgeLabel="Grunnpakke"
             initialLimit={tierPolicies.FREE?.dailyTestLimit ?? 1}
+            initialAudioMinutes={tierPolicies.FREE?.dailyAudioMinutes ?? 30}
             initialPriceCents={tierPolicies.FREE?.priceCents ?? 0}
             initialFeatures={tierPolicies.FREE?.features ?? []}
             isPaid={false}
             isSaving={isSaving}
-            onSave={(dailyLimit, priceCents, features) => handleUpdateTier('FREE', dailyLimit, priceCents, features)}
+            onSave={(dailyLimit, audioMinutes, priceCents, features) =>
+              handleUpdateTier('FREE', dailyLimit, audioMinutes, priceCents, features)
+            }
           />
           <TierConfigCard
             tier="STANDARD"
@@ -110,12 +120,13 @@ export function ConfigPanel({ request, notify }: ConfigPanelProps) {
             accentColor={colors.accent}
             badgeLabel="Populær"
             initialLimit={tierPolicies.STANDARD?.dailyTestLimit ?? 5}
+            initialAudioMinutes={tierPolicies.STANDARD?.dailyAudioMinutes ?? 90}
             initialPriceCents={tierPolicies.STANDARD?.priceCents ?? 14900}
             initialFeatures={tierPolicies.STANDARD?.features ?? []}
             isPaid={true}
             isSaving={isSaving}
-            onSave={(dailyLimit, priceCents, features) =>
-              handleUpdateTier('STANDARD', dailyLimit, priceCents, features)
+            onSave={(dailyLimit, audioMinutes, priceCents, features) =>
+              handleUpdateTier('STANDARD', dailyLimit, audioMinutes, priceCents, features)
             }
           />
           <TierConfigCard
@@ -124,12 +135,13 @@ export function ConfigPanel({ request, notify }: ConfigPanelProps) {
             accentColor="#F59E0B"
             badgeLabel="Maksimal øving"
             initialLimit={tierPolicies.PREMIUM?.dailyTestLimit ?? 20}
+            initialAudioMinutes={tierPolicies.PREMIUM?.dailyAudioMinutes ?? 180}
             initialPriceCents={tierPolicies.PREMIUM?.priceCents ?? 29900}
             initialFeatures={tierPolicies.PREMIUM?.features ?? []}
             isPaid={true}
             isSaving={isSaving}
-            onSave={(dailyLimit, priceCents, features) =>
-              handleUpdateTier('PREMIUM', dailyLimit, priceCents, features)
+            onSave={(dailyLimit, audioMinutes, priceCents, features) =>
+              handleUpdateTier('PREMIUM', dailyLimit, audioMinutes, priceCents, features)
             }
           />
         </div>
@@ -153,11 +165,12 @@ interface TierConfigCardProps {
   accentColor: string;
   badgeLabel: string;
   initialLimit: number;
+  initialAudioMinutes: number;
   initialPriceCents: number;
   initialFeatures: string[];
   isPaid: boolean;
   isSaving: boolean;
-  onSave: (dailyLimit: number, priceCents: number, features: string[]) => void;
+  onSave: (dailyLimit: number, audioMinutes: number, priceCents: number, features: string[]) => void;
 }
 
 function TierConfigCard({
@@ -166,6 +179,7 @@ function TierConfigCard({
   accentColor,
   badgeLabel,
   initialLimit,
+  initialAudioMinutes,
   initialPriceCents,
   initialFeatures,
   isPaid,
@@ -173,15 +187,17 @@ function TierConfigCard({
   onSave,
 }: TierConfigCardProps) {
   const [dailyLimit, setDailyLimit] = useState<number>(initialLimit);
+  const [audioMinutes, setAudioMinutes] = useState<number>(initialAudioMinutes);
   const [priceNok, setPriceNok] = useState<number>(Math.round(initialPriceCents / 100));
   const [features, setFeatures] = useState<string[]>(initialFeatures);
   const [newFeatureText, setNewFeatureText] = useState<string>('');
 
   useEffect(() => {
     setDailyLimit(initialLimit);
+    setAudioMinutes(initialAudioMinutes);
     setPriceNok(Math.round(initialPriceCents / 100));
     setFeatures(initialFeatures);
-  }, [initialLimit, initialPriceCents, initialFeatures]);
+  }, [initialLimit, initialAudioMinutes, initialPriceCents, initialFeatures]);
 
   const handleAddFeature = () => {
     const trimmed = newFeatureText.trim();
@@ -205,7 +221,7 @@ function TierConfigCard({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     const cleanFeatures = features.map((f) => f.trim()).filter((f) => f.length > 0);
-    onSave(dailyLimit, isPaid ? priceNok * 100 : 0, cleanFeatures);
+    onSave(dailyLimit, audioMinutes, isPaid ? priceNok * 100 : 0, cleanFeatures);
   };
 
   return (
@@ -221,7 +237,7 @@ function TierConfigCard({
           <span className={cx(s.badge, s.badgeNeutral)}>{badgeLabel}</span>
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: isPaid ? '1fr 1fr' : '1fr', gap: 12 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isPaid ? '1fr 1fr 1fr' : '1fr 1fr', gap: 12 }}>
           <div>
             <label style={styles.label}>Tester per døgn</label>
             <input
@@ -229,6 +245,17 @@ function TierConfigCard({
               min="1"
               value={dailyLimit}
               onChange={(e) => setDailyLimit(Math.max(1, parseInt(e.target.value, 10) || 1))}
+              style={styles.input}
+              required
+            />
+          </div>
+          <div>
+            <label style={styles.label}>Taleminutter per døgn</label>
+            <input
+              type="number"
+              min="3"
+              value={audioMinutes}
+              onChange={(e) => setAudioMinutes(Math.max(3, parseInt(e.target.value, 10) || 3))}
               style={styles.input}
               required
             />

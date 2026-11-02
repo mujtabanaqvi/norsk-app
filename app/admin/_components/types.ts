@@ -75,7 +75,10 @@ export interface AdminUserDetail {
   /** Auto-renewing store subscription: deleting the user does not stop the billing */
   hasActivePaidSubscription: boolean;
   usage: {
+    /** Speaking time left today (resets at Oslo midnight) */
     remainingAudioSeconds: number;
+    audioUsedTodaySeconds: number;
+    dailyAudioSeconds: number;
     totalSttSecondsUsed: number;
     totalLlmTokensUsed: number;
     totalCostUsd: number;
