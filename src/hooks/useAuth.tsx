@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AppState, Platform } from 'react-native';
 import { getStoredUser, clearAuthSession } from '../identity';
+import { logOutPurchases } from '../lib/purchases';
 import {
   fetchCurrentUser,
   loginWithEmail,
@@ -8,6 +9,7 @@ import {
   loginWithGoogleToken,
   verifyEmailCode,
   logoutUser,
+  deleteCurrentUserAccount,
   type RegisterResult,
 } from '../api';
 
@@ -63,6 +65,7 @@ interface AuthContextType {
   verifyEmail: (email: string, code: string) => Promise<void>;
   loginWithGoogle: (idToken: string, referralCode?: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   refreshProfile: () => Promise<void>;
 }
 
@@ -127,6 +130,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await refreshProfile();
   };
 
+
+  const handleDeleteAccount = async () => {
+    setIsLoading(true);
+    try {
+      await deleteCurrentUserAccount();
+      await clearAuthSession();
+      await logOutPurchases();
+      setUser(null);
+      setDailyTestStatus(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const handleLogout = async () => {
     setIsLoading(true);
     try {
@@ -149,6 +166,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         verifyEmail: handleVerifyEmail,
         loginWithGoogle: handleGoogleLogin,
         logout: handleLogout,
+        deleteAccount: handleDeleteAccount,
         refreshProfile,
       }}
     >

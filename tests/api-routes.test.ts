@@ -84,3 +84,15 @@ test('Route Logic: Results and Turn routes validate UUID parameter', () => {
   assert.equal(isValidUuid('invalid-session-id'), false);
   assert.equal(isValidUuid('12345'), false);
 });
+
+test('Route Logic: DELETE /api/auth/me rejects unauthenticated requests', async () => {
+  const { DELETE } = await import('../app/api/auth/me/route');
+  const { NextRequest } = await import('next/server');
+  const req = new NextRequest('http://localhost:3000/api/auth/me', {
+    method: 'DELETE',
+  });
+  const res = await DELETE(req);
+  assert.equal(res.status, 401);
+  const data = await res.json();
+  assert.equal(data.error, 'Unauthorized');
+});

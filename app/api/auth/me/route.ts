@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm';
 import { authenticateUser, AuthenticationError } from '@/lib/auth';
 import { getUserDailyTestStatus } from '@/lib/tier-policy';
 import { getActiveSubscription } from '@/lib/entitlements';
+import { deleteUserAndData } from '@/lib/user-admin';
 
 export async function GET(req: NextRequest) {
   try {
@@ -50,6 +51,26 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized', message: error.message }, { status: 401 });
     }
     console.error('Error fetching current user:', error);
+    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const auth = await authenticateUser(req);
+    const result = await deleteUserAndData(auth.userId);
+    if (!result) {
+      return NextResponse.json({ error: 'User Not Found' }, { status: 404 });
+    }
+
+    const res = NextResponse.json({ success: true, ...result }, { status: 200 });
+    res.cookies.delete('better-auth.session_token');
+    return res;
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return NextResponse.json({ error: 'Unauthorized', message: error.message }, { status: 401 });
+    }
+    console.error('Error deleting user account:', error);
     return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
   }
 }

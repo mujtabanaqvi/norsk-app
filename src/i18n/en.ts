@@ -640,7 +640,7 @@ export const en: Translations = {
       },
       {
         title: '7. Deleting your account',
-        body: 'Choose "Delete account" in the menu, or email support. We delete the account and its data within 30 days. Remember to cancel your subscription in Google Play or the App Store first.',
+        body: 'Choose "Delete account" in the menu to permanently delete your account and all associated data immediately. You may also contact customer support. Remember to cancel your subscription in Google Play or the App Store first.',
       },
     ],
   },
@@ -648,6 +648,14 @@ export const en: Translations = {
   legal: {
     readFull: 'Read the full document on the website',
     contact: 'Questions? Email us at {email}.',
+  },
+
+  account: {
+    deleteTitle: 'Permanently delete account?',
+    deleteBody:
+      'Are you sure you want to delete your account? All your tests, audio recordings, assessments, and learning progress will be immediately and permanently deleted. This action cannot be undone.\n\nNote: If you have an active subscription via the App Store or Google Play, you must cancel it in your store settings to avoid future charges.',
+    deleteConfirmAction: 'Delete account',
+    deleteFailed: 'Could not delete your account. Please try again later or contact support.',
   },
 
   support: {
@@ -728,6 +736,7 @@ export const en: Translations = {
     fetchPlans: 'Could not load subscription plans',
     fetchReferral: 'Could not load the referral code',
     fetchLearningProfile: 'Could not load your learning profile ({status})',
+    deleteAccountFailed: 'Could not delete account',
     verifyPurchase: 'Could not confirm the purchase',
   },
 };

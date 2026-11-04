@@ -473,6 +473,19 @@ export async function logoutUser() {
   await clearAuthSession();
 }
 
+export async function deleteCurrentUserAccount(): Promise<{ success: boolean; revenueCatDeleted?: boolean }> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/me`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.message || data.error || tr('network.deleteAccountFailed'));
+  }
+  return res.json();
+}
+
+
 export async function fetchCurrentUser() {
   const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/auth/me`, {
     method: 'GET',

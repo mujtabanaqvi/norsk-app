@@ -60,24 +60,38 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
   const insets = useSafeAreaInsets();
 
-  const { user, dailyTestStatus, logout, refreshProfile } = useAuth();
+  const { user, dailyTestStatus, logout, deleteAccount, refreshProfile } = useAuth();
   const { t, locale } = useLocale();
   const publicLinks = usePublicLinks();
 
-  // There is no self-service delete endpoint: the request goes to support (see the privacy policy, #slett-konto).
-  const confirmDeleteAccount = (email: string) =>
-    Alert.alert(t('support.deleteTitle'), t('support.deleteBody'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('support.deleteConfirm'),
-        style: 'destructive',
-        onPress: () =>
-          openSupportEmail(locale, publicLinks.supportEmail, {
-            subject: t('support.deleteSubject'),
-            body: t('support.deleteMailBody', { email }),
-          }),
-      },
-    ]);
+  const [isDeletingAccount, setIsDeletingAccount] = useState<boolean>(false);
+
+  const confirmDeleteAccount = () => {
+    setIsMenuOpen(false);
+    Alert.alert(
+      t('account.deleteTitle'),
+      t('account.deleteBody'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        {
+          text: t('account.deleteConfirmAction'),
+          style: 'destructive',
+          onPress: async () => {
+            setIsDeletingAccount(true);
+            try {
+              await deleteAccount();
+            } catch (err: any) {
+              setIsDeletingAccount(false);
+              Alert.alert(
+                t('common.error'),
+                err?.message || t('account.deleteFailed')
+              );
+            }
+          },
+        },
+      ]
+    );
+  };
 
   /**
    * Fetch theme catalog and remaining user audio quota from backend
@@ -341,7 +355,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
           {
             title: t('setup.menuAccount'),
             items: [
-              { icon: 'trash-outline' as IconName, label: t('nav.deleteAccount'), onPress: () => confirmDeleteAccount(user.email) },
+              { icon: 'trash-outline' as IconName, label: t('nav.deleteAccount'), color: colors.red, onPress: confirmDeleteAccount },
               { icon: 'log-out-outline' as IconName, label: t('setup.a11yLogout'), color: colors.red, onPress: logout },
             ],
           },

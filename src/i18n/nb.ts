@@ -650,7 +650,7 @@ export const nb = {
       },
       {
         title: '7. Sletting av konto',
-        body: 'Velg «Slett konto» i menyen, eller send en e-post til kundeservice. Vi sletter kontoen og tilhørende data innen 30 dager. Husk å si opp abonnementet i Google Play eller App Store først.',
+        body: 'Velg «Slett konto» i menyen for å slette kontoen din og alle data umiddelbart. Du kan også kontakte kundeservice. Husk å si opp abonnementet i Google Play eller App Store først.',
       },
     ],
   },
@@ -658,6 +658,14 @@ export const nb = {
   legal: {
     readFull: 'Les hele dokumentet på nettsiden',
     contact: 'Spørsmål? Skriv til oss på {email}.',
+  },
+
+  account: {
+    deleteTitle: 'Slette kontoen permanent?',
+    deleteBody:
+      'Er du sikker på at du vil slette kontoen din? Alle prøver, lydopptak, vurderinger og fremgang blir slettet umiddelbart og permanent. Handlingen kan ikke angres.\n\nMerk: Har du et aktivt abonnement via App Store eller Google Play, må du si det opp i butikkens innstillinger for å unngå videre belastning.',
+    deleteConfirmAction: 'Slett konto',
+    deleteFailed: 'Kunne ikke slette kontoen din. Prøv igjen senere eller kontakt kundeservice.',
   },
 
   support: {
@@ -740,6 +748,7 @@ export const nb = {
     fetchPlans: 'Kunne ikke hente abonnementsplaner',
     fetchReferral: 'Kunne ikke hente vervekode',
     fetchLearningProfile: 'Kunne ikke hente læringsprofil ({status})',
+    deleteAccountFailed: 'Kunne ikke slette kontoen',
     verifyPurchase: 'Kunne ikke bekrefte kjøpet',
   },
 };
