@@ -585,3 +585,75 @@ export async function redeemPromoCode(code: string): Promise<PromoRedemptionResp
   }
   return data;
 }
+
+export interface UserNotificationItem {
+  id: string;
+  type: 'DAILY_CREDITS' | 'PRACTICE_REMINDER' | 'ANNOUNCEMENT' | 'PROMOTION' | 'SYSTEM';
+  titleNo: string;
+  titleEn: string;
+  messageNo: string;
+  messageEn: string;
+  actionRoute: string | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface UserNotificationsResponse {
+  notifications: UserNotificationItem[];
+  unreadCount: number;
+}
+
+export async function fetchUserNotifications(options?: {
+  unreadOnly?: boolean;
+  limit?: number;
+}): Promise<UserNotificationsResponse> {
+  const query = new URLSearchParams();
+  if (options?.unreadOnly) query.set('unreadOnly', 'true');
+  if (options?.limit) query.set('limit', String(options.limit));
+
+  const qs = query.toString();
+  const url = `${activeApiBaseUrl}/api/notifications${qs ? `?${qs}` : ''}`;
+  const res = await fetchWithTimeout(url, {
+    method: 'GET',
+    headers: { Accept: 'application/json' },
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    throw new ApiError(res.status, data, tr('common.unknownError'));
+  }
+  return data;
+}
+
+export async function markNotificationRead(id: string): Promise<void> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/notifications/${id}`, {
+    method: 'PATCH',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data, tr('common.unknownError'));
+  }
+}
+
+export async function markAllNotificationsRead(): Promise<void> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/notifications`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ readAll: true }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data, tr('common.unknownError'));
+  }
+}
+
+export async function deleteNotification(id: string): Promise<void> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/notifications/${id}`, {
+    method: 'DELETE',
+    headers: { Accept: 'application/json' },
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data, tr('common.unknownError'));
+  }
+}

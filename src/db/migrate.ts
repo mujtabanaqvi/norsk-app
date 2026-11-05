@@ -1,8 +1,12 @@
 import { drizzle } from 'drizzle-orm/neon-serverless';
 import { migrate } from 'drizzle-orm/neon-serverless/migrator';
-import { Pool } from '@neondatabase/serverless';
+import { Pool, neonConfig } from '@neondatabase/serverless';
+import ws from 'ws';
 import * as dotenv from 'dotenv';
 import path from 'path';
+
+// Configure WebSocket constructor for Neon interactive connection in Node.js
+neonConfig.webSocketConstructor = ws;
 
 // Load environment variables (.env.local or process.env)
 dotenv.config({ path: '.env.local' });

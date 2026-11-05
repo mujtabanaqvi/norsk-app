@@ -429,6 +429,59 @@ export const promoRedemptions = pgTable(
   ]
 );
 
+/**
+ * 13. notifications Table (Broadcast / campaign / template definitions)
+ */
+export const notifications = pgTable(
+  'notifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    type: varchar('type', { length: 32 }).notNull().default('ANNOUNCEMENT'),
+    titleNo: text('title_no').notNull(),
+    titleEn: text('title_en').notNull(),
+    messageNo: text('message_no').notNull(),
+    messageEn: text('message_en').notNull(),
+    actionRoute: varchar('action_route', { length: 64 }),
+    targetAudience: varchar('target_audience', { length: 32 }).notNull().default('ALL'),
+    targetUserId: varchar('target_user_id', { length: 128 }),
+    createdById: varchar('created_by_id', { length: 128 }).notNull().default('SYSTEM'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_notifications_created_at').on(table.createdAt),
+    index('idx_notifications_type').on(table.type),
+  ]
+);
+
+/**
+ * 14. user_notifications Table (Inbox delivered to each user)
+ */
+export const userNotifications = pgTable(
+  'user_notifications',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: varchar('user_id', { length: 128 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    notificationId: uuid('notification_id').references(() => notifications.id, { onDelete: 'cascade' }),
+    type: varchar('type', { length: 32 }).notNull().default('SYSTEM'),
+    titleNo: text('title_no').notNull(),
+    titleEn: text('title_en').notNull(),
+    messageNo: text('message_no').notNull(),
+    messageEn: text('message_en').notNull(),
+    actionRoute: varchar('action_route', { length: 64 }),
+    dedupKey: varchar('dedup_key', { length: 128 }),
+    isRead: boolean('is_read').notNull().default(false),
+    readAt: timestamp('read_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index('idx_user_notifications_user_created').on(table.userId, table.createdAt),
+    index('idx_user_notifications_user_unread').on(table.userId, table.isRead),
+    uniqueIndex('uq_user_notifications_dedup').on(table.userId, table.dedupKey),
+  ]
+);
+
 // Drizzle Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   oauthAccounts: many(oauthAccounts),
@@ -437,6 +490,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   earnedRewards: many(referralRewards, { relationName: 'referrer' }),
   referredRewards: many(referralRewards, { relationName: 'referred' }),
   promoRedemptions: many(promoRedemptions),
+  notifications: many(userNotifications),
   referredBy: one(users, {
     fields: [users.referredByUserId],
     references: [users.id],
@@ -487,6 +541,21 @@ export const promoRedemptionsRelations = relations(promoRedemptions, ({ one }) =
   subscription: one(subscriptions, {
     fields: [promoRedemptions.subscriptionId],
     references: [subscriptions.id],
+  }),
+}));
+
+export const notificationsRelations = relations(notifications, ({ many }) => ({
+  userNotifications: many(userNotifications),
+}));
+
+export const userNotificationsRelations = relations(userNotifications, ({ one }) => ({
+  user: one(users, {
+    fields: [userNotifications.userId],
+    references: [users.id],
+  }),
+  notification: one(notifications, {
+    fields: [userNotifications.notificationId],
+    references: [notifications.id],
   }),
 }));
 
@@ -581,3 +650,9 @@ export type NewPromoCode = typeof promoCodes.$inferInsert;
 
 export type PromoRedemption = typeof promoRedemptions.$inferSelect;
 export type NewPromoRedemption = typeof promoRedemptions.$inferInsert;
+
+export type Notification = typeof notifications.$inferSelect;
+export type NewNotification = typeof notifications.$inferInsert;
+
+export type UserNotification = typeof userNotifications.$inferSelect;
+export type NewUserNotification = typeof userNotifications.$inferInsert;

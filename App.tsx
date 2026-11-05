@@ -10,6 +10,7 @@ import {
 } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { AuthProvider, useAuth } from './src/hooks/useAuth';
+import { NotificationsProvider } from './src/hooks/useNotifications';
 import { LocaleProvider, useLocale } from './src/hooks/useLocale';
 import { ExamSetupScreen } from './src/screens/ExamSetupScreen';
 import { ExamRoomScreen } from './src/screens/ExamRoomScreen';
@@ -242,7 +243,9 @@ export default function App() {
     <SafeAreaProvider>
       <LocaleProvider>
         <AuthProvider>
-          <AppNavigation />
+          <NotificationsProvider>
+            <AppNavigation />
+          </NotificationsProvider>
         </AuthProvider>
       </LocaleProvider>
     </SafeAreaProvider>

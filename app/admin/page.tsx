@@ -9,16 +9,18 @@ import { ThemesPanel } from './_components/ThemesPanel';
 import { ConfigPanel } from './_components/ConfigPanel';
 import { PromoCodesPanel } from './_components/PromoCodesPanel';
 import { UsersPanel } from './_components/UsersPanel';
+import { NotificationsPanel } from './_components/NotificationsPanel';
 import type { AdminExamTheme, AdminExamTopic, ExamFilterPreset } from './_components/types';
 
 const SESSION_STORAGE_KEY = 'norsk_admin_secret';
 
-type Section = 'exams' | 'themes' | 'users' | 'config' | 'promo';
+type Section = 'exams' | 'themes' | 'users' | 'notifications' | 'config' | 'promo';
 
 const SECTIONS: Array<{ id: Section; label: string; icon: string }> = [
   { id: 'exams', label: 'Eksamener', icon: '📚' },
   { id: 'themes', label: 'Temaer', icon: '🗂' },
   { id: 'users', label: 'Brukere', icon: '👥' },
+  { id: 'notifications', label: 'Varsler', icon: '🔔' },
   { id: 'config', label: 'Abonnement & verving', icon: '⚙️' },
   { id: 'promo', label: 'Kampanjekoder', icon: '🎟' },
 ];
@@ -41,6 +43,7 @@ export default function AdminPortalPage() {
   const [isLoadingThemes, setIsLoadingThemes] = useState<boolean>(false);
   const [promoCount, setPromoCount] = useState<number | null>(null);
   const [userCount, setUserCount] = useState<number | null>(null);
+  const [notificationCount, setNotificationCount] = useState<number | null>(null);
 
   const [section, setSection] = useState<Section>(sectionFromHash);
   // Filters to open the exam list with when navigating from another section; the key remounts the panel.
@@ -176,6 +179,7 @@ export default function AdminPortalPage() {
     setThemes([]);
     setPromoCount(null);
     setUserCount(null);
+    setNotificationCount(null);
   };
 
   const showExams = (preset: ExamFilterPreset) => {
@@ -189,6 +193,7 @@ export default function AdminPortalPage() {
     exams: exams.length,
     themes: themes.length,
     users: userCount,
+    notifications: notificationCount,
     promo: promoCount,
   };
 
@@ -318,6 +323,9 @@ export default function AdminPortalPage() {
           )}
           {section === 'users' && (
             <UsersPanel request={adminJsonRequest} notify={notify} onCountChange={setUserCount} />
+          )}
+          {section === 'notifications' && (
+            <NotificationsPanel request={adminJsonRequest} notify={notify} onCountChange={setNotificationCount} />
           )}
           {section === 'config' && <ConfigPanel request={adminJsonRequest} notify={notify} />}
           {section === 'promo' && (

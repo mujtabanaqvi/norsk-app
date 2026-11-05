@@ -6,6 +6,8 @@ import {
   userQuotas,
   examSessions,
   usageLedger,
+  notifications,
+  userNotifications,
   cefrLevelEnum,
   coCandidateModeEnum,
   sessionStatusEnum,
@@ -68,6 +70,18 @@ test('Schema: verifies all PostgreSQL tables and columns match prompt specificat
   assert.ok(usageLedger.sttAudioSeconds, 'usage_ledger.sttAudioSeconds exists');
   assert.ok(usageLedger.estimatedCostUsd, 'usage_ledger.estimatedCostUsd exists');
   assert.ok(usageLedger.createdAt, 'usage_ledger.createdAt exists');
+
+  // 5. notifications and user_notifications
+  assert.ok(notifications.id, 'notifications.id PK exists');
+  assert.ok(notifications.type, 'notifications.type exists');
+  assert.ok(notifications.titleNo, 'notifications.titleNo exists');
+  assert.ok(notifications.messageNo, 'notifications.messageNo exists');
+  assert.ok(notifications.targetAudience, 'notifications.targetAudience exists');
+
+  assert.ok(userNotifications.id, 'user_notifications.id PK exists');
+  assert.ok(userNotifications.userId, 'user_notifications.userId exists');
+  assert.ok(userNotifications.isRead, 'user_notifications.isRead exists');
+  assert.ok(userNotifications.dedupKey, 'user_notifications.dedupKey exists');
 });
 
 test('Schema: verifies all PostgreSQL enum values match specifications', () => {

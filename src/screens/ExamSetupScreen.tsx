@@ -25,6 +25,7 @@ import type {
 import type { LearningInsight } from '../types/learning-profile';
 import { TREND_ICON, TREND_LABEL_KEY } from '../lib/learning-profile-ui';
 import { openSupportEmail, usePublicLinks } from '../lib/public-links';
+import { NotificationCenterModal } from '../components/NotificationCenterModal';
 import {
   Screen,
   Logo,
@@ -34,6 +35,7 @@ import {
   Button,
   Icon,
   LanguageToggle,
+  NotificationBell,
   type IconName,
 } from '../components/ui';
 import { colors, radius, shadow, space, tierColors, type } from '../theme';
@@ -58,6 +60,7 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [learningInsight, setLearningInsight] = useState<LearningInsight | null>(null);
   const [isMenuOpen, setIsMenuOpen] = useState<boolean>(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState<boolean>(false);
   const insets = useSafeAreaInsets();
 
   const { user, dailyTestStatus, logout, deleteAccount, refreshProfile } = useAuth();
@@ -414,6 +417,10 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
             />
           )}
 
+          {user && (
+            <NotificationBell onPress={() => setIsNotificationsOpen(true)} />
+          )}
+
           <Pressable
             onPress={() => setIsMenuOpen(true)}
             style={({ pressed }) => [
@@ -441,6 +448,12 @@ export const ExamSetupScreen: React.FC<Props> = ({ navigation }) => {
           </Pressable>
         </View>
       </View>
+
+      <NotificationCenterModal
+        visible={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        onNavigate={(route) => navigation.navigate(route as any)}
+      />
 
       {/* Account & settings sheet: slides up from the bottom and scrolls, so it always fits on screen */}
       <Modal
