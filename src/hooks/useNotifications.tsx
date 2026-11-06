@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { AppState, type AppStateStatus } from 'react-native';
+import * as Notifications from 'expo-notifications';
 import { useAuth } from './useAuth';
 import {
   fetchUserNotifications,
@@ -9,6 +10,7 @@ import {
   type UserNotificationItem,
 } from '../api';
 import { requestNotificationPermission } from '../lib/notification-permissions';
+import { registerDevicePushToken } from '../lib/push-notifications';
 
 interface NotificationsContextType {
   notifications: UserNotificationItem[];
@@ -55,7 +57,9 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setIsLoading(true);
     refresh();
-    requestNotificationPermission().catch(() => {});
+    requestNotificationPermission()
+      .then(() => registerDevicePushToken())
+      .catch((err) => console.warn('[useNotifications] Push register failed:', err));
   }, [user, refresh]);
 
   // Refresh whenever app returns to foreground
@@ -67,6 +71,15 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
       }
     };
     const sub = AppState.addEventListener('change', handleAppStateChange);
+    return () => sub.remove();
+  }, [user, refresh]);
+
+  // Refresh inbox immediately when a push notification is received while app is foregrounded
+  useEffect(() => {
+    if (!user) return;
+    const sub = Notifications.addNotificationReceivedListener(() => {
+      refresh();
+    });
     return () => sub.remove();
   }, [user, refresh]);
 

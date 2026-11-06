@@ -26,6 +26,7 @@ import { PrivacyPolicyScreen } from './src/screens/PrivacyPolicyScreen';
 import { PaymentResultScreen } from './src/screens/PaymentResultScreen';
 import { addCustomerInfoListener, configurePurchases, logOutPurchases } from './src/lib/purchases';
 import { installWebAlert } from './src/lib/web-alert';
+import { subscribeToNotificationResponse } from './src/lib/push-notifications';
 import {
   captureReferralFromUrl,
   captureReferralOnFirstLaunch,
@@ -114,6 +115,28 @@ function AppNavigation() {
     const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
     return () => subscription.remove();
   }, [userId, isLoading]);
+
+  // Handle incoming notification banner tap from Android/iOS status bar or lockscreen
+  useEffect(() => {
+    const unsubscribe = subscribeToNotificationResponse((actionRoute) => {
+      if (!navigationRef.isReady()) return;
+      if (actionRoute === 'ExamSetup') {
+        navigationRef.navigate('ExamSetup');
+      } else if (actionRoute === 'Subscription') {
+        navigationRef.navigate('Subscription');
+      } else if (actionRoute === 'Referral') {
+        navigationRef.navigate('Referral');
+      } else if (actionRoute === 'LearningProfile') {
+        navigationRef.navigate('LearningProfile');
+      } else if (actionRoute === 'HowTo') {
+        navigationRef.navigate('HowTo');
+      }
+    });
+
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   if (isLoading || isLocaleLoading) {
     return (

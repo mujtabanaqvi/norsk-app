@@ -482,6 +482,27 @@ export const userNotifications = pgTable(
   ]
 );
 
+/**
+ * 15. user_push_tokens Table (Stores registered device tokens for mobile push notifications)
+ */
+export const userPushTokens = pgTable(
+  'user_push_tokens',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    userId: varchar('user_id', { length: 128 })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    token: text('token').notNull(),
+    platform: varchar('platform', { length: 16 }).notNull().default('android'),
+    createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex('uq_user_push_tokens_user_token').on(table.userId, table.token),
+    index('idx_user_push_tokens_user_id').on(table.userId),
+  ]
+);
+
 // Drizzle Relations
 export const usersRelations = relations(users, ({ many, one }) => ({
   oauthAccounts: many(oauthAccounts),
@@ -491,6 +512,7 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   referredRewards: many(referralRewards, { relationName: 'referred' }),
   promoRedemptions: many(promoRedemptions),
   notifications: many(userNotifications),
+  pushTokens: many(userPushTokens),
   referredBy: one(users, {
     fields: [users.referredByUserId],
     references: [users.id],
@@ -556,6 +578,13 @@ export const userNotificationsRelations = relations(userNotifications, ({ one })
   notification: one(notifications, {
     fields: [userNotifications.notificationId],
     references: [notifications.id],
+  }),
+}));
+
+export const userPushTokensRelations = relations(userPushTokens, ({ one }) => ({
+  user: one(users, {
+    fields: [userPushTokens.userId],
+    references: [users.id],
   }),
 }));
 
@@ -656,3 +685,6 @@ export type NewNotification = typeof notifications.$inferInsert;
 
 export type UserNotification = typeof userNotifications.$inferSelect;
 export type NewUserNotification = typeof userNotifications.$inferInsert;
+
+export type UserPushToken = typeof userPushTokens.$inferSelect;
+export type NewUserPushToken = typeof userPushTokens.$inferInsert;

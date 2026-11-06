@@ -3,10 +3,12 @@ import { db } from '@/src/db';
 import {
   notifications,
   userNotifications,
+  userPushTokens,
   users,
   examSessions,
   type Notification,
   type UserNotification,
+  type UserPushToken,
 } from '@/src/db/schema';
 import { getOsloDayKey } from './tier-policy';
 
@@ -29,6 +31,26 @@ export interface CreateBroadcastParams {
   targetAudience?: TargetAudience;
   targetUserId?: string;
   createdById?: string;
+  sendPush?: boolean;
+}
+
+export interface ExpoPushMessage {
+  to: string;
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  sound?: 'default' | null;
+  priority?: 'default' | 'normal' | 'high';
+  channelId?: string;
+}
+
+interface ExpoPushTicket {
+  status: 'ok' | 'error';
+  id?: string;
+  message?: string;
+  details?: {
+    error?: 'DeviceNotRegistered' | 'InvalidCredentials' | 'MessageTooBig' | 'MessageRateExceeded';
+  };
 }
 
 export interface NotificationStats {
@@ -124,6 +146,20 @@ export async function createBroadcastNotification(
     deliveredCount += userRows.length;
   }
 
+  // 4. Optionally dispatch mobile push notifications to registered devices
+  if (params.sendPush !== false) {
+    const userIds = eligibleUsers.map((u) => u.id);
+    sendPushToUsers(userIds, {
+      title: titleNo,
+      body: messageNo,
+      data: {
+        actionRoute,
+        type,
+        notificationId: createdNotification.id,
+      },
+    }).catch((err) => console.error('[createBroadcastNotification] Push dispatch error:', err));
+  }
+
   return { notification: createdNotification, deliveredCount };
 }
 
@@ -164,6 +200,18 @@ export async function sendDailyCreditsNotification(
         isRead: false,
       })
       .returning();
+
+    if (inserted) {
+      sendPushToUsers([userId], {
+        title: inserted.titleNo,
+        body: inserted.messageNo,
+        data: {
+          actionRoute: inserted.actionRoute,
+          type: inserted.type,
+          notificationId: inserted.id,
+        },
+      }).catch((err) => console.error('[sendDailyCreditsNotification] Push dispatch error:', err));
+    }
 
     return inserted;
   } catch (err: unknown) {
@@ -221,6 +269,18 @@ export async function sendPracticeReminderNotification(
       })
       .returning();
 
+    if (inserted) {
+      sendPushToUsers([userId], {
+        title: inserted.titleNo,
+        body: inserted.messageNo,
+        data: {
+          actionRoute: inserted.actionRoute,
+          type: inserted.type,
+          notificationId: inserted.id,
+        },
+      }).catch((err) => console.error('[sendPracticeReminderNotification] Push dispatch error:', err));
+    }
+
     return inserted;
   } catch (err: unknown) {
     const isConflict = typeof err === 'object' && err !== null && 'code' in err && (err as { code: string }).code === '23505';
@@ -276,6 +336,16 @@ export async function triggerDailyCreditsBroadcast(now = new Date()): Promise<{ 
 
     await db.insert(userNotifications).values(rows);
     sentCount += rows.length;
+  }
+
+  // Dispatch push to all notified users
+  if (toNotify.length > 0) {
+    const userIds = toNotify.map((u) => u.id);
+    sendPushToUsers(userIds, {
+      title: 'Daglige taleminutter er klare! ⚡',
+      body: 'Dine daglige taleminutter og prøver er fornyet for i dag. Ta en muntlig økt nå for å forbedre flyten.',
+      data: { actionRoute: 'ExamSetup', type: 'DAILY_CREDITS' },
+    }).catch((err) => console.error('[triggerDailyCreditsBroadcast] Push dispatch error:', err));
   }
 
   return { sentCount, eligibleUsers: activeUsers.length };
@@ -343,6 +413,17 @@ export async function triggerPracticeRemindersBroadcast(
 
     await db.insert(userNotifications).values(rows);
     sentCount += rows.length;
+  }
+
+  // Dispatch push to all eligible users
+  if (eligible.length > 0) {
+    const userIds = eligible.map((u) => u.id);
+    const daysLabelNo = daysThreshold === 1 ? '1 dag' : `${daysThreshold} dager`;
+    sendPushToUsers(userIds, {
+      title: 'Tid for litt norsktrening? 🎯',
+      body: `Det er over ${daysLabelNo} siden din forrige prøve. Jevnlig muntlig øving er nøkkelen til å bestå B1/B2!`,
+      data: { actionRoute: 'ExamSetup', type: 'PRACTICE_REMINDER' },
+    }).catch((err) => console.error('[triggerPracticeRemindersBroadcast] Push dispatch error:', err));
   }
 
   return { sentCount, evaluatedUsers: activeUsers.length };
@@ -474,4 +555,183 @@ export async function getAdminNotificationStats(
 
   return { items, total };
 }
+
+/**
+ * Registers (or updates) an Expo push token for an authenticated user.
+ */
+export async function registerUserPushToken(
+  userId: string,
+  token: string,
+  platform: 'android' | 'ios' | 'web' = 'android'
+): Promise<void> {
+  await db
+    .insert(userPushTokens)
+    .values({
+      userId,
+      token,
+      platform,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [userPushTokens.userId, userPushTokens.token],
+      set: {
+        platform,
+        updatedAt: new Date(),
+      },
+    });
+}
+
+/**
+ * Unregisters an Expo push token for a user (e.g. on logout or app reset).
+ */
+export async function unregisterUserPushToken(
+  userId: string,
+  token: string
+): Promise<boolean> {
+  const result = await db
+    .delete(userPushTokens)
+    .where(and(eq(userPushTokens.userId, userId), eq(userPushTokens.token, token)))
+    .returning({ id: userPushTokens.id });
+
+  return result.length > 0;
+}
+
+/**
+ * Returns total registered push tokens and unique users with active tokens.
+ */
+export async function getRegisteredPushTokensCount(): Promise<{
+  totalTokens: number;
+  uniqueUsers: number;
+}> {
+  const [tokensResult] = await db
+    .select({
+      totalTokens: sql<number>`count(*)::int`,
+      uniqueUsers: sql<number>`count(distinct ${userPushTokens.userId})::int`,
+    })
+    .from(userPushTokens);
+
+  return {
+    totalTokens: tokensResult?.totalTokens ?? 0,
+    uniqueUsers: tokensResult?.uniqueUsers ?? 0,
+  };
+}
+
+/**
+ * Low-level dispatcher to Expo's Push Notification REST API (https://exp.host/--/api/v2/push/send).
+ * Sends messages in chunks of up to 100 per request, and automatically prunes DeviceNotRegistered tokens.
+ */
+export async function sendExpoPushNotifications(
+  messages: ExpoPushMessage[]
+): Promise<{ sent: number; failed: number }> {
+  if (!messages || messages.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  // Filter messages with valid Expo push token formats
+  const validMessages = messages.filter((m) =>
+    typeof m.to === 'string' && /^(?:ExponentPushToken|ExpoPushToken)\[.+\]$/.test(m.to)
+  );
+
+  if (validMessages.length === 0) {
+    return { sent: 0, failed: messages.length };
+  }
+
+  const batchSize = 100;
+  let sent = 0;
+  let failed = messages.length - validMessages.length;
+  const deadTokens: string[] = [];
+
+  for (let i = 0; i < validMessages.length; i += batchSize) {
+    const chunk = validMessages.slice(i, i + batchSize);
+    try {
+      const response = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+        body: JSON.stringify(chunk),
+      });
+
+      if (!response.ok) {
+        console.error(`[ExpoPush] HTTP error ${response.status}: ${await response.text().catch(() => '')}`);
+        failed += chunk.length;
+        continue;
+      }
+
+      const result = (await response.json()) as { data?: ExpoPushTicket[] };
+      const tickets = result.data || [];
+
+      tickets.forEach((ticket, idx) => {
+        if (ticket.status === 'ok') {
+          sent++;
+        } else {
+          failed++;
+          if (ticket.details?.error === 'DeviceNotRegistered') {
+            const badToken = chunk[idx]?.to;
+            if (badToken) deadTokens.push(badToken);
+          }
+        }
+      });
+    } catch (err) {
+      console.error('[ExpoPush] Dispatch exception:', err);
+      failed += chunk.length;
+    }
+  }
+
+  // Clean up any uninstalled/unregistered tokens
+  if (deadTokens.length > 0) {
+    try {
+      await db.delete(userPushTokens).where(inArray(userPushTokens.token, deadTokens));
+      console.log(`[ExpoPush] Cleaned up ${deadTokens.length} dead device token(s)`);
+    } catch (cleanupErr) {
+      console.warn('[ExpoPush] Failed cleaning dead tokens:', cleanupErr);
+    }
+  }
+
+  return { sent, failed };
+}
+
+/**
+ * Sends push notifications to all registered device tokens belonging to the specified user IDs.
+ */
+export async function sendPushToUsers(
+  userIds: string[],
+  payload: { title: string; body: string; data?: Record<string, unknown> }
+): Promise<{ sent: number; failed: number }> {
+  if (!userIds || userIds.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  // Fetch registered push tokens for these users in batches
+  const batchSize = 500;
+  const allTokens: string[] = [];
+
+  for (let i = 0; i < userIds.length; i += batchSize) {
+    const chunk = userIds.slice(i, i + batchSize);
+    const tokenRows = await db
+      .select({ token: userPushTokens.token })
+      .from(userPushTokens)
+      .where(inArray(userPushTokens.userId, chunk));
+    allTokens.push(...tokenRows.map((r) => r.token));
+  }
+
+  if (allTokens.length === 0) {
+    return { sent: 0, failed: 0 };
+  }
+
+  const messages: ExpoPushMessage[] = allTokens.map((token) => ({
+    to: token,
+    title: payload.title,
+    body: payload.body,
+    data: payload.data,
+    sound: 'default',
+    priority: 'high',
+    channelId: 'default',
+  }));
+
+  return sendExpoPushNotifications(messages);
+}
+
 

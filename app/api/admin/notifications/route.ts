@@ -4,6 +4,7 @@ import { verifyAdminRequest } from '@/lib/admin-auth';
 import {
   createBroadcastNotification,
   getAdminNotificationStats,
+  getRegisteredPushTokensCount,
 } from '@/lib/notification-service';
 
 const createBroadcastSchema = z.object({
@@ -17,6 +18,7 @@ const createBroadcastSchema = z.object({
   actionRoute: z.string().trim().optional(),
   targetAudience: z.enum(['ALL', 'FREE', 'STANDARD', 'PREMIUM', 'CUSTOM']).default('ALL'),
   targetUserId: z.string().trim().optional(),
+  sendPush: z.boolean().default(true),
 });
 
 export async function GET(req: NextRequest) {
@@ -30,8 +32,12 @@ export async function GET(req: NextRequest) {
     const limit = parseInt(searchParams.get('limit') || '50', 10);
     const offset = parseInt(searchParams.get('offset') || '0', 10);
 
-    const { items, total } = await getAdminNotificationStats(limit, offset);
-    return NextResponse.json({ items, total });
+    const [{ items, total }, pushStats] = await Promise.all([
+      getAdminNotificationStats(limit, offset),
+      getRegisteredPushTokensCount(),
+    ]);
+
+    return NextResponse.json({ items, total, pushStats });
   } catch (error) {
     console.error('[GET /api/admin/notifications] Error:', error);
     return NextResponse.json(

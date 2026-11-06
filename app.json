@@ -31,6 +31,7 @@
     },
     "android": {
       "package": "com.snakkly.app",
+      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
@@ -61,6 +62,13 @@
         "expo-audio",
         {
           "microphonePermission": "Norskprøven muntlig simulator trenger tilgang til mikrofonen for å vurdere din muntlige uttale og flyt."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/brand/icon-maskable-512.png",
+          "color": "#BA0C2F"
         }
       ],
       "expo-secure-store",

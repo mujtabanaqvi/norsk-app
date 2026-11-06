@@ -81,6 +81,7 @@ const TEMPLATES = [
 
 export function NotificationsPanel({ request, notify, onCountChange }: NotificationsPanelProps) {
   const [items, setItems] = useState<NotificationItem[]>([]);
+  const [pushStats, setPushStats] = useState<{ totalTokens: number; uniqueUsers: number } | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isComposeOpen, setIsComposeOpen] = useState<boolean>(false);
   const [isSending, setIsSending] = useState<boolean>(false);
@@ -97,6 +98,7 @@ export function NotificationsPanel({ request, notify, onCountChange }: Notificat
   const [formMessageNo, setFormMessageNo] = useState<string>('');
   const [formMessageEn, setFormMessageEn] = useState<string>('');
   const [formRoute, setFormRoute] = useState<string>('ExamSetup');
+  const [formSendPush, setFormSendPush] = useState<boolean>(true);
 
   const loadNotifications = useCallback(async () => {
     setIsLoading(true);
@@ -104,6 +106,7 @@ export function NotificationsPanel({ request, notify, onCountChange }: Notificat
       const data = await request('/api/admin/notifications', 'GET');
       const list: NotificationItem[] = Array.isArray(data.items) ? data.items : [];
       setItems(list);
+      if (data.pushStats) setPushStats(data.pushStats);
       if (onCountChange) onCountChange(data.total ?? list.length);
     } catch (err) {
       notify.error(err instanceof Error ? err.message : 'Kunne ikke laste varsler');
@@ -151,6 +154,7 @@ export function NotificationsPanel({ request, notify, onCountChange }: Notificat
         messageNo: formMessageNo.trim(),
         messageEn: formMessageEn.trim() || undefined,
         actionRoute: formRoute || undefined,
+        sendPush: formSendPush,
       });
 
       notify.success(`Varsel sendt! Levert til ${res.deliveredCount ?? 0} brukere.`);
@@ -275,6 +279,29 @@ export function NotificationsPanel({ request, notify, onCountChange }: Notificat
             </button>
           </div>
         </div>
+
+        {pushStats && (
+          <div
+            style={{
+              paddingTop: 10,
+              borderTop: `1px solid ${colors.border}`,
+              display: 'flex',
+              gap: 20,
+              flexWrap: 'wrap',
+              fontSize: 12,
+              color: colors.muted,
+            }}
+          >
+            <div>
+              📱 Registrerte mobilenheter:{' '}
+              <strong style={{ color: colors.text }}>{pushStats.totalTokens}</strong>
+            </div>
+            <div>
+              👥 Brukere med push-varsler:{' '}
+              <strong style={{ color: colors.text }}>{pushStats.uniqueUsers}</strong>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Notification Broadcasts Table */}
@@ -533,6 +560,25 @@ export function NotificationsPanel({ request, notify, onCountChange }: Notificat
               <option value="">Ingen spesiell handling</option>
             </select>
           </div>
+
+          <label
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              cursor: 'pointer',
+              fontSize: 13,
+              color: colors.text,
+              marginTop: 4,
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={formSendPush}
+              onChange={(e) => setFormSendPush(e.target.checked)}
+            />
+            <span>Send også som push-varsel til mobil (låseskjerm / varsellinje)</span>
+          </label>
 
           <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 16 }}>
             <button

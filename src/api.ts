@@ -657,3 +657,28 @@ export async function deleteNotification(id: string): Promise<void> {
     throw new ApiError(res.status, data, tr('common.unknownError'));
   }
 }
+
+export async function registerPushTokenApi(token: string, platform: string): Promise<void> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/notifications/push-token`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ token, platform }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data, tr('common.unknownError'));
+  }
+}
+
+export async function unregisterPushTokenApi(token: string): Promise<void> {
+  const res = await fetchWithTimeout(`${activeApiBaseUrl}/api/notifications/push-token`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ token }),
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new ApiError(res.status, data, tr('common.unknownError'));
+  }
+}
+
