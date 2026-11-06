@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "431083080132",
+    "project_id": "snakkly",
+    "storage_bucket": "snakkly.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:431083080132:android:896f49dbbf267ea4267c91",
+        "android_client_info": {
+          "package_name": "com.snakkly.app"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "431083080132-mogl565icej17ost1a57hlvlrn3f99r2.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAfDFeMv4joX1SxRMlQQLsqB2-WO_LVFZM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "431083080132-mogl565icej17ost1a57hlvlrn3f99r2.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
