@@ -31,7 +31,6 @@
     },
     "android": {
       "package": "com.snakkly.app",
-      "googleServicesFile": "./google-services.json",
       "intentFilters": [
         {
           "action": "VIEW",
