@@ -152,3 +152,4 @@ Located at [`app/admin/_components/NotificationsPanel.tsx`](../app/admin/_compon
 ### Apple App Store (iOS / APNs)
 - Run `eas build --platform ios`. EAS will prompt to automatically generate and register the **Apple Push Notification service key (.p8)** with your Apple Developer account.
 - Alternatively, upload an APNs `.p8` key manually under **Credentials** → **iOS** in the Expo dashboard.
+
