@@ -34,6 +34,11 @@ This repository contains the full-stack infrastructure and cross-platform mobile
 `STT_PROVIDER` can be combined freely with either `AI_PROVIDER`. See [docs/AZURE_AI_FOUNDRY_SETUP.md](docs/AZURE_AI_FOUNDRY_SETUP.md).
 - **Post-Exam CEFR Rubric Grading (`src/lib/evaluate-exam.ts`)**:
   - Scores candidate performance against 4 official HK-dir criteria (*Formidling & flyt*, *Uttale & forståelighet*, *Ordforråd*, *Grammatikk & setningsstruktur*) using OpenAI `gpt-4o` scheduled via Next.js `after()`, evaluating the candidate against the exact Del 1 monologue, Del 2 discussion, and randomly chosen Del 3 follow-up questions for their session.
+- **In-App & Mobile Push Notifications (`lib/notification-service.ts`, `docs/NOTIFICATIONS_AND_PUSH.md`)**:
+  - Full-stack notification system with in-app bell center (unread count badges, mark as read, delete, shortcuts).
+  - Mobile lockscreen and status bar push notifications (Android and iOS) via 100% free Expo Push Notification Service (`https://exp.host/--/api/v2/push/send`).
+  - Automated daily credits refresh and inactivity practice reminders with calendar-day deduplication protection.
+  - Admin management portal (`/admin#notifications`) with quick templates, target audience segmentation, and live push device metrics.
 
 ---
 

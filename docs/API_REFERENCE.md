@@ -204,4 +204,79 @@ Protected by the `x-admin-secret` header (checked against `process.env.ADMIN_SEC
 - **`GET /api/admin/config`**: Returns current tier policies (`tiers`) and referral parameters (`referral: { bonusDailyTests, durationDays }`).
 - **`PUT /api/admin/config`**: Updates a tier limit, fallback price label (users are charged the store / Web Billing price), and feature array (`tier`, `dailyTestLimit`, `priceCents`, `currency`, `features: string[]`), or updates referral bonus parameters (`bonusDailyTests`, `durationDays`). Saves directly to `tier_configs` and `system_configs`.
 
+### 10.3 Notifications Management (`/api/admin/notifications`)
+- **`GET /api/admin/notifications`**: Returns past broadcast history with delivery counts, read counts, read rates (%), and mobile device statistics (`pushStats: { totalTokens, uniqueUsers }`). Query: `limit`, `offset`.
+- **`POST /api/admin/notifications`**: Dispatches a broadcast or targeted announcement. Body:
+  ```json
+  {
+    "type": "ANNOUNCEMENT",
+    "targetAudience": "ALL | FREE | STANDARD | PREMIUM | CUSTOM",
+    "targetUserId": "uuid (optional when CUSTOM)",
+    "titleNo": "Tittel på norsk",
+    "titleEn": "English Title (optional)",
+    "messageNo": "Meldingstekst på norsk",
+    "messageEn": "English body (optional)",
+    "actionRoute": "ExamSetup | Subscription | Referral | LearningProfile",
+    "sendPush": true
+  }
+  ```
+- **`POST /api/admin/notifications/triggers`**: Triggers automated recurring broadcasts. Body:
+  - `{ "action": "TRIGGER_DAILY_CREDITS" }`: Sends daily credit refresh notifications to eligible users who haven't received one today.
+  - `{ "action": "TRIGGER_PRACTICE_REMINDERS", "daysThreshold": 2 }`: Sends motivational reminders to users inactive for >= N days.
+
+---
+
+## 11. Notifications & Mobile Push Endpoints (`/api/notifications/*`)
+User inbox and device push token registration endpoints. All require a valid user session or Bearer JWT token.
+
+### 11.1 `GET /api/notifications`
+Returns the user's notification list and unread badge count. Opportunistically issues the daily credit refresh notification for today if not already received.
+- Query: `unreadOnly=true|false`, `limit` (default 30, max 100), `offset`.
+- Response:
+  ```json
+  {
+    "notifications": [
+      {
+        "id": "...",
+        "type": "DAILY_CREDITS",
+        "titleNo": "Daglige taleminutter er klare! ⚡",
+        "titleEn": "Daily speaking minutes refreshed! ⚡",
+        "messageNo": "Dine daglige taleminutter og prøver er fornyet for i dag...",
+        "messageEn": "Your daily speaking minutes...",
+        "actionRoute": "ExamSetup",
+        "isRead": false,
+        "readAt": null,
+        "createdAt": "2026-11-06T08:00:00.000Z"
+      }
+    ],
+    "unreadCount": 1
+  }
+  ```
+
+### 11.2 `PATCH /api/notifications`
+Marks all notifications as read for the authenticated user. Body: `{ "readAll": true }`. Returns `{ success: true, updatedCount }`.
+
+### 11.3 `PATCH /api/notifications/[id]`
+Marks a single notification as read. Returns `{ success: true }`.
+
+### 11.4 `DELETE /api/notifications/[id]`
+Deletes a notification from the user's inbox. Returns `{ success: true }`.
+
+### 11.5 `POST /api/notifications/push-token`
+Registers or updates an Expo push token for the authenticated device.
+- Body:
+  ```json
+  {
+    "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]",
+    "platform": "android | ios | web"
+  }
+  ```
+- Response: `{ "success": true, "message": "Push token registered successfully" }`.
+
+### 11.6 `DELETE /api/notifications/push-token`
+Unregisters a push token (called on logout or app reset).
+- Body: `{ "token": "ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]" }`.
+- Response: `{ "success": true, "removed": true }`.
+
+
 

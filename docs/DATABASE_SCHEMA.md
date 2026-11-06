@@ -260,6 +260,55 @@ One row per user per redeemed code.
 | `subscription_id` | `UUID` | `NULLABLE`, `FK -> subscriptions(id)`, set null on delete | The `PROMO` subscription row it created. |
 | `redeemed_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Redemption time. |
 
+### 2.12 `notifications`
+Admin broadcast announcements, promotional campaigns, and master system notifications.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Unique notification ID. |
+| `type` | `VARCHAR(32)` | `NOT NULL`, `DEFAULT 'ANNOUNCEMENT'` | Type: `DAILY_CREDITS`, `PRACTICE_REMINDER`, `ANNOUNCEMENT`, `PROMOTION`, `SYSTEM`. |
+| `title_no` | `TEXT` | `NOT NULL` | Norwegian title. |
+| `title_en` | `TEXT` | `NOT NULL` | English title fallback. |
+| `message_no` | `TEXT` | `NOT NULL` | Norwegian notification message body. |
+| `message_en` | `TEXT` | `NOT NULL` | English notification message body. |
+| `action_route` | `VARCHAR(64)` | `NULLABLE` | Deep-link target route (e.g. `ExamSetup`, `Subscription`, `Referral`). |
+| `target_audience` | `VARCHAR(32)` | `NOT NULL`, `DEFAULT 'ALL'` | Target: `ALL`, `FREE`, `STANDARD`, `PREMIUM`, `CUSTOM`. |
+| `target_user_id` | `VARCHAR(128)` | `NULLABLE`, `FK -> "user"(id)` | Single target user ID when `target_audience = 'CUSTOM'`. |
+| `created_by_id` | `VARCHAR(128)` | `NULLABLE` | Admin or system user ID who created the broadcast. |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Timestamps. |
+
+### 2.13 `user_notifications`
+User inbox entries for in-app notification center and delivery tracking.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Inbox entry ID. |
+| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> "user"(id)`, cascade delete | Recipient user ID. |
+| `notification_id` | `UUID` | `NULLABLE`, `FK -> notifications(id)`, cascade delete | Parent broadcast ID if broadcast-derived. |
+| `type` | `VARCHAR(32)` | `NOT NULL`, `DEFAULT 'ANNOUNCEMENT'` | Notification category. |
+| `title_no` / `title_en` | `TEXT` | `NOT NULL` | Snapshot of localized titles. |
+| `message_no` / `message_en` | `TEXT` | `NOT NULL` | Snapshot of localized messages. |
+| `action_route` | `VARCHAR(64)` | `NULLABLE` | In-app navigation route. |
+| `is_read` | `BOOLEAN` | `NOT NULL`, `DEFAULT false` | Read status. |
+| `read_at` | `TIMESTAMPTZ` | `NULLABLE` | Timestamp when user marked as read. |
+| `dedup_key` | `VARCHAR(128)` | `NULLABLE` | Dedup key (e.g. `daily_credits:2026-11-06:usr_123`) to prevent duplicate daily deliveries. |
+| `created_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Delivery timestamp. |
+
+*Indexes*: `idx_user_notifications_user_id`, `idx_user_notifications_is_read`, `uq_user_notifications_dedup` (unique on `(user_id, dedup_key)`).
+
+### 2.14 `user_push_tokens`
+Stores Expo mobile device push tokens for remote lockscreen and notification tray delivery.
+
+| Column | Type | Constraints | Description |
+| :--- | :--- | :--- | :--- |
+| `id` | `UUID` | `PRIMARY KEY`, `DEFAULT gen_random_uuid()` | Token record ID. |
+| `user_id` | `VARCHAR(128)` | `NOT NULL`, `FK -> "user"(id)`, cascade delete | Authenticated user ID owning the device. |
+| `token` | `TEXT` | `NOT NULL` | Expo push token (`ExponentPushToken[...]` or `ExpoPushToken[...]`). |
+| `platform` | `VARCHAR(16)` | `NOT NULL`, `DEFAULT 'android'` | Operating system (`android`, `ios`, `web`). |
+| `created_at` / `updated_at` | `TIMESTAMPTZ` | `NOT NULL`, `DEFAULT now()` | Timestamps. |
+
+*Indexes*: `idx_user_push_tokens_user_id`, `uq_user_push_tokens_user_token` (unique on `(user_id, token)` for conflict-free upserting).
+
 ---
 
 ## 3. JSONB Data Structures

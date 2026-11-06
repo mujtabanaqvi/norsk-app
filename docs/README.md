@@ -18,8 +18,9 @@ Welcome to the documentation for the **Norskprøven Muntlig B1/B2 Practice Simul
 | **[5. User Module, Subscriptions & Configuration](./USER_MODULE_AND_CONFIGURATION.md)** | User authentication (Better Auth), subscriptions (RevenueCat: App Store, Google Play and Web Billing/Stripe — see [PAYMENTS.md](./PAYMENTS.md)), daily test calendar quotas, referral reward engine, and how to update configurable limits. |
 | **[6. Billing, Costs & Quota Ledger](./BILLING_AND_USAGE.md)** | Pricing formulas for the LLM, STT (OpenAI / Azure AI Speech), and TTS, plus atomic quota transactions. |
 | **[7. HK-dir B1/B2 Rubric Evaluation Engine](./EXAM_RUBRIC_EVALUATION.md)** | Official 4 HK-dir criteria (1–10 scale), bilingual feedback, concrete improvements, and GPT-4o execution lifecycle. |
+| **[8. Notifications & Mobile Push System](./NOTIFICATIONS_AND_PUSH.md)** | In-App Notification Center, Expo Push Notification Service, daily credits & practice inactivity automation, admin broadcast controls, and Google FCM v1 / Apple APNs credentials. |
 | **[Payments & Subscriptions (RevenueCat)](./PAYMENTS.md)** | Step-by-step setup of the Standard/Premium products in the App Store, Google Play and RevenueCat Web Billing (Stripe), RevenueCat wiring, env vars, testing, and how the payment code works. |
-| **[8. Publishing to Google Play](./GOOGLE_PLAY_RELEASE.md)** | From-scratch release checklist: developer account, app signing, Play subscriptions and RevenueCat, store listing, data safety, testing and review. |
+| **[9. Publishing to Google Play](./GOOGLE_PLAY_RELEASE.md)** | From-scratch release checklist: developer account, app signing, Play subscriptions and RevenueCat, store listing, data safety, testing and review. |
 
 ---
 
