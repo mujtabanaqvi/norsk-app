@@ -8,6 +8,7 @@ import {
   deleteNotification,
   type UserNotificationItem,
 } from '../api';
+import { requestNotificationPermission } from '../lib/notification-permissions';
 
 interface NotificationsContextType {
   notifications: UserNotificationItem[];
@@ -54,6 +55,7 @@ export const NotificationsProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     setIsLoading(true);
     refresh();
+    requestNotificationPermission().catch(() => {});
   }, [user, refresh]);
 
   // Refresh whenever app returns to foreground

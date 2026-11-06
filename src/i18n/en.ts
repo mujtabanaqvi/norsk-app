@@ -757,6 +757,9 @@ export const en: Translations = {
     actionUpgrade: 'View plans',
     deleteNotification: 'Delete notification',
     creditsRefreshedTitle: 'Daily speaking minutes refreshed! ⚡',
+    permissionBannerTitle: 'Get speaking minutes alerts',
+    permissionBannerBody: 'Enable notifications to know when daily credits are refreshed.',
+    enableNotifications: 'Enable',
     practiceReminderTitle: 'Time for some Norwegian practice? 🎯',
   },
 };

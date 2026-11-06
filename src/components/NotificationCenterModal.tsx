@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -15,6 +15,10 @@ import { useLocale } from '../hooks/useLocale';
 import { Icon, type IconName } from './ui';
 import { colors, radius, shadow, space, type } from '../theme';
 import type { UserNotificationItem } from '../api';
+import {
+  checkNotificationPermission,
+  requestNotificationPermission,
+} from '../lib/notification-permissions';
 
 interface NotificationCenterModalProps {
   visible: boolean;
@@ -48,6 +52,19 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
   const { t, locale } = useLocale();
   const insets = useSafeAreaInsets();
   const [filter, setFilter] = useState<'all' | 'unread'>('all');
+  const [hasDevicePermission, setHasDevicePermission] = useState<boolean>(true);
+
+  // Check device notification permission when modal opens
+  useEffect(() => {
+    if (visible) {
+      checkNotificationPermission().then(setHasDevicePermission);
+    }
+  }, [visible]);
+
+  const handleRequestPermission = async () => {
+    const granted = await requestNotificationPermission();
+    setHasDevicePermission(granted);
+  };
 
   const filteredItems = useMemo(() => {
     if (filter === 'unread') {
@@ -56,10 +73,12 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
     return notifications;
   }, [notifications, filter]);
 
-  const formatRelativeTime = (isoString: string): string => {
+  const formatRelativeTime = (isoString?: string | null): string => {
+    if (!isoString) return '';
     try {
       const then = new Date(isoString).getTime();
-      const diffMs = Date.now() - then;
+      if (isNaN(then)) return '';
+      const diffMs = Math.max(0, Date.now() - then);
       const diffMins = Math.floor(diffMs / 60000);
       if (diffMins < 1) return t('notifications.justNow');
       if (diffMins < 60) return t('notifications.minutesAgo', { minutes: diffMins });
@@ -108,7 +127,6 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
             styles.sheet,
             {
               paddingBottom: Math.max(insets.bottom, space.md),
-              maxHeight: Platform.OS === 'web' ? '85%' : '80%',
             },
           ]}
         >
@@ -144,6 +162,34 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
               </Pressable>
             </View>
           </View>
+
+          {/* System notification permission banner if blocked on device */}
+          {!hasDevicePermission && (
+            <View style={styles.permissionBanner}>
+              <View style={styles.permissionBannerIcon}>
+                <Icon name="notifications-outline" size={18} color={colors.navy} />
+              </View>
+              <View style={styles.permissionBannerText}>
+                <Text style={styles.permissionBannerTitle}>
+                  {t('notifications.permissionBannerTitle')}
+                </Text>
+                <Text style={styles.permissionBannerBody}>
+                  {t('notifications.permissionBannerBody')}
+                </Text>
+              </View>
+              <Pressable
+                onPress={handleRequestPermission}
+                style={({ pressed }) => [
+                  styles.permissionBannerBtn,
+                  pressed && styles.pressedOpacity,
+                ]}
+              >
+                <Text style={styles.permissionBannerBtnText}>
+                  {t('notifications.enableNotifications')}
+                </Text>
+              </Pressable>
+            </View>
+          )}
 
           {/* Filter Segment */}
           <View style={styles.filterRow}>
@@ -190,8 +236,14 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
             ) : (
               filteredItems.map((item) => {
                 const cfg = getCategoryConfig(item.type);
-                const title = locale === 'en' && item.titleEn ? item.titleEn : item.titleNo;
-                const message = locale === 'en' && item.messageEn ? item.messageEn : item.messageNo;
+                const title =
+                  (locale === 'en' && item.titleEn ? item.titleEn : item.titleNo) ||
+                  item.titleNo ||
+                  '';
+                const message =
+                  (locale === 'en' && item.messageEn ? item.messageEn : item.messageNo) ||
+                  item.messageNo ||
+                  '';
 
                 return (
                   <Pressable
@@ -228,7 +280,10 @@ export const NotificationCenterModal: React.FC<NotificationCenterModalProps> = (
                         )}
 
                         <Pressable
-                          onPress={() => removeNotification(item.id)}
+                          onPress={(e) => {
+                            e.stopPropagation?.();
+                            removeNotification(item.id);
+                          }}
                           hitSlop={8}
                           accessibilityLabel={t('notifications.deleteNotification')}
                           style={({ pressed }) => [styles.deleteBtn, pressed && styles.pressedOpacity]}
@@ -263,6 +318,9 @@ const styles = StyleSheet.create({
   sheet: {
     width: '100%',
     maxWidth: 520,
+    height: Platform.OS === 'web' ? '80%' : '72%',
+    minHeight: 380,
+    maxHeight: '88%',
     backgroundColor: colors.bg,
     borderTopLeftRadius: radius.xl,
     borderTopRightRadius: radius.xl,
@@ -324,6 +382,51 @@ const styles = StyleSheet.create({
   pressedOpacity: {
     opacity: 0.6,
   },
+  permissionBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.navySoft,
+    borderRadius: radius.md,
+    padding: space.sm,
+    marginBottom: space.sm,
+    gap: space.sm,
+  },
+  permissionBannerIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.bg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  permissionBannerText: {
+    flex: 1,
+  },
+  permissionBannerTitle: {
+    ...type.caption,
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.navy,
+  },
+  permissionBannerBody: {
+    ...type.caption,
+    fontSize: 11,
+    color: colors.textSecondary,
+    lineHeight: 14,
+    marginTop: 1,
+  },
+  permissionBannerBtn: {
+    backgroundColor: colors.navy,
+    paddingHorizontal: space.sm,
+    paddingVertical: 6,
+    borderRadius: radius.sm,
+  },
+  permissionBannerBtnText: {
+    ...type.caption,
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.white,
+  },
   filterRow: {
     flexDirection: 'row',
     backgroundColor: colors.surface,
@@ -354,17 +457,21 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flex: 1,
+    width: '100%',
   },
   scrollContent: {
     gap: space.sm,
-    paddingBottom: space.lg,
+    paddingBottom: space.xl,
+    flexGrow: 1,
   },
   loadingWrap: {
+    flex: 1,
     paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
   },
   emptyWrap: {
+    flex: 1,
     paddingVertical: 40,
     alignItems: 'center',
     justifyContent: 'center',
@@ -477,4 +584,3 @@ const styles = StyleSheet.create({
     backgroundColor: colors.red,
   },
 });
-

@@ -769,6 +769,9 @@ export const nb = {
     actionUpgrade: 'Se abonnement',
     deleteNotification: 'Slett varsel',
     creditsRefreshedTitle: 'Daglige taleminutter er klare! ⚡',
+    permissionBannerTitle: 'Få varsler om nye taleminutter',
+    permissionBannerBody: 'Aktiver varsler for å få beskjed når daglige kreditter er klare.',
+    enableNotifications: 'Aktiver',
     practiceReminderTitle: 'Tid for litt norsktrening? 🎯',
   },
 };
